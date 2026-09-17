@@ -237,3 +237,18 @@ export function kvKeysWithPrefix(prefix: string): string[] {
 export function kvEntries(): Array<{ key: string; value: string }> {
     return Array.from(_cache.entries()).map(([key, value]) => ({ key, value }));
 }
+
+/** Atomic fresh read/modify/write for plugin ledgers. Does not use stale tab caches. */
+export async function kvUpdateAtomic<T>(key: string, update: (value: string | null) => { value: string; result: T }): Promise<T> {
+    if (!_hydrated) throw new Error("Storage is not hydrated");
+    let committed = "";
+    const result = await kvDb.transaction("rw", kvDb.entries, async () => {
+        const row = await kvDb.entries.get(key);
+        const next = update(row?.value ?? null);
+        committed = next.value;
+        if (committed !== row?.value) await kvDb.entries.put({ key, value: committed });
+        return next.result;
+    });
+    _cache.set(key, committed);
+    return result;
+}

@@ -119,6 +119,20 @@ const RICH_PATTERNS: {
         }),
     },
     {
+        // Optional stable instance reference. Still a native gift card/event.
+        regex: /\[礼物实例[：:]([^\]：:]+)(?:[：:]([^\]]+))?\]/,
+        build: (m) => ({
+            content: "",
+            mediaType: "gift" as const,
+            mediaData: {
+                giftInstanceId: m[1].trim(),
+                recipientName: m[2]?.trim(),
+                giftOwnershipStatus: "pending" as const,
+                giftSentAt: new Date().toISOString(),
+            },
+        }),
+    },
+    {
         // 群聊赠礼：[礼物:商品名:收礼人]，兼容旧格式：[礼物:商品名:送给收礼人]
         regex: new RegExp(`\\[礼物${C}([^\\]：:]+)${C}(?:送给)?([^\\]]+)\\]`),
         build: (m) => {

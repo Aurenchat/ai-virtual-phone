@@ -1,15 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { loadNativeGifts, NATIVE_GIFTS_CHANGED, type NativeGiftCandidate } from "@/lib/native-gift-bridge";
 import { Gift, PackageCheck, Search, UserRound, X } from "lucide-react";
 import type { Character } from "@/lib/character-types";
-import type { ShoppingGiftCandidate } from "@/lib/shopping-gift-utils";
 
 type GiftPickerModalProps = {
-    gifts: ShoppingGiftCandidate[];
+    initialItemId?: string;
+    sendLabel?: string;
     isGroup?: boolean;
     recipients?: Character[];
-    onSend: (gift: ShoppingGiftCandidate, recipient?: Character) => void;
+    onSend: (gift: NativeGiftCandidate, recipient?: Character) => void | Promise<void>;
     onClose: () => void;
 };
 
@@ -17,29 +18,54 @@ function normalizeSearchText(value: string): string {
     return value.trim().toLowerCase();
 }
 
-export function GiftPickerModal({ gifts, isGroup, recipients = [], onSend, onClose }: GiftPickerModalProps) {
+export function GiftPickerModal({ initialItemId, sendLabel = "送出", isGroup, recipients = [], onSend, onClose }: GiftPickerModalProps) {
+    const [gifts, setGifts] = useState<NativeGiftCandidate[]>([]);
+    const [source, setSource] = useState<"shopping" | "backpack">(initialItemId ? "backpack" : "shopping");
+    const [busy, setBusy] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    useEffect(() => {
+        let active = true;
+        let generation = 0;
+        const refresh = async () => {
+            const current = ++generation;
+            try {
+                const next = await loadNativeGifts();
+                if (active && current === generation) { setGifts(next); setError(""); }
+            } catch (e) {
+                if (active && current === generation) { setGifts([]); setError(e instanceof Error ? e.message : String(e)); }
+            } finally { if (active && current === generation) setLoading(false); }
+        };
+        void refresh();
+        window.addEventListener(NATIVE_GIFTS_CHANGED, refresh);
+        window.addEventListener("shopping-state-updated", refresh);
+        return () => { active = false; window.removeEventListener(NATIVE_GIFTS_CHANGED, refresh); window.removeEventListener("shopping-state-updated", refresh); };
+    }, []);
     const [query, setQuery] = useState("");
-    const [selectedGiftId, setSelectedGiftId] = useState(gifts[0]?.id ?? "");
+    const [selectedGiftId, setSelectedGiftId] = useState(initialItemId ?? "");
     const [selectedRecipientId, setSelectedRecipientId] = useState(recipients[0]?.id ?? "");
 
     const filteredGifts = useMemo(() => {
         const normalized = normalizeSearchText(query);
-        if (!normalized) return gifts;
-        return gifts.filter(gift => [
+        const candidates = gifts.filter(gift => source === "backpack" ? Boolean(gift.providerId) : gift.giftSource === "shopping");
+        if (!normalized) return candidates;
+        return candidates.filter(gift => [
             gift.productName,
             gift.merchantLabel,
             gift.subtitle,
             gift.detail,
             gift.priceLabel,
         ].some(field => field.toLowerCase().includes(normalized)));
-    }, [gifts, query]);
+    }, [gifts, query, source]);
 
-    const selectedGift = filteredGifts.find(gift => gift.id === selectedGiftId) ?? filteredGifts[0] ?? null;
+    const selectedGift = selectedGiftId
+        ? filteredGifts.find(gift => gift.id === selectedGiftId || gift.inventoryItemId === selectedGiftId) ?? null
+        : filteredGifts[0] ?? null;
     const selectedRecipient = recipients.find(recipient => recipient.id === selectedRecipientId);
-    const canSend = Boolean(selectedGift && (!isGroup || selectedRecipient));
+    const canSend = Boolean(!busy && !loading && !error && selectedGift && (!isGroup || selectedRecipient));
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="送出礼物" onClick={() => { if (!busy) onClose(); }}>
             <div
                 onClick={e => e.stopPropagation()}
                 className="w-[340px] max-w-[calc(100vw-32px)] max-h-[78vh] rounded-[24px] text-[var(--c-text)] overflow-hidden flex flex-col"
@@ -58,13 +84,13 @@ export function GiftPickerModal({ gifts, isGroup, recipients = [], onSend, onClo
                         </div>
                         <div className="min-w-0">
                             <div className="ts-16 font-semibold">送出礼物</div>
-                            <div className="ts-11 text-[var(--c-icon)] truncate">来自已到货购物订单</div>
+                            <div className="ts-11 text-[var(--c-icon)] truncate">选择当前持有的物品</div>
                         </div>
                     </div>
                     <button
                         type="button"
                         aria-label="关闭"
-                        onClick={onClose}
+                        onClick={() => { if (!busy) onClose(); }}
                         className="w-9 h-9 rounded-full bg-[var(--c-input)] flex items-center justify-center"
                     >
                         <X size={16} />
@@ -72,6 +98,17 @@ export function GiftPickerModal({ gifts, isGroup, recipients = [], onSend, onClo
                 </div>
 
                 <div className="p-4 flex flex-col gap-3 overflow-hidden">
+                    <div className="flex gap-2" role="tablist" aria-label="物品来源">
+                        {(["shopping", "backpack"] as const).map(value => (
+                            <button type="button" role="tab" aria-selected={source === value} key={value}
+                                className="px-3 py-2 rounded-xl bg-[var(--c-input)]" disabled={busy}
+                                onClick={() => { setSource(value); setSelectedGiftId(""); setQuery(""); setError(""); }}>
+                                {value === "shopping" ? "购物商店" : "我的背包"}
+                            </button>
+                        ))}
+                    </div>
+                    {loading && <div role="status">读取物品…</div>}
+                    {error && <div role="alert" className="text-red-500">{error}</div>}
                     {isGroup && (
                         <div className="flex flex-col gap-2">
                             <div className="ts-12 text-[var(--c-icon)]">送给</div>
@@ -107,7 +144,7 @@ export function GiftPickerModal({ gifts, isGroup, recipients = [], onSend, onClo
                         <input
                             value={query}
                             onChange={event => setQuery(event.target.value)}
-                            placeholder="搜索已到货商品"
+                            placeholder="搜索物品"
                             className="flex-1 min-w-0 bg-transparent border-none outline-none ts-13 text-[var(--c-text)]"
                         />
                     </div>
@@ -118,7 +155,7 @@ export function GiftPickerModal({ gifts, isGroup, recipients = [], onSend, onClo
                                 <PackageCheck size={28} className="mx-auto mb-2 text-[var(--c-icon)]" />
                                 <div className="ts-13 font-medium">暂无可送礼物</div>
                                 <div className="ts-12 text-[var(--c-icon)] mt-1 leading-5">
-                                    购物订单到货后会出现在这里。
+                                    {source === "shopping" ? "购物订单到货后会出现在这里。" : "收到或购买的物品会出现在这里。"}
                                 </div>
                             </div>
                         ) : filteredGifts.map(gift => {
@@ -127,7 +164,7 @@ export function GiftPickerModal({ gifts, isGroup, recipients = [], onSend, onClo
                                 <button
                                     key={gift.id}
                                     type="button"
-                                    onClick={() => setSelectedGiftId(gift.id)}
+                                    onClick={() => { setSelectedGiftId(gift.id); setError(""); }}
                                     className="w-full rounded-2xl p-3 text-left flex gap-3 transition-transform active:scale-[0.99]"
                                     style={{
                                         background: selected ? "color-mix(in srgb, var(--c-success) 16%, var(--c-input))" : "color-mix(in srgb, var(--c-input) 88%, var(--c-card))",
@@ -161,7 +198,7 @@ export function GiftPickerModal({ gifts, isGroup, recipients = [], onSend, onClo
                 <div className="px-4 pb-4 pt-2 flex gap-3">
                     <button
                         type="button"
-                        onClick={onClose}
+                        onClick={() => { if (!busy) onClose(); }}
                         className="h-11 rounded-2xl flex-1 ts-14 font-semibold text-[var(--c-text)]"
                         style={{ background: "color-mix(in srgb, var(--c-input) 82%, transparent)" }}
                     >
@@ -170,14 +207,18 @@ export function GiftPickerModal({ gifts, isGroup, recipients = [], onSend, onClo
                     <button
                         type="button"
                         disabled={!canSend}
-                        onClick={() => {
-                            if (!selectedGift) return;
-                            onSend(selectedGift, selectedRecipient);
+                        onClick={async () => {
+                            if (!selectedGift || busy) return;
+                            setBusy(true);
+                            setError("");
+                            try { await onSend(selectedGift, selectedRecipient); }
+                            catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+                            finally { setBusy(false); }
                         }}
                         className="h-11 rounded-2xl flex-1 ts-14 font-semibold text-white disabled:opacity-45"
                         style={{ background: "var(--c-success)" }}
                     >
-                        送出
+                        {busy ? "处理中…" : sendLabel}
                     </button>
                 </div>
             </div>

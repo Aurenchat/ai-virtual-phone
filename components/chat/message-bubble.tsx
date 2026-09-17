@@ -1122,7 +1122,7 @@ function GiftBubble({ msg }: { msg: ChatMessage }) {
                             <div className="chat-gift-card-source ts-12 text-[var(--c-text)] mt-1 truncate">{merchant}</div>
                         </div>
                         <div className="chat-gift-card-status ts-11 font-semibold px-2 py-1 shrink-0">
-                            已送出
+                            {d?.giftOwnershipStatus === "conflict" ? "物品转移待核对" : d?.giftOwnershipStatus === "pending" ? "物品处理中" : "已送出"}
                         </div>
                     </div>
 

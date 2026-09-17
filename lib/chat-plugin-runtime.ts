@@ -9,11 +9,13 @@
 //  - 连续两次启动未完成（插件把页面搞崩）自动进入安全模式，跳过全部插件
 //  - URL 加 ?plugin-safe-mode=1 手动进入安全模式（逃生舱）
 
-import { kvGet, kvSet, kvRemove, hydrateKvDb } from "./kv-db";
+import { kvGet, kvSet, kvRemove, hydrateKvDb, kvUpdateAtomic } from "./kv-db";
+import { registerNativeGiftProvider, openNativeGift, notifyNativeGiftsChanged } from "./native-gift-bridge";
+import { loadShoppingState } from "./shopping-storage";
 import { hydrateChatStorage, loadChatMessages, loadChatSessions, loadChatContacts, pushChatMessage, updateChatMessage, type ChatMessage } from "./chat-storage";
 import { isMediaStoreRef, loadMediaBlob } from "./media-cache-storage";
 import { loadCharacters } from "./character-storage";
-import { loadApiConfigs, loadBindingConfig } from "./settings-storage";
+import { loadApiConfigs, loadBindingConfig, resolveUserIdentity } from "./settings-storage";
 import { simpleLLMCall } from "./api-helpers";
 import { getChatPluginHookBus } from "./chat-plugin-hooks";
 import { loadChatPluginModule } from "./chat-plugin-loader";
@@ -339,6 +341,8 @@ class ChatPluginRuntime {
             },
 
             data: {
+                shopping: { get: () => loadShoppingState() },
+                user: { name: (characterId, isGroup) => resolveUserIdentity(characterId, isGroup ? "group_chat" : "chat")?.name || "用户" },
                 messages: {
                     list: (sessionId) => loadChatMessages(sessionId),
                     push: (input) => pushChatMessage(input as Parameters<typeof pushChatMessage>[0]),
@@ -369,6 +373,12 @@ class ChatPluginRuntime {
                     },
                     unset: (name, scope = "global", targetId) => unsetChatPluginVar(name, scope, targetId),
                 },
+            },
+
+            gifts: {
+                register: provider => track(registerNativeGiftProvider(pluginId, provider)),
+                open: request => openNativeGift({ ...request, providerId: pluginId }),
+                changed: () => notifyNativeGiftsChanged(),
             },
 
             ai: {
@@ -489,6 +499,15 @@ class ChatPluginRuntime {
                         }
                     },
                     keys: () => Object.keys(readChatPluginData(pluginId)),
+                    readOther: (otherId, key) => readChatPluginData(otherId)[key] ?? null,
+                    atomic: async <T,>(key: string, update: (value: T | null) => T): Promise<T> =>
+                        kvUpdateAtomic("chat_plugin_data_v1:" + pluginId, raw => {
+                            const data = raw ? JSON.parse(raw) as Record<string, unknown> : {};
+                            const next = update((data[key] ?? null) as T | null);
+                            if (next instanceof Promise) throw new Error("atomic updater must be synchronous");
+                            data[key] = next;
+                            return { value: JSON.stringify(data), result: next };
+                        }),
                 },
                 timers: {
                     setTimeout: (fn, ms) => {

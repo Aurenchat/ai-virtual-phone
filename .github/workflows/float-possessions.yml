@@ -1,0 +1,25 @@
+name: Float possessions checks
+on:
+  pull_request:
+    paths:
+      - 'plugins/float-possessions.js'
+      - 'lib/**'
+      - 'components/**'
+      - 'scripts/test-float-possessions.mjs'
+      - '.github/workflows/float-possessions.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node scripts/test-float-possessions.mjs
+      - run: npx tsc --noEmit

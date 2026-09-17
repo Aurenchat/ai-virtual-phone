@@ -1,0 +1,33 @@
+diff --git a/components/chat/message-bubble.tsx b/components/chat/message-bubble.tsx
+index 3fd61463aba42b12feccc106411275fdb743e029..7091747d0b5795ec2dd7fea8cc0e4961b5ade823 100644
+--- a/components/chat/message-bubble.tsx
++++ b/components/chat/message-bubble.tsx
+@@ -1122,7 +1122,7 @@ function GiftBubble({ msg }: { msg: ChatMessage }) {
+                             <div className="chat-gift-card-source ts-12 text-[var(--c-text)] mt-1 truncate">{merchant}</div>
+                         </div>
+                         <div className="chat-gift-card-status ts-11 font-semibold px-2 py-1 shrink-0">
+-                            已送出
++                            {d?.giftOwnershipStatus === "conflict" ? "物品转移待核对" : d?.giftOwnershipStatus === "pending" ? "物品处理中" : "已送出"}
+                         </div>
+                     </div>
+ 
+diff --git a/components/phone-character-app.tsx b/components/phone-character-app.tsx
+index f9de66c95ecfc9d354ab404020e3dc862a013924..327185350e7f1ad2de2b9b198e60aeff4e189bb5 100644
+--- a/components/phone-character-app.tsx
++++ b/components/phone-character-app.tsx
+@@ -37,6 +37,7 @@ import { RelationLinkDialog, RelationPairSheet } from "@/components/character/re
+ import { loadMomentsConfig, saveMomentsConfig } from "@/lib/moments-storage";
+ import type { CanvasBgItem } from "@/lib/character-types";
+ import { PageShell } from "@/components/ui/page-shell";
++import { ChatPluginSlot } from "@/components/chat/chat-plugin-slot";
+ import { ConfirmDialog } from "@/components/ui/modal";
+ import { AlertCircle, History } from "lucide-react";
+ import {
+@@ -2609,6 +2610,7 @@ function CharArchiveView({
+       ) : undefined}
+     >
+       {archiveFrame}
++      {isExisting && <ChatPluginSlot name="character.details" slotProps={{ characterId: char.id }} />}
+ 
+       {showSaveVersionConfirm && (
+         <div className="fixed inset-0 z-[10020] flex items-center justify-center bg-black/45 px-5" role="dialog" aria-modal="true" aria-label="保存角色卡">

@@ -37,6 +37,7 @@ import { RelationLinkDialog, RelationPairSheet } from "@/components/character/re
 import { loadMomentsConfig, saveMomentsConfig } from "@/lib/moments-storage";
 import type { CanvasBgItem } from "@/lib/character-types";
 import { PageShell } from "@/components/ui/page-shell";
+import { ChatPluginSlot } from "@/components/chat/chat-plugin-slot";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { AlertCircle, History } from "lucide-react";
 import {
@@ -2609,6 +2610,7 @@ function CharArchiveView({
       ) : undefined}
     >
       {archiveFrame}
+      {isExisting && <ChatPluginSlot name="character.details" slotProps={{ characterId: char.id }} />}
 
       {showSaveVersionConfirm && (
         <div className="fixed inset-0 z-[10020] flex items-center justify-center bg-black/45 px-5" role="dialog" aria-modal="true" aria-label="保存角色卡">

@@ -64,7 +64,7 @@ import { formatChatUiTime } from "@/lib/chat-time";
 import { parseActionTags } from "@/lib/action-parser";
 import { kvGet, kvSet, kvRemove } from "@/lib/kv-db";
 import { creditWalletBalance, payWithWalletBalance } from "@/lib/wallet-storage";
-import { loadDeliveredShoppingGifts, type ShoppingGiftCandidate } from "@/lib/shopping-gift-utils";
+import { sendNativeGift, takeNativeGift, NATIVE_GIFT_QUEUED, type NativeGiftCandidate } from "@/lib/native-gift-bridge";
 import { settleShoppingPaymentRequest } from "@/lib/shopping-payment-request";
 import type { RegexConfig } from "@/lib/settings-types";
 import { MacroEngine } from "@/lib/macro-engine";
@@ -1715,10 +1715,16 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         };
     }, []);
 
-    const availableShoppingGifts = useMemo(
-        () => loadDeliveredShoppingGifts(),
-        [messages],
-    );
+    const [giftInitialItemId, setGiftInitialItemId] = useState<string | undefined>();
+    useEffect(() => {
+        const open = () => {
+            const request = takeNativeGift(session.id);
+            if (request) { setGiftInitialItemId(request.itemId); setRichModal("gift"); }
+        };
+        open();
+        window.addEventListener(NATIVE_GIFT_QUEUED, open);
+        return () => window.removeEventListener(NATIVE_GIFT_QUEUED, open);
+    }, [session.id]);
 
     useEffect(() => {
         setUserIdentity(resolveUserIdentity(session.contactId, "chat"));
@@ -3526,26 +3532,30 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         });
     }, [character?.name, groupCharacters, session.contactId, session.groupName, session.id, session.isGroup, session.participantIds]);
 
-    const sendShoppingGiftMessage = (gift: ShoppingGiftCandidate, recipient?: Character): boolean => {
+    const sendShoppingGiftMessage = async (gift: NativeGiftCandidate, recipient?: Character): Promise<boolean> => {
         if (session.isGroup && !recipient) {
             showChatToast("请选择收礼对象");
             return false;
         }
-        const sent = sendRichMessage("gift", {
-            label: gift.productName,
-            giftName: gift.productName,
-            shoppingGiftId: gift.id,
-            giftOrderId: gift.orderId,
-            giftItemId: gift.itemId,
-            giftMerchantLabel: gift.merchantLabel,
-            giftPriceLabel: gift.priceLabel,
-            giftPreviewIcon: gift.previewIcon,
-            giftTone: gift.tone,
-            giftDeliveredAt: gift.deliveredAt,
+        const targetId = recipient?.id || character?.id || session.contactId;
+        const sent = await sendNativeGift(gift, targetId, resolved => sendRichMessage("gift", {
+            label: resolved.productName,
+            giftName: resolved.productName,
+            shoppingGiftId: resolved.shoppingGiftId || (resolved.providerId ? undefined : resolved.id),
+            giftInstanceId: resolved.inventoryItemId,
+            giftTransferToken: resolved.transferToken,
+            giftDescription: resolved.detail || resolved.subtitle,
+            giftOrderId: resolved.orderId,
+            giftItemId: resolved.itemId,
+            giftMerchantLabel: resolved.merchantLabel,
+            giftPriceLabel: resolved.priceLabel,
+            giftPreviewIcon: resolved.previewIcon,
+            giftTone: resolved.tone,
+            giftDeliveredAt: resolved.deliveredAt,
             giftSentAt: new Date().toISOString(),
             senderName: userIdentity?.name || "你",
             ...(recipient ? { recipientId: recipient.id, recipientName: recipient.name } : {}),
-        });
+        }));
         if (sent) showChatToast("礼物已送出");
         return sent;
     };
@@ -6404,14 +6414,14 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             )}
             {richModal === "gift" && (
                 <GiftPickerModal
-                    gifts={availableShoppingGifts}
+                    initialItemId={giftInitialItemId}
                     isGroup={session.isGroup}
                     recipients={groupCharacters}
-                    onSend={(gift, recipient) => {
-                        const sent = sendShoppingGiftMessage(gift, recipient);
-                        if (sent) setRichModal(null);
+                    onSend={async (gift, recipient) => {
+                        const sent = await sendShoppingGiftMessage(gift, recipient);
+                        if (sent) { setRichModal(null); setGiftInitialItemId(undefined); }
                     }}
-                    onClose={() => setRichModal(null)}
+                    onClose={() => { setRichModal(null); setGiftInitialItemId(undefined); }}
                 />
             )}
             {richModal === "red_packet" && (

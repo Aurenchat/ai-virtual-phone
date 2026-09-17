@@ -146,6 +146,10 @@ export type ChatMessage = {
         shoppingGiftId?: string; // 购物订单中的可送礼物实例 ID
         giftOrderId?: string;    // 礼物来源订单 ID
         giftItemId?: string;     // 礼物来源商品 ID
+        giftInstanceId?: string; // Stable possession instance, independent of shop product ID
+        giftTransferToken?: string; // Idempotent native-gift reservation
+        giftDescription?: string;
+        giftOwnershipStatus?: "pending" | "complete" | "conflict";
         giftName?: string;       // 礼物商品名
         giftMerchantLabel?: string; // 礼物来源商家
         giftPriceLabel?: string; // 礼物商品价格

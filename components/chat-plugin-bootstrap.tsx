@@ -6,10 +6,11 @@
 
 import { useEffect } from "react";
 import { getChatPluginRuntime } from "@/lib/chat-plugin-runtime";
+import { NativeGiftLauncher } from "@/components/chat/native-gift-launcher";
 
 export function ChatPluginBootstrap() {
     useEffect(() => {
         void getChatPluginRuntime().ensureStarted();
     }, []);
-    return null;
+    return <NativeGiftLauncher />;
 }

@@ -17,6 +17,8 @@
 
 import type { ChatMessage, ChatSession, ChatContact } from "./chat-storage";
 import type { Character } from "./character-types";
+import type { NativeGiftProvider, NativeGiftOpenRequest } from "./native-gift-bridge";
+import type { ShoppingState } from "./shopping-types";
 
 /** 反注册函数：撤销对应的注册动作 */
 export type Disposable = () => void;
@@ -165,9 +167,11 @@ export type ChatPluginSlotName =
     | "chat.header"
     | "chat.inputToolbar"
     | "message.footer"
-    | "settings.section";
+    | "settings.section"
+    | "character.details";
 
 export type ChatPluginSlotProps = {
+    characterId?: string;
     sessionId?: string;
     isGroup?: boolean;
     /** message.footer 坑位携带当前消息 */
@@ -227,6 +231,8 @@ export type ChatPluginContext = {
     };
 
     data: {
+        shopping?: { get(): ShoppingState };
+        user?: { name(characterId?: string, isGroup?: boolean): string };
         messages: {
             list(sessionId: string): ChatMessage[];
             push(input: { sessionId: string; role: "user" | "assistant" | "system"; content: string;[k: string]: unknown }): ChatMessage;
@@ -259,6 +265,13 @@ export type ChatPluginContext = {
             update(name: string, patch: Record<string, unknown>, scope?: ChatPluginVarScope, targetId?: string): Record<string, unknown>;
             unset(name: string, scope?: ChatPluginVarScope, targetId?: string): void;
         };
+    };
+
+    /** Optional host extension; feature-detect on older apiVersion 1 hosts. */
+    gifts?: {
+        register(provider: NativeGiftProvider): Disposable;
+        open(request: Omit<NativeGiftOpenRequest, "providerId">): void;
+        changed(): void;
     };
 
     ai: {
@@ -310,6 +323,10 @@ export type ChatPluginContext = {
             set(key: string, value: unknown): void;
             remove(key: string): void;
             keys(): string[];
+            /** Synchronous updater inside an awaited IndexedDB transaction; rejects on failure. */
+            atomic?<T>(key: string, update: (value: T | null) => T): Promise<T>;
+            /** Read-only access for explicit, previewed plugin-data migrations. */
+            readOther?(pluginId: string, key: string): unknown;
         };
         /** 定时器：禁用插件时自动清除 */
         timers: {
