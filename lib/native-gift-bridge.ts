@@ -2,6 +2,7 @@
 
 import type { ShoppingGiftCandidate } from "./shopping-gift-utils";
 import { loadDeliveredShoppingGifts } from "./shopping-gift-utils";
+import { loadChatPlugins } from "./chat-plugin-storage";
 
 export type NativeGiftCandidate = ShoppingGiftCandidate & {
     providerId?: string;
@@ -37,6 +38,10 @@ export function registerNativeGiftProvider(id: string, provider: NativeGiftProvi
     return () => { registry().providers.delete(id); notifyNativeGiftsChanged(); };
 }
 export async function loadNativeGifts(): Promise<NativeGiftCandidate[]> {
+    if (loadChatPlugins().some(p => p.manifest.id === "auren.float-possessions")
+        && !registry().providers.has("auren.float-possessions")) {
+        throw new Error("物品持有插件尚未就绪，请启用插件后重新打开赠礼窗口");
+    }
     const managed = new Set<string>();
     const extras: NativeGiftCandidate[] = [];
     // Do not fall back to stale shop items when an active ownership provider fails.
@@ -52,7 +57,8 @@ export async function loadNativeGifts(): Promise<NativeGiftCandidate[]> {
 }
 export async function sendNativeGift(gift: NativeGiftCandidate, recipientId: string, send: (gift: NativeGiftCandidate) => boolean): Promise<boolean> {
     if (!gift.providerId) {
-        const current = loadDeliveredShoppingGifts().find(g => g.id === gift.id);
+        // Revalidate through the authority, including candidates selected before plugin startup.
+        const current = (await loadNativeGifts()).find(g => !g.providerId && g.id === gift.id);
         if (!current) throw new Error("该商品已送出或尚未到货");
         return send(current);
     }

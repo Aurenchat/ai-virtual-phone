@@ -1,10 +1,22 @@
-# Float 我的背包 · 物品持有 1.0.0
+# Float 我的背包 · 物品持有 1.0.1
+
+## 1.0.0 手机存档升级
+
+在 `f1dfa85da8f13bbe30c1aace62bcc8cb7fc029ca` 上应用增量 `patches/float-possessions-v1.0.1.patch`；原有 core/full/optional-ui 补丁是 1.0.0 的历史交付，不包含本次修复。更新宿主后，同 ID 覆盖导入新版 `plugins/float-possessions.js`，不要卸载旧版 possessions。仅更新网站不会更新已经保存在手机插件安装表里的 JS。
+
+无需账本迁移，仍为 `auren.float-possessions` / `ledger-v1` / version 1。初始化只沿用原账本并执行已有去重恢复，不重编号、不猜所有权、不清理记录。v1.0.0 已有 itemIds、ownerId、provenance、transferHistory、events、shopKeys、orders、reservations、deletedAt 均保留。v1.0.0 删除时已清空的展示字段无法凭空还原，但其 tombstone 与审计身份继续有效。
+
+底部旧“背包”原由社区 `gift-backpack` 3.25.0 注入 `.chat-plus-menu`，读写它自己的 `backpack_gifts_v1`。移除该第三方插件后，不假设手机已有我们的底部入口。本次通过现有 `ctx.ui.slot("chat.inputToolbar", ...)` 在「聊天 → 线上 → 扩展栏」注册唯一“背包”，复用现有 viewer；不保留之前未发布的核心 `PossessionsBackpackButton`。图标使用 Float 已有 Lucide Backpack 的轮廓路径，以 DOM SVG 绘制（插件不依赖 React），附 ISC 授权说明。
+
+核心 `ChatTextInputBar` 已在在线 `showPlusMenu` 时挂载该扩展 slot，本次只补传 sessionId。通用 `ChatPluginSlot` 同时修复遗漏的 characterId 转发，使角色详情快捷入口定位正确；未硬编码新的背包 UI 或新增 ownership store。宿主检测到 possessions 已安装时，仍不运行旧 `gift-backpack` 的扫描、写入与 prompt（即使 possessions 暂时禁用或启动失败也不回退旧所有权）。旧插件保存数据不删除，其他插件不受影响。
+
+实测描述符合“账本已正确转移，旧 UI 仍显示旧快照”；此情况更新宿主和插件后自动消除显示分歧，无需清理测试物品或迁移旧行。这里不宣称检查过手机实际账本；如果账本本身已存在两个不同 itemId，不能靠同名自动合并，需先导出账本明确核对。请勿把这批测试礼物再从旧背包预览中导入；旧快照没有足够关联身份可安全自动合并。
 
 ## 安装
 1. 在基线 `fc65539c8494b9328ea76c1e557ec12b168e24bc` 上应用 `patches/float-possessions-core.patch`，重新构建并部署 Float。角色详情快捷入口和礼物卡状态文字可另行应用 `patches/float-possessions-optional-ui.patch`。
 2. 从 `plugins/float-possessions.js` 下载文件，在 Float 插件管理中导入 JS 并启用。
 3. 如已使用穆叶的 `gift-backpack`，先禁用旧插件（不要卸载）。打开新背包 →「预览旧背包迁移」→ 核对列表 → 确认导入。
-4. 聊天标题下和插件设置中都有「我的背包」；角色档案详情下有「查看角色背包」。
+4. 「聊天 → 线上 → 扩展栏」有「背包」，插件设置有「我的背包」；角色档案详情下有「查看角色背包」。三个入口复用同一个 viewer，不注入 chat.header。
 
 这是“插件 + 原生通用接口适配”，不是能够安装到任意旧版 Float 的纯 JS 插件。旧宿主会明确提示缺少接口。原生礼物卡片、消息发送、群聊权限、自动回复触发和记忆摘要仍由 Float 处理。
 
@@ -15,7 +27,7 @@
 - 背包快捷赠送：在会话内预选物品打开该会话的原生赠礼。在全局背包用同一原生选择器先选角色，再到聊天确认发送。没有插件私建礼物卡／消息／记忆。
 - 购物付款成功后按订单数量建独立实例，包括角色代付成功；待付款、拒绝、取消不入包。数量解析保持原有规则：1–50 单件。
 - 用户背包包含已付款但尚在运输中的物品，并标注运输中；原生“购物商店”标签仍只列已到货物品。“我的背包”允许赠送当前归用户所有的物品。
-- 名称、描述、价格、来源、emoji 都可编辑和留空。留空名称时 UI 的“未命名物品”仅为占位，不写入字段。
+- 任意当前活跃且未预留的物品，无论归用户还是角色，均可由用户编辑名称、描述、价格、来源、emoji，或确认后删除。这是用户侧世界状态管理，不表示角色主动修改或丢弃。字段可留空；编辑只改语义字段和 updatedAt，删除只设置 tombstone，不创建转移／叙事事件。只有归用户的物品可通过用户原生赠礼发送；角色仍通过既有实例赠礼协议转移自己的物品。旧编辑窗口若归属已经变化会拒绝保存，重新打开当前角色背包后可管理。
 - 每个角色独立拥有物品。角色卡删除后，账本保留该 ownerId，管理器以“已移除角色”展示，不把东西归给其他角色。
 - 归属不明的群聊赠礼进入“待核对礼物”，不会猜测接收人。可明确收礼人再核对。所有权冲突不会以新物品替代旧物品。
 
@@ -52,14 +64,15 @@ React 内部赠礼窗口和 `sendRichMessage` 不在插件 ctx 暴露范围，�
 - provenance：sourceType、sourceId、creatorId、订单追踪信息（只记录可证明的信息）。
 - transferHistory：fromId/toId/at/reason/eventId。
 - createdAt/updatedAt；购物可有 availableAt。
-- 删除采用内部 tombstone：UI 物品及展示字段清除，保留 ID/历史和处理回执，防止扫描后复活。
+- 删除只设置 deletedAt/updatedAt，不清空展示字段、itemId、provenance、transferHistory、events 或 shopKeys。所有活跃视图与候选过滤 tombstone；ownerId 保留末任所有者用于审计，已删除实例没有活跃所有者。不删除聊天礼物消息或购物订单。
 - events：按消息 ID、订单单件 ID 或旧快照 ID 去重。
 - reservations：唯一物品发送预留。原生发送返回 false 时释放；成功后移动原实例。双击／多个标签页争抢依赖 IDB 原子读改写。
 - 原生发送后若账本写入失败，保留 token；重启后以原生消息中的 token 恢复。无消息的过期预留 5 分钟后释放。
 - Float 聊天数据库本身仍使用原生异步写入，这不是跨聊天 DB 与插件 KV DB 的分布式原子事务；不声称断电下两库严格同时提交。插件不会更改原生聊天落库语义。
 
 ### 新增宿主 API
-- `ctx.gifts.register({label,list,send})`：provider 注册；禁用自动撤销。
+- `ctx.gifts.register({label,list,send})`：原生赠礼 provider 注册，禁用自动撤销。
+- `ctx.ui.slot("chat.inputToolbar", ...)`：线上扩展栏“背包”注册，点击调用同一个账本 viewer；slot 清理移除按钮，不使用 DOM 扫描／注入 React 树。
 - `ctx.gifts.open({itemId,sessionId?})`：原生赠礼入口。
 - `ctx.gifts.changed()`：通知候选更新。
 - `ctx.data.shopping.get()`：原生订单只读快照。
@@ -70,7 +83,7 @@ React 内部赠礼窗口和 `sendRichMessage` 不在插件 ctx 暴露范围，�
 以上为 apiVersion 1 的增量可选扩展，不破坏旧插件。
 
 ## Prompt 与边界
-仅注入当前归属、名称、描述、可编辑来源和引用 ID。用 JSON 字符串编码展示字段并声明它们是数据，不是额外指令。角色不需要先拥有物品才能创造新礼物，不授予自动拿取用户物品、删除或随意编辑后台物品的能力。
+仅注入当前归属、名称、描述、价格／价值、可编辑来源和实例引用 ID。原生消息与记忆摘要共用 gift-prompt.ts，保留名称、描述、价格、来源及消息已有 giver，并明确它是历史赠礼而非当前持有。用 JSON 编码语义字段，不注入 token、reservation、ledger key 或内部 provenance ID。角色不需要先拥有物品才能创造新礼物，不授予自动拿取用户物品、删除或随意编辑后台物品的能力。
 
 每角色约 6000 字符预算，描述缩略到 180 字符、来源到 100 字符，超出时明确标注省略件数。大型背包仍可在管理 UI 查看全部。群聊共享同一模型请求，按角色分段，并非群内模型层面的保密隔离。后台未经过 prompt.system 的外部自动化／独立云端聊天路径不在此版本的动态注入覆盖范围。
 
@@ -79,14 +92,14 @@ React 内部赠礼窗口和 `sendRichMessage` 不在插件 ctx 暴露范围，�
 - 已支付的历史订单标为 baseline；仍可经原生商店赠礼，发生新的明确转赠后才登记所有权。待代付旧订单在本插件观察到完成付款后正常入包。
 - 旧背包“user”记录可导入；“character”记录仅在 sessionId 能唯一定位现存角色时导入；群礼物堆和无法定位的记录跳过。
 - 迁移创建 `legacy-snapshot` provenance；不虚构 earlier transfer history，不改写原旧记录。重复导入不产生新实例。
-- 请禁用旧背包后迁移，避免双插件各自拥有同名物品并同时注入 prompt。
+- 1.0.1 宿主自动暂停旧背包执行与 prompt；仅对确认从未入新账本的独立旧物品使用手工迁移，不将陈旧归属覆盖当前账本。
 - 插件数据仍在 Float 完整备份的 `chat_plugin_data_v1:` 范围内。可额外导出 JSON 账本用于核对；恢复请使用 Float 原生完整备份。
 - 禁用插件保留数据；卸载插件会由 Float 原生机制删除其私有数据桶，卸载前请备份。
 
 ## 验证
-`node scripts/test-float-possessions.mjs` 覆盖 18 个行为场景：主链实例保持、字段清空与 provenance、重放、删除不复活、原生拒绝、并发双送、写盘失败、token 恢复、购物数量、支付状态、历史基线、角色间新赠礼和实例转赠、群聊归属不明、用户名称匹配、未知 ID、迁移幂等、prompt 范围。
+`node scripts/test-float-possessions.mjs` 覆盖原 18 个场景及新的所有权视图、旧插件隔离、权限、语义 prompt、删除审计、购物 tombstone、v1 兼容和 DOM 适配场景。DOM 测试执行真实插件 setup/按钮操作与真实 gift bridge，使用模拟浏览器节点及存储；不替代手机渲染与交互验收。
 
-本地已实际执行并通过 `node scripts/test-float-possessions.mjs`（18/18）、`npx tsc --noEmit` 和 `npm run build`。`.github/workflows/float-possessions.yml` 用于在 GitHub 运行账本测试和 TypeScript 检查。账本测试使用模拟原生数据与事务接口，不能替代手机实例验收；本地浏览器在插件安全确认处按用户要求停止，未安装或执行插件。手机完整手工验收步骤见 `docs/float-possessions-phone-install.md`。
+本批保持未发布版本 1.0.1；账本仍是 version 1，扩展入口和管理权限调整不需要数据迁移或卸载。更新同 ID 插件源码即可保留手机数据。最新回归增加角色编辑／删除、无伪转移、角色购物 tombstone、唯一 slot 注册／重挂载、sessionId/characterId 转发；原有赠礼、价格、恢复、购物和删除检查保留。完整 build 在临时源副本执行，避免生成脚本触碰主工作区的受保护文件。具体结果见交付报告。`.github/workflows/float-possessions.yml` 继续运行同一测试脚本及 TypeScript 检查。
 1. 更新宿主后导入插件，打开角色档案背包及聊天背包入口。
 2. 让 Jay 用原生礼物标记送新刀，确认卡片与用户背包。
 3. 在编辑器修改来源后，从原生赠礼“我的背包”送给 Sebastian。

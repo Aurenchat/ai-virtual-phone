@@ -1,5 +1,27 @@
 # Float 物品持有：手机安装与验收
 
+## 已安装 1.0.0 的升级
+
+当前修复为 1.0.1。在已部署的 `f1dfa85` 上使用增量 `patches/float-possessions-v1.0.1.patch`，然后同 ID 覆盖导入新版 JS；不要卸载 possessions 或清空数据。以下 core/full/optional-ui 补丁与首次安装步骤描述的是 1.0.0 基线，新的底部背包需要本次增量核心修改。
+
+- 插件通过现有 `chat.inputToolbar` slot 注册「聊天 → 线上 → 扩展栏 → 背包」，复用账本 viewer。轮廓 SVG 采用现有 Lucide Backpack 路径。未发布的 `PossessionsBackpackButton` 已移除，不需要新的专用核心按钮。
+- 修改 `lib/chat-plugin-storage.ts` / `lib/chat-plugin-runtime.ts`：有 possessions 安装记录时，阻止旧 gift-backpack 执行与旧 prompt 注入，保留其存档；没有 possessions 的安装不受影响。
+- 新增 `lib/gift-prompt.ts`，修改 `lib/llm-prompt-assembler.ts` / `lib/short-term-assembler.ts`：将编辑后的描述、价格、来源保留在收礼模型和记忆上下文中。
+- `components/chat/chat-room.tsx` 为现有扩展 slot 补传 sessionId；`components/chat/chat-plugin-slot.tsx` 补传 characterId，使角色入口正确定位。`lib/native-gift-bridge.ts` 保留购物候选校验与 provider 重载保护；不维护第二份库存。
+
+ledger-v1 无需 schema 迁移。旧 UI 中的陈旧行在切换视图后不再显示，不删除其历史存档，不自动猜测／合并 itemId。若测试礼物在 ledger 中确实只有一个 itemId 且 ownerId 已为收件人，无需手工清理；否则先导出账本核对，不要再次导入同一测试礼物的旧快照。仅部署宿主不能替换手机已安装的插件源码，必须覆盖导入 1.0.1。
+
+### 本次重点验收
+
+- [ ] 聊天标题没有额外“我的背包”；线上扩展栏只有一个“背包”（轮廓图标），重开扩展栏不重复；设置入口和角色入口仍可用。
+- [ ] 我的物品有编辑／删除／赠送；角色物品有编辑／删除，没有用户赠送按钮。用户与角色的物品均可编辑名称、描述、价格、来源和图标。
+- [ ] 管理角色物品不新增转移记录或叙事消息，不改变所有者、itemId、provenance 和 dedup 索引；确认删除后保留 tombstone 与末任所有者。
+- [ ] 转赠后所有用户背包视图立即移除，角色包只显示一件；旧编辑窗口保存被拒绝，刷新后不恢复旧归属。
+- [ ] 修改价格／描述／来源后转赠，收件角色上下文包含这些语义字段，没有转移 token。
+- [ ] 删除先确认，取消不改动；确认后普通背包和原生赠礼候选立即消失。
+- [ ] 删除后重载、购物同步和消息重放不产生替代实例；原聊天卡片和订单仍在。
+- [ ] 原 v1 ledger 的 itemId、归属、provenance、transferHistory、去重索引和 tombstone 保留。
+
 ## 结论
 
 `plugins/float-possessions.js` 不是当前未修改 upstream Float 的纯单文件插件。它是最终可导入的插件文件，但运行前必须先把 `patches/float-possessions-core.patch` 合并到 Float 宿主、重新构建并部署。未打核心补丁时，插件会在 `setup()` 阶段明确报错并停止，不会退化到不安全的 DOM 模拟或复制礼物消息。
@@ -38,13 +60,13 @@
 | 文件 | 省略后的影响 |
 | --- | --- |
 | `components/chat/message-bubble.tsx` | 省略后核心所有权和恢复仍工作，但原生礼物卡不会显示「物品处理中 / 物品转移待核对」。 |
-| `components/phone-character-app.tsx` | 省略后仍可在插件设置的背包 owner 下拉中查看和管理角色物品，但角色详情页没有「查看角色背包」快捷按钮。 |
+| `components/phone-character-app.tsx` | 省略后仍可在插件设置的背包 owner 下拉中查看、编辑或确认删除角色物品，但角色详情页没有「查看角色背包」快捷按钮。 |
 
 这两项位于 `patches/float-possessions-optional-ui.patch`，不在最小必需核心补丁内。
 
 ## 测试、CI 与文档文件
 
-- `scripts/test-float-possessions.mjs`：18 场景 Node 账本测试；手机运行时不加载。
+- `scripts/test-float-possessions.mjs`：Node 账本／UI adapter 回归测试；手机运行时不加载。
 - `.github/workflows/float-possessions.yml`：CI；手机运行时不加载。
 - `docs/float-possessions.md`：设计、数据和边界说明；手机运行时不加载。
 - `docs/float-possessions-phone-install.md`：本安装与验收说明；手机运行时不加载。

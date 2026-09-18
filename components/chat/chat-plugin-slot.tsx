@@ -33,19 +33,20 @@ export const ChatPluginSlot = memo(function ChatPluginSlot({ name, slotProps, cl
 
     // slotProps 逐字段参与依赖，避免调用方每次渲染传新对象导致无谓重挂载
     const sessionId = slotProps?.sessionId;
+    const characterId = slotProps?.characterId;
     const isGroup = slotProps?.isGroup;
     const message = slotProps?.message;
 
     useEffect(() => {
         const el = containerRef.current;
         if (!el || !hasPlugins) return;
-        const dispose = runtime.mountSlot(name, el, { sessionId, isGroup, message }, pluginId);
+        const dispose = runtime.mountSlot(name, el, { sessionId, characterId, isGroup, message }, pluginId);
         return () => {
             dispose();
             el.replaceChildren();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [name, slotVersion, hasPlugins, sessionId, isGroup, message?.id, message?.content, pluginId]);
+    }, [name, slotVersion, hasPlugins, sessionId, characterId, isGroup, message?.id, message?.content, pluginId]);
 
     // chat.header 坑位是 absolute 浮层，把它的实测高度写到聊天室 wrapper 的 CSS 变量，
     // 让消息区 padding-top 相应增加，避免插件条遮住首条消息。

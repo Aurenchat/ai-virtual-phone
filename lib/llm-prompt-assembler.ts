@@ -2,6 +2,7 @@
 
 import { Character } from "./character-types";
 import { ChatMessage } from "./chat-storage";
+import { formatGiftForPrompt } from "./gift-prompt";
 import type { StateValue } from "./chat-storage";
 import { PresetConfig, Prompt, PromptOrderEntry, WorldBookConfig, RegexConfig, WorldBookEntry } from "./settings-types";
 import type { UserIdentity } from "@/components/settings/user-identity";
@@ -1148,10 +1149,7 @@ export function formatRichMediaForHistory(msg: ChatMessage, userName: string, ch
                 : `[转账:${d?.amount ?? 0}:${d?.label ?? "转账"}]`;
         }
         case "gift": {
-            const giftName = d?.giftName || d?.label || "礼物";
-            return isGroup && d?.recipientName
-                ? `[礼物:${giftName}:${d.recipientName}]`
-                : `[礼物:${giftName}]`;
+            return formatGiftForPrompt(msg, isGroup);
         }
         case "payment_request":
             return formatShoppingPaymentRequestHistory({

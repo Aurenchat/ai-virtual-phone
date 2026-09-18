@@ -58,6 +58,16 @@ export function loadChatPlugins(): InstalledChatPlugin[] {
         && typeof p.code === "string");
 }
 
+/** An installed possessions ledger owns inventory even while its plugin is disabled.
+ * Keep gift-backpack's code/data/settings intact, but never restart its independent
+ * scanner, mutations or saved ownership prompts alongside that authority.
+ */
+export function loadRunnableChatPlugins(): InstalledChatPlugin[] {
+    const installed = loadChatPlugins();
+    const possessionsInstalled = installed.some(p => p.manifest.id === "auren.float-possessions");
+    return installed.filter(p => p.enabled && !(possessionsInstalled && p.manifest.id === "gift-backpack"));
+}
+
 export function saveChatPlugins(plugins: InstalledChatPlugin[]): void {
     writeJson(PLUGINS_KEY, plugins);
     emit(CHAT_PLUGINS_CHANGED_EVENT);
@@ -208,7 +218,7 @@ export function setChatPluginPromptFragment(pluginId: string, text: string, sess
 
 /** 聚合启用插件在该会话生效的持久片段（prompt.system transform 的 hint 初值） */
 export function buildChatPluginPromptFragments(sessionId?: string): string {
-    const enabledIds = new Set(loadChatPlugins().filter(p => p.enabled).map(p => p.manifest.id));
+    const enabledIds = new Set(loadRunnableChatPlugins().map(p => p.manifest.id));
     if (enabledIds.size === 0) return "";
     const store = readJson<Record<string, Record<string, string>>>(FRAGMENTS_KEY, {});
     const blocks: string[] = [];

@@ -25,6 +25,7 @@ import {
     setChatPluginVar,
     unsetChatPluginVar,
     loadChatPlugins,
+    loadRunnableChatPlugins,
     readChatPluginData,
     writeChatPluginData,
     recordChatPluginLog,
@@ -131,8 +132,8 @@ class ChatPluginRuntime {
         const bus = getChatPluginHookBus();
         bus.onAutoDisable = (pluginId) => { void this.stopPlugin(pluginId); };
 
-        for (const installed of loadChatPlugins()) {
-            if (installed.enabled) await this.startPlugin(installed);
+        for (const installed of loadRunnableChatPlugins()) {
+            await this.startPlugin(installed);
         }
         kvRemove(BOOT_GUARD_KEY);
         this.finishStart();
@@ -148,8 +149,7 @@ class ChatPluginRuntime {
 
     /** 对齐"存储里的启用集合"与"内存里的运行集合"（免刷新启停/覆盖安装/设置变更） */
     private async applyPluginListChange(): Promise<void> {
-        const installedList = loadChatPlugins();
-        const wanted = new Map(installedList.filter(p => p.enabled).map(p => [p.manifest.id, p]));
+        const wanted = new Map(loadRunnableChatPlugins().map(p => [p.manifest.id, p]));
         if (isChatPluginSafeMode()) return;
 
         for (const id of [...this.active.keys()]) {
