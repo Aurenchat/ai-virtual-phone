@@ -56,6 +56,7 @@ export interface AssemblerInput {
     appTags?: string[];
     featureFilterEnabled?: boolean;
     nativeToolHistory?: boolean;
+    shoppingPurchaseToolAvailable?: boolean;
     initialStateValues?: StateValue[];
     followUpCount?: number;
     followUpDelay?: number;
@@ -463,6 +464,7 @@ function pushChronologicalShortTermBlocks(params: {
     timestampOptions?: PromptTimestampOptions;
     visionEnabled: boolean;
     nativeToolHistory?: boolean;
+    shoppingPurchaseToolAvailable?: boolean;
 }) {
     const {
         blocks,
@@ -544,7 +546,7 @@ function pushChronologicalShortTermBlocks(params: {
                 body = formatDirectVisionBody(msg, resolvedUserName, characterName);
                 imageUrl = visionImageUrl;
             } else {
-                body = formatRichMediaForHistory(msg, resolvedUserName, characterName);
+                body = formatRichMediaForHistory(msg, resolvedUserName, characterName, false, { shoppingPurchaseToolAvailable: params.shoppingPurchaseToolAvailable });
             }
         }
 
@@ -900,6 +902,7 @@ export function assemblePromptPayload(input: AssemblerInput): LLMMessage[] {
             timestampOptions: promptTimestampOptions,
             visionEnabled: input.enableVision === true,
             nativeToolHistory: input.nativeToolHistory === true,
+            shoppingPurchaseToolAvailable: input.shoppingPurchaseToolAvailable === true,
         });
     } else if (preset) {
         // Wrap chat history section in XML tags with per-feature recent blocks
@@ -1005,7 +1008,7 @@ export function assemblePromptPayload(input: AssemblerInput): LLMMessage[] {
                     body = formatDirectVisionBody(msg, resolvedUserName, character?.name || "对方");
                     imageUrl = visionImageUrl;
                 } else {
-                    body = formatRichMediaForHistory(msg, resolvedUserName, character?.name || "对方");
+                    body = formatRichMediaForHistory(msg, resolvedUserName, character?.name || "对方", false, { shoppingPurchaseToolAvailable: input.shoppingPurchaseToolAvailable });
                 }
             }
 
@@ -1133,7 +1136,7 @@ export function assemblePromptPayload(input: AssemblerInput): LLMMessage[] {
 // ── Rich Media History Formatting ──────────────────────────
 
 /** Format a rich-media message as bracket text for LLM context. */
-export function formatRichMediaForHistory(msg: ChatMessage, userName: string, charName: string, isGroup?: boolean): string {
+export function formatRichMediaForHistory(msg: ChatMessage, userName: string, charName: string, isGroup?: boolean, options?: { shoppingPurchaseToolAvailable?: boolean }): string {
     const d = msg.mediaData;
     switch (msg.mediaType) {
         case "red_packet": {
@@ -1160,7 +1163,10 @@ export function formatRichMediaForHistory(msg: ChatMessage, userName: string, ch
                 itemsText: d?.paymentRequestItemsText,
             });
         case "shopping_product_share":
-            return formatShoppingProductShareHistory(d);
+            return formatShoppingProductShareHistory(d, {
+                purchaseToolAvailable: options?.shoppingPurchaseToolAvailable && !isGroup,
+                sourceShareMessageId: msg.id,
+            });
         case "contact_card":
             return `[名片:${d?.contactCardName || d?.label || "联系人"}]`;
         case "app_card": {

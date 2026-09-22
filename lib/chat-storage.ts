@@ -187,6 +187,14 @@ export type ChatMessage = {
         sharedAt?: string;         // 商品分享时间
         recipientCharacterId?: string;
         recipientCharacterName?: string;
+        purchaseOutcome?: {
+            orderId: string;
+            intent: "self" | "gift_user";
+            buyerCharacterId: string;
+            buyerCharacterName: string;
+            ownerId: string;
+            completedAt: string;
+        };
         blackMarketTheaterLocalId?: string;
         blackMarketTheaterTemplateId?: string;
         blackMarketTheaterTitle?: string;

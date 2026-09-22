@@ -318,6 +318,12 @@ export type CheckPhoneShoppingOrder = {
   paymentRequestedAt?: string;
   paymentDeclinedAt?: string;
   characterPaidAt?: string;
+  buyerCharacterId?: string;
+  buyerCharacterName?: string;
+  ownerId?: string;
+  purchaseSource?: "user_checkout" | "payment_request" | "product_share";
+  sourceShareMessageId?: string;
+  purchaseIntent?: "self" | "gift_user";
 };
 
 export type CheckPhoneShoppingPayload = {

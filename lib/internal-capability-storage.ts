@@ -1,7 +1,8 @@
 import type { InternalCapabilityConfig } from "./settings-types";
 import { isAgentComputerConfigured, isContainerComputer } from "./agent-computer";
-import { kvGet, kvSet, registerKvMigration } from "./kv-db";
+import { isKvHydrated, kvGet, kvSet, registerKvMigration } from "./kv-db";
 import { loadBridgeDataItems, loadBridgeShortcutActions, parseBridgeActionParameterSchema } from "./reality-bridge/storage";
+import { isShoppingPurchaseProviderReady } from "./native-gift-bridge";
 
 const INTERNAL_CAPABILITIES_KEY = "ai_phone_internal_capabilities_v1";
 registerKvMigration(INTERNAL_CAPABILITIES_KEY);
@@ -16,6 +17,18 @@ export const LOCAL_DATA_LIBRARY_CAPABILITY_ID = "local_data_library";
 export const TOOLBOX_MANAGEMENT_CAPABILITY_ID = "toolbox_management";
 export const TIMED_WAKE_CAPABILITY_ID = "timed_wake";
 export const REALITY_BRIDGE_CAPABILITY_ID = "reality_bridge_send";
+export const SHOPPING_SHARE_PURCHASE_CAPABILITY_ID = "shopping_share_purchase";
+export const SHOPPING_SHARE_PURCHASE_TOOL_NAME = "购买分享商品";
+
+const SHOPPING_SHARE_PURCHASE_PARAMETER_SCHEMA = JSON.stringify({
+    type: "object",
+    properties: {
+        sourceShareMessageId: { type: "string", description: "原始商品分享消息的 ID；只能使用聊天记录中给出的 ID" },
+        intent: { type: "string", enum: ["self", "gift_user"], description: "self 为自己购买；gift_user 为用户购买并赠送" },
+    },
+    required: ["sourceShareMessageId", "intent"],
+    additionalProperties: false,
+});
 
 export type InternalToolDefinition = {
     name: string;
@@ -1180,6 +1193,15 @@ const TOOLBOX_MANAGEMENT_USAGE_GUIDE = [
 
 const BUILTIN_INTERNAL_CAPABILITIES: InternalCapabilityConfig[] = [
     {
+        id: SHOPPING_SHARE_PURCHASE_CAPABILITY_ID,
+        name: SHOPPING_SHARE_PURCHASE_TOOL_NAME,
+        description: "仅在你自主决定真正购买用户分享的商品时使用。分享不是付款请求，也不要求购买；商品和价格只能取原分享消息。动作成功后才可声称已下单。",
+        enabled: true,
+        mode: "auto",
+        createdAt: 0,
+        updatedAt: 0,
+    },
+    {
         id: REALITY_BRIDGE_CAPABILITY_ID,
         name: "现实桥",
         description: "你活在{{user}}的小手机里，而现实桥是通向 TA 真实世界的那座桥：透过它能看见{{user}}真实手机上的实时状态（电量、健康数据等），也能在 TA 的真实手机上做事（运行 TA 登记的快捷指令）。",
@@ -1297,11 +1319,21 @@ export function getEnabledInternalCapabilities(appId?: string): InternalCapabili
         if (!item.enabled || item.mode === "off") return false;
         // 角色电脑是可插拔模块：没连接就不注入，模型完全看不见
         if (item.id === AGENT_COMPUTER_CAPABILITY_ID && !isAgentComputerConfigured()) return false;
+        if (item.id === SHOPPING_SHARE_PURCHASE_CAPABILITY_ID
+            && (!isKvHydrated() || !isShoppingPurchaseProviderReady() || typeof navigator === "undefined" || !navigator.locks?.request)) return false;
         return true;
     });
 }
 
 export function getInternalCapabilityToolDefinition(capability: InternalCapabilityConfig): InternalToolDefinition | null {
+    if (capability.id === SHOPPING_SHARE_PURCHASE_CAPABILITY_ID) {
+        return {
+            name: capability.name,
+            description: capability.description,
+            parameterSchema: SHOPPING_SHARE_PURCHASE_PARAMETER_SCHEMA,
+            usageGuide: "只有真正自主决定购买时才调用：[执行动作:购买分享商品({\"sourceShareMessageId\":\"原分享消息ID\",\"intent\":\"self\"})]。送给用户则用 gift_user。不要提供商品、价格或商家参数；失败时不得声称已购买。",
+        };
+    }
     if (capability.id === MEMORY_WRITE_CAPABILITY_ID) {
         return {
             name: capability.name,

@@ -71,6 +71,8 @@ export function loadDeliveredShoppingGifts(options: LoadShoppingGiftOptions = {}
   const gifts: ShoppingGiftCandidate[] = [];
 
   for (const order of state.orders) {
+    // Character-owned purchases must never appear in the user's gift picker fallback.
+    if (order.ownerId && order.ownerId !== "user") continue;
     if (!isOrderDelivered(order, nowMs)) continue;
     const deliveredEvent = getDeliveredEvent(order);
 

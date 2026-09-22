@@ -17,6 +17,8 @@ export type NativeGiftProvider = {
     list(): Promise<{ gifts: NativeGiftCandidate[]; managedShoppingIds: string[] }>;
     /** The provider validates/reserves an item, invokes the native sender, then commits ownership. */
     send(itemId: string, recipientId: string, send: (gift: NativeGiftCandidate) => boolean): Promise<boolean>;
+    /** Only the upgraded possessions provider can attest a shopping order's unique owner. */
+    confirmShoppingOrder?: (orderId: string, ownerId: string) => Promise<{ itemId: string; ownerId: string }>;
 };
 export type NativeGiftOpenRequest = { providerId: string; itemId: string; sessionId?: string };
 type Registry = { providers: Map<string, NativeGiftProvider>; pending: Map<string, NativeGiftOpenRequest> };
@@ -36,6 +38,14 @@ export function registerNativeGiftProvider(id: string, provider: NativeGiftProvi
     registry().providers.set(id, provider);
     notifyNativeGiftsChanged();
     return () => { registry().providers.delete(id); notifyNativeGiftsChanged(); };
+}
+export function isShoppingPurchaseProviderReady(): boolean {
+    return typeof registry().providers.get("auren.float-possessions")?.confirmShoppingOrder === "function";
+}
+export async function confirmShoppingPurchaseOrder(orderId: string, ownerId: string): Promise<{ itemId: string; ownerId: string }> {
+    const provider = registry().providers.get("auren.float-possessions");
+    if (!provider?.confirmShoppingOrder) throw new Error("请先启用并覆盖更新新版物品持有插件");
+    return provider.confirmShoppingOrder(orderId, ownerId);
 }
 export async function loadNativeGifts(): Promise<NativeGiftCandidate[]> {
     if (loadChatPlugins().some(p => p.manifest.id === "auren.float-possessions")

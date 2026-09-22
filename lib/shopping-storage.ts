@@ -1,4 +1,4 @@
-import { kvGet, kvSet, registerKvMigration } from "./kv-db";
+import { kvGet, kvSet, kvUpdateAtomic, registerKvMigration } from "./kv-db";
 import type { ShoppingCategory, ShoppingSearchResult, ShoppingShippingEvent, ShoppingState } from "./shopping-types";
 import { DEFAULT_SHOPPING_REFRESH_PROMPT, DEFAULT_SHOPPING_SEARCH_PROMPT, SHOPPING_RECOMMENDATION_CATEGORIES } from "./shopping-engine";
 
@@ -151,6 +151,12 @@ function normalizeOrder(value: unknown): ShoppingState["orders"][number] | null 
     paymentRequestedAt: cleanText(record.paymentRequestedAt, 80) || undefined,
     paymentDeclinedAt: cleanText(record.paymentDeclinedAt, 80) || undefined,
     characterPaidAt: cleanText(record.characterPaidAt, 80) || undefined,
+    buyerCharacterId: cleanText(record.buyerCharacterId, 120) || undefined,
+    buyerCharacterName: cleanText(record.buyerCharacterName, 120) || undefined,
+    ownerId: cleanText(record.ownerId, 120) || undefined,
+    purchaseSource: record.purchaseSource === "user_checkout" || record.purchaseSource === "payment_request" || record.purchaseSource === "product_share" ? record.purchaseSource : undefined,
+    sourceShareMessageId: cleanText(record.sourceShareMessageId, 180) || undefined,
+    purchaseIntent: record.purchaseIntent === "self" || record.purchaseIntent === "gift_user" ? record.purchaseIntent : undefined,
   };
 }
 
@@ -222,7 +228,7 @@ export function loadShoppingState(): ShoppingState {
       searchResult: normalizeSearchResult(parsed.searchResult),
       savedItems: normalizeArray(parsed.savedItems, normalizeProduct).slice(0, 80),
       cartItems: normalizeArray(parsed.cartItems, normalizeCartItem).slice(0, 80),
-      orders: normalizeArray(parsed.orders, normalizeOrder).slice(0, 80),
+      orders: normalizeArray(parsed.orders, normalizeOrder).filter((order, index) => index < 80 || order.purchaseSource === "product_share"),
       settings: {
         refreshPrompt: normalizeRefreshPrompt(settingsRaw.refreshPrompt),
         searchPrompt: normalizeSearchPrompt(settingsRaw.searchPrompt),
@@ -244,4 +250,31 @@ export function saveShoppingState(state: ShoppingState): ShoppingState {
     window.dispatchEvent(new CustomEvent(SHOPPING_STATE_UPDATED_EVENT));
   }
   return next;
+}
+
+/** Atomically append a share purchase without replacing an unrelated cart or concurrent order. */
+export async function persistShoppingShareOrder(order: ShoppingState["orders"][number], requireExisting = false): Promise<{ order: ShoppingState["orders"][number]; created: boolean }> {
+  const result = await kvUpdateAtomic(SHOPPING_STATE_KEY, raw => {
+    const parsed = raw ? JSON.parse(raw) as Record<string, unknown> : createDefaultShoppingState() as unknown as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("购物状态数据无效");
+    const orders = Array.isArray(parsed.orders) ? parsed.orders : [];
+    const previous = orders.find((value: unknown) => {
+      if (!value || typeof value !== "object") return false;
+      const row = value as Record<string, unknown>;
+      return row.id === order.id || row.sourceShareMessageId === order.sourceShareMessageId;
+    });
+    if (previous) {
+      const existing = normalizeOrder(previous);
+      if (!existing || existing.purchaseSource !== "product_share" || existing.sourceShareMessageId !== order.sourceShareMessageId
+        || existing.purchaseIntent !== order.purchaseIntent || existing.buyerCharacterId !== order.buyerCharacterId || existing.ownerId !== order.ownerId) {
+        throw new Error("该商品分享已经用于另一项购买决定");
+      }
+      return { value: raw!, result: { order: existing, created: false } };
+    }
+    if (requireExisting) throw new Error("该商品分享已处理，原订单不在当前购物记录中");
+    const next = { ...parsed, orders: [order, ...orders], updatedAt: new Date().toISOString() };
+    return { value: JSON.stringify(next), result: { order, created: true } };
+  });
+  if (result.created && typeof window !== "undefined") window.dispatchEvent(new CustomEvent(SHOPPING_STATE_UPDATED_EVENT));
+  return result;
 }

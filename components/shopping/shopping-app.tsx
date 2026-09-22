@@ -385,6 +385,8 @@ function buildOrderFromCart(
     payerCharacterId: options.payerCharacterId,
     payerCharacterName: options.payerCharacterName,
     paymentRequestedAt: options.paymentRequestedAt,
+    ownerId: "user",
+    purchaseSource: options.paymentStatus === "payment_requested" ? "payment_request" : "user_checkout",
     items: cartItems.map((item, index) => ({
       id: `${id}_item_${index + 1}`,
       title: item.title,
@@ -1499,6 +1501,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
                                 <span style={{ fontSize: "calc(11px*var(--app-text-scale,1))", color: "#999", whiteSpace: "nowrap" }}>{order.items.length} items</span>
                               </div>
                               <span style={{ fontSize: "calc(11px*var(--app-text-scale,1))", color: "#888", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{order.timeLabel}</span>
+                              {order.purchaseSource === "product_share" ? <span style={{ fontSize: "calc(11px*var(--app-text-scale,1))", color: "#888" }}>{order.purchaseIntent === "gift_user" ? `${order.buyerCharacterName || "角色"}送给你` : `${order.buyerCharacterName || "角色"}自购`}</span> : null}
                             </div>
                             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "baseline", lineHeight: 1 }}>
                               <strong style={{ fontSize: "calc(14px*var(--app-text-scale,1))", color: "#222", lineHeight: 1 }}>{order.totalLabel}</strong>
@@ -1695,6 +1698,11 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
                         : activeOrder.paymentCardLabel ?? "未记录付款方式"}
                   </span>
                 </div>
+                {activeOrder.purchaseSource === "product_share" ? (
+                  <div style={{ marginTop: "8px", fontSize: "calc(12px*var(--app-text-scale,1))", color: "#555" }}>
+                    {activeOrder.buyerCharacterName || "角色"}购买 · {activeOrder.ownerId === "user" ? "送给你" : "角色自购"} · 角色已付款
+                  </div>
+                ) : null}
               </div>
 
               {activeOrderShipping?.timeline.length ? (

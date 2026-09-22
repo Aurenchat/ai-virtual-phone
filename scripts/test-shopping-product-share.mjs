@@ -61,6 +61,31 @@ const richMediaPrompt = assembler.formatRichMediaForHistory({
   mediaData: share.buildShoppingProductShareData(product, recipient, sharedAt),
 }, "Chloe", recipient.name);
 assert.equal(richMediaPrompt, prompt, "unified rich-media formatting delegates to the product-share formatter");
+const availablePrompt = assembler.formatRichMediaForHistory({
+  id: "share-message-1",
+  mediaType: "shopping_product_share",
+  mediaData: share.buildShoppingProductShareData(product, recipient, sharedAt),
+}, "Chloe", recipient.name, false, { shoppingPurchaseToolAvailable: true });
+assert.match(availablePrompt, /商品分享消息ID：share-message-1/);
+assert.match(availablePrompt, /只有确实自主决定购买时/);
+assert.match(availablePrompt, /购买分享商品/);
+assert.doesNotMatch(availablePrompt, /当前没有由商品分享触发的角色购买动作/);
+const unavailablePrompt = assembler.formatRichMediaForHistory({
+  id: "share-message-1", mediaType: "shopping_product_share",
+  mediaData: share.buildShoppingProductShareData(product, recipient, sharedAt),
+}, "Chloe", recipient.name, false, { shoppingPurchaseToolAvailable: false });
+assert.match(unavailablePrompt, /当前没有由商品分享触发的角色购买动作/);
+assert.doesNotMatch(unavailablePrompt, /商品分享消息ID：/);
+const completedPrompt = assembler.formatRichMediaForHistory({
+  id: "share-message-1", mediaType: "shopping_product_share",
+  mediaData: {
+    ...share.buildShoppingProductShareData(product, recipient, sharedAt),
+    purchaseOutcome: { orderId: "shop_share_share-message-1", intent: "gift_user", buyerCharacterId: recipient.id, buyerCharacterName: recipient.name, ownerId: "user", completedAt: sharedAt },
+  },
+}, "Chloe", recipient.name, false, { shoppingPurchaseToolAvailable: false });
+assert.match(completedPrompt, /真实购买记录/);
+assert.match(completedPrompt, /这条分享已经处理，不要再次购买/);
+assert.match(completedPrompt, /当前会话没有购买动作/);
 
 const shoppingState = {
   orders: [{ id: "existing-order" }],
@@ -123,5 +148,7 @@ for (const forbidden of ["待付款", "帮TA付款", "接受代付", "拒绝代�
 }
 const storageSource = await readFile(new URL("../lib/chat-storage.ts", import.meta.url), "utf8");
 assert.ok(storageSource.includes('shopping_product_share: "[商品分享]"'), "session preview uses the product-share label");
+const chatEngineSource = await readFile(new URL("../lib/chat-engine.ts", import.meta.url), "utf8");
+assert.match(chatEngineSource, /shoppingPurchaseToolAvailable: toolsEnabled && !session\.isGroup/, "prompt capability follows the actual tool/preset switch");
 
 console.log("shopping product share tests passed");

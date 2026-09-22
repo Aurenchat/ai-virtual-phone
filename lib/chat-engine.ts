@@ -35,6 +35,7 @@ import {
     resolveUserIdentity,
 } from "./settings-storage";
 import { assemblePromptPayload, applyOutputRegex, type LLMMessage, type LLMContentPart } from "./llm-prompt-assembler";
+import { SHOPPING_SHARE_PURCHASE_TOOL_NAME } from "./internal-capability-storage";
 import { MacroEngine, postProcessTrim } from "./macro-engine";
 import { getStatusRegionConfig, resolveStatusRegionSection, resolveStatusRegionExampleLine, resolveStatusRegionComposition, resolveStatusRegionFullExample } from "./chat-status-region";
 import {
@@ -1936,6 +1937,8 @@ export async function buildChatPromptMessages(
         offlineBilingualInstruction,
         offlineSummaryTag: preset?.story_summary_tag?.trim() || "summary",
         nativeToolHistory: usesNativeActions,
+        shoppingPurchaseToolAvailable: toolsEnabled && !session.isGroup && resolvedAppId === "chat"
+            && enabledTools.some(tool => tool.name === SHOPPING_SHARE_PURCHASE_TOOL_NAME),
     });
     if (promptProfile?.output === "plain_text") {
         llmMessages.push({
@@ -2252,6 +2255,7 @@ async function generateNativeChatCompletion(
                     sessionId: session.id,
                     characterId: session.contactId,
                     sourceEngine: "chat",
+                    shoppingPurchaseAllowed: enabledTools.some(tool => tool.name === SHOPPING_SHARE_PURCHASE_TOOL_NAME),
                     signal: options?.signal,
                     onShortcutCommandCreated: onlyNativeCall ? async command => {
                         const resultMarker = `__FLOAT_SHORTCUT_RESULT_${command.id}__`;
@@ -2731,6 +2735,7 @@ async function generateChatCompletionCore(
                     sessionId: session.id,
                     characterId: session.contactId,
                     sourceEngine: "chat",
+                    shoppingPurchaseAllowed: toolsEnabled && getEnabledTools(options?.appId ?? "chat").some(tool => tool.name === SHOPPING_SHARE_PURCHASE_TOOL_NAME),
                     signal: options?.signal,
                     onShortcutCommandCreated: onlyToolCall ? async command => {
                         const resultMarker = `__FLOAT_SHORTCUT_RESULT_${command.id}__`;

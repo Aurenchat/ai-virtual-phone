@@ -117,6 +117,41 @@ export async function runPossessionTests(createEngine) {
     f.orders.push({id:"o1",paidAt:"2026-09-17T00:30:00.000Z",items:[{id:"p",title:"Book",detail:"A book",priceLabel:"10",previewIcon:"📚",quantityLabel:"x 2"}]});
     await f.e.sync();await f.e.sync();eq(Object.keys(f.state.items).length,2,"units");eq(Object.keys(f.state.shopKeys).length,2,"shop keys");
   });
+  await test("share self-purchase creates one character-owned instance and preserves provenance",async()=>{
+    const f=fixture();await f.start();f.advance();
+    f.orders.push({id:"shop_share_m1",purchaseSource:"product_share",sourceShareMessageId:"m1",purchaseIntent:"self",ownerId:"jay",buyerCharacterId:"jay",buyerCharacterName:"Jay Mercer",paymentStatus:"paid_by_character",characterPaidAt:"2026-09-17T01:00:00.000Z",items:[{id:"lamp",title:"Lamp",detail:"Warm light",priceLabel:"¥128",previewIcon:"💡",quantityLabel:"1 件"}]});
+    const confirmed=await f.e.confirmShoppingOrder("shop_share_m1","jay");
+    eq(confirmed.ownerId,"jay","owner attested");eq(f.e.inventory("jay").length,1,"character inventory");eq(f.e.inventory("user").length,0,"not user inventory");
+    const item=f.state.items[confirmed.itemId];eq(item.provenance.sourceShareMessageId,"m1","share provenance");eq(item.provenance.buyerCharacterId,"jay","buyer provenance");
+    await f.e.sync();await f.reload();eq(Object.keys(f.state.items).length,1,"retry and reload do not clone");
+    const prompt=await f.e.prompt({sessionId:"jay-chat",characterId:"jay",isGroup:false,hint:""});ok(prompt.hint.includes("Lamp"),"character prompt sees item");
+  });
+  await test("share gift-user creates one user instance without a second gift",async()=>{
+    const f=fixture();await f.start();f.advance();
+    f.orders.push({id:"shop_share_m2",purchaseSource:"product_share",sourceShareMessageId:"m2",purchaseIntent:"gift_user",ownerId:"user",buyerCharacterId:"jay",buyerCharacterName:"Jay Mercer",paymentStatus:"paid_by_character",characterPaidAt:"2026-09-17T01:00:00.000Z",items:[{id:"lamp",title:"Lamp",quantityLabel:"1 件"}]});
+    const confirmed=await f.e.confirmShoppingOrder("shop_share_m2","user");
+    eq(f.e.inventory("user").length,1,"user owns gift");eq(f.e.inventory("jay").length,0,"buyer is not owner");
+    eq(f.state.items[confirmed.itemId].provenance.purchaseIntent,"gift_user","gift provenance");
+    await f.e.sync();eq(Object.keys(f.state.items).length,1,"no duplicate from order");
+  });
+  await test("legacy paid and character-paid user orders still belong to user",async()=>{
+    const f=fixture();await f.start();f.advance();
+    f.orders.push({id:"legacy",paymentStatus:"paid_by_user",paidAt:"2026-09-17T01:00:00.000Z",items:[{id:"book",title:"Book",quantityLabel:"1"}]});
+    f.orders.push({id:"request",paymentStatus:"paid_by_character",characterPaidAt:"2026-09-17T01:00:00.000Z",payerCharacterId:"jay",items:[{id:"pen",title:"Pen",quantityLabel:"1"}]});
+    await f.e.sync();eq(f.e.inventory("user").length,2,"both remain user-owned");eq(f.e.inventory("jay").length,0,"payer not owner");
+  });
+  await test("orphan explicit order owner is preserved rather than reassigned to user",async()=>{
+    const f=fixture();await f.start();f.advance();
+    f.orders.push({id:"orphan",ownerId:"removed-character",paymentStatus:"paid_by_character",characterPaidAt:"2026-09-17T01:00:00.000Z",items:[{id:"p",title:"Book",quantityLabel:"1"}]});
+    await f.e.sync();eq(f.e.inventory("user").length,0,"not silently reassigned");eq(f.e.inventory("removed-character").length,1,"orphan identity retained");
+  });
+  await test("share shopping tombstone and shop key never revive",async()=>{
+    const f=fixture();await f.start();f.advance();
+    f.orders.push({id:"shop_share_m3",purchaseSource:"product_share",sourceShareMessageId:"m3",purchaseIntent:"self",ownerId:"jay",buyerCharacterId:"jay",paymentStatus:"paid_by_character",characterPaidAt:"2026-09-17T01:00:00.000Z",items:[{id:"lamp",title:"Lamp",quantityLabel:"1"}]});
+    const {itemId}=await f.e.confirmShoppingOrder("shop_share_m3","jay");await f.e.deleteItem(itemId,"jay");await f.e.sync();await f.reload();
+    eq(Object.keys(f.state.items),[itemId],"same stable instance");eq(f.e.inventory("jay"),[],"tombstone stays deleted");
+    eq(f.state.shopKeys["shop_share_m3::lamp::1"],itemId,"shop key remains");await rejects(()=>f.e.confirmShoppingOrder("shop_share_m3","jay"),"deleted item cannot confirm again");
+  });
   await test("pending, declined and canceled payments do not create possessions",async()=>{
     const f=fixture();await f.start();f.advance();
     for(const status of ["payment_requested","payment_declined","payment_canceled"])f.orders.push({id:status,paymentStatus:status,items:[{id:"p",title:"No"}]});
@@ -343,6 +378,6 @@ export async function runPossessionTests(createEngine) {
 }
 
 const passed = await runPossessionTests(createPossessionsEngine);
-assert.equal(passed.length, 30);
+assert.equal(passed.length, 35);
 for (const name of passed) console.log("PASS", name);
 console.log(passed.length + " possessions checks passed.");

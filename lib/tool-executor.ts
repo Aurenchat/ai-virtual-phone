@@ -23,7 +23,8 @@ import {
 } from "./tool-storage";
 import { executeCustomAppToolCall } from "./custom-app-tool-runtime";
 import { characterWorkspace, agentComputerRequest, isAgentComputerConfigured } from "./agent-computer";
-import { AGENT_COMPUTER_CAPABILITY_ID, CALENDAR_MANAGEMENT_CAPABILITY_ID, LOCAL_DATA_LIBRARY_CAPABILITY_ID, MEMORY_WRITE_CAPABILITY_ID, MUSIC_CONTROL_CAPABILITY_ID, NOTE_WALL_CAPABILITY_ID, REALITY_BRIDGE_CAPABILITY_ID, SEND_FILE_CAPABILITY_ID, TIMED_WAKE_CAPABILITY_ID, TOOLBOX_MANAGEMENT_CAPABILITY_ID, getInternalCapability } from "./internal-capability-storage";
+import { AGENT_COMPUTER_CAPABILITY_ID, CALENDAR_MANAGEMENT_CAPABILITY_ID, LOCAL_DATA_LIBRARY_CAPABILITY_ID, MEMORY_WRITE_CAPABILITY_ID, MUSIC_CONTROL_CAPABILITY_ID, NOTE_WALL_CAPABILITY_ID, REALITY_BRIDGE_CAPABILITY_ID, SEND_FILE_CAPABILITY_ID, TIMED_WAKE_CAPABILITY_ID, TOOLBOX_MANAGEMENT_CAPABILITY_ID, SHOPPING_SHARE_PURCHASE_CAPABILITY_ID, SHOPPING_SHARE_PURCHASE_TOOL_NAME, getEnabledInternalCapabilities, getInternalCapability } from "./internal-capability-storage";
+import { purchaseSharedProduct } from "./shopping-share-purchase";
 import { bridgeConnection, loadBridgeDataItems, loadBridgeShortcutActions, readAllBridgeStateSnapshots, readBridgeStateSnapshot } from "./reality-bridge/storage";
 import { createShortcutCommand, deliverShortcutCommand, waitForShortcutCommand } from "./shortcut-command-client";
 import { loadMemoryEntriesByType, saveMemoryEntry } from "./memory-storage";
@@ -96,6 +97,7 @@ export type ToolExecutionContext = {
     characterId?: string;
     sourceEngine?: "chat" | "group_chat" | "custom_app";
     signal?: AbortSignal;
+    shoppingPurchaseAllowed?: boolean;
     onShortcutCommandCreated?: (command: {
         id: string;
         actionName: string;
@@ -783,6 +785,26 @@ function normalizeInternalToolResult(result: ToolResult): ToolResult {
 }
 
 async function executeInternalTool(call: ToolCall, context?: ToolExecutionContext): Promise<ToolResult | null> {
+    if (call.name === SHOPPING_SHARE_PURCHASE_TOOL_NAME) {
+        if (!context?.shoppingPurchaseAllowed || context.appId !== "chat" || context.sourceEngine !== "chat"
+            || !context.sessionId || !context.characterId
+            || !getEnabledInternalCapabilities("chat").some(item => item.id === SHOPPING_SHARE_PURCHASE_CAPABILITY_ID)) {
+            return { name: call.name, success: false, error: "当前会话未启用商品购买动作" };
+        }
+        const sourceShareMessageId = typeof call.args.sourceShareMessageId === "string" ? call.args.sourceShareMessageId.trim() : "";
+        const intent = call.args.intent;
+        if (!sourceShareMessageId || (intent !== "self" && intent !== "gift_user")) {
+            return { name: call.name, success: false, error: "需要有效的原商品分享消息 ID 和购买意图" };
+        }
+        try {
+            const { order, repeated } = await purchaseSharedProduct({ sourceShareMessageId, intent, sessionId: context.sessionId, characterId: context.characterId });
+            const who = order.buyerCharacterName || "角色";
+            const recipient = intent === "self" ? "为自己" : "作为礼物送给用户";
+            return { name: call.name, success: true, data: `${repeated ? "此前已处理，未重复下单" : "购买成功"}：${who}${recipient}购买了「${order.items[0].title}」。正式订单已保存，唯一物品已确认归属，当前配送中。` };
+        } catch (error) {
+            return { name: call.name, success: false, error: `购买未成功：${error instanceof Error ? error.message : String(error)}。不得声称已下单、付款或赠送。` };
+        }
+    }
     if (isNoteWallToolName(call.name)) return executeNoteWallTool(call, context);
     if (isMusicControlToolName(call.name)) return executeMusicControlTool(call, context);
     if (isCalendarToolName(call.name)) return executeCalendarTool(call, context);
