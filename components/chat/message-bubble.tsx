@@ -100,6 +100,8 @@ export const MessageBubble = memo(function MessageBubble({ msg, onUpdate, charNa
             return <ContactCardBubble msg={msg} characterId={characterId} />;
         case "payment_request":
             return <PaymentRequestBubble msg={msg} charName={charName} userName={userName} onShowDetail={onShowDetail} />;
+        case "shopping_product_share":
+            return <ShoppingProductShareBubble msg={msg} />;
         case "app_card":
             return <AppCardBubble msg={msg} characterId={characterId} characterName={msg.senderName || charName} />;
         case "image":
@@ -731,6 +733,31 @@ function TransferBubble({ msg, charName, userName, onShowDetail }: {
                 {isReceived && <span>已收款</span>}
                 {isDeclined && <span>已退回</span>}
             </div>
+        </div>
+    );
+}
+
+// ── Shopping Product Share ─────────────────────────────
+
+function ShoppingProductShareBubble({ msg }: { msg: ChatMessage }) {
+    const d = msg.mediaData;
+    return (
+        <div className="w-[264px] overflow-hidden rounded-2xl border border-black/[0.06] bg-white shadow-[0_8px_28px_rgba(0,0,0,0.08)] text-[#222]">
+            <div className="flex items-center gap-3 bg-[#fff8f1] px-4 py-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-[30px] shadow-sm" aria-hidden>
+                    {d?.previewIcon || "🛍️"}
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="line-clamp-2 ts-14 font-semibold leading-snug">{d?.title || "商品"}</div>
+                    <div className="mt-1 truncate ts-11 text-[#8a7564]">{d?.merchantLabel || "未知商家"}</div>
+                    <div className="mt-1 ts-15 font-bold text-[#f06a21]">{d?.priceLabel || "价格未知"}</div>
+                </div>
+            </div>
+            <div className="px-4 py-3">
+                {d?.subtitle ? <div className="mb-1 ts-12 font-medium text-[#555]">{d.subtitle}</div> : null}
+                <div className="line-clamp-4 ts-12 leading-relaxed text-[#777]">{d?.detail || d?.subtitle || "暂无商品详情"}</div>
+            </div>
+            <div className="border-t border-black/[0.05] px-4 py-2 ts-11 text-[#999]">Float · 商品分享</div>
         </div>
     );
 }

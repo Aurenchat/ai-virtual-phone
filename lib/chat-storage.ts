@@ -106,6 +106,7 @@ export type ChatMessage = {
         | "voice_call" | "video_call"
         | "accept_red_packet" | "decline_red_packet" | "accept_transfer" | "decline_transfer"
         | "payment_request" | "accept_payment_request" | "decline_payment_request"
+        | "shopping_product_share"
         | "music" | "music_share" | "music_notify" | "music_not_found"
         | "xiaohongshu_note_share"
         | "gift"
@@ -175,6 +176,17 @@ export type ChatMessage = {
         paymentRequestedAt?: string;
         paymentResolvedAt?: string;
         paymentWalletTransactionId?: string;
+        productId?: string;        // 分享商品 ID
+        title?: string;            // 分享商品名
+        merchantLabel?: string;    // 分享商品商家
+        priceLabel?: string;       // 分享商品价格
+        subtitle?: string;         // 分享商品副标题
+        detail?: string;           // 分享商品详情
+        previewIcon?: string;      // 分享商品预览图标
+        tone?: "ivory" | "mist" | "blush" | "graphite";
+        sharedAt?: string;         // 商品分享时间
+        recipientCharacterId?: string;
+        recipientCharacterName?: string;
         blackMarketTheaterLocalId?: string;
         blackMarketTheaterTemplateId?: string;
         blackMarketTheaterTitle?: string;
@@ -304,6 +316,7 @@ const MEDIA_PREVIEW_MAP: Record<string, string> = {
     gift: "[礼物]",
     contact_card: "[名片]",
     payment_request: "[代付请求]",
+    shopping_product_share: "[商品分享]",
     music: "[音乐]",
     music_share: "[音乐分享]",
     xiaohongshu_note_share: "[小红书分享]",

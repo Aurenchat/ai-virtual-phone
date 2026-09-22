@@ -17,6 +17,7 @@ import { formatPromptTimestamp, getPromptTimestampOptionsForTimeContext, resolve
 import { formatCharacterRelationsForPrompt } from "./character-world-storage";
 import { buildCharacterTimeContext, buildGroupTimeContext, type CharacterTimeContext } from "./character-time";
 import { formatShoppingPaymentRequestHistory } from "./shopping-payment-request";
+import { formatShoppingProductShareHistory } from "./shopping-product-share";
 import { buildGroupAdminBracketText } from "./group-admin";
 
 export type LLMMessageRole = "system" | "user" | "assistant" | "tool";
@@ -1158,6 +1159,8 @@ export function formatRichMediaForHistory(msg: ChatMessage, userName: string, ch
                 items: d?.paymentRequestItems,
                 itemsText: d?.paymentRequestItemsText,
             });
+        case "shopping_product_share":
+            return formatShoppingProductShareHistory(d);
         case "contact_card":
             return `[名片:${d?.contactCardName || d?.label || "联系人"}]`;
         case "app_card": {

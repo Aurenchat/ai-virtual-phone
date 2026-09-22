@@ -177,6 +177,7 @@ const CHAT_VISUAL_MEDIA_TYPES = new Set([
     "red_packet",
     "transfer",
     "payment_request",
+    "shopping_product_share",
     "gift",
     "contact_card",
     "image",
@@ -225,6 +226,7 @@ const CHAT_MEDIA_BUBBLE_TYPES = new Set([
     "red_packet",
     "transfer",
     "payment_request",
+    "shopping_product_share",
     "gift",
     "contact_card",
     "image",
@@ -2941,6 +2943,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             red_packet: "发了一个红包",
             transfer: "发了一笔转账",
             payment_request: "发起了代付请求",
+            shopping_product_share: "分享了一件商品",
             sticker: "发了一个表情",
             image: "发了一张照片",
             location: "分享了位置",
@@ -2966,6 +2969,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             if (m.mediaType === "app_card") return `分享了${m.mediaData?.appName || "APP"}卡片: ${m.mediaData?.appCardTitle || m.mediaData?.appCardSummary || ""}`.trim();
             if (m.mediaType === "quote") return `引用回复: ${m.mediaData?.quotePreview || ""}`.trim();
             if (m.mediaType === "payment_request") return `发起了代付请求: ${m.mediaData?.paymentRequestAmountLabel || m.mediaData?.amount || ""}`.trim();
+            if (m.mediaType === "shopping_product_share") return `分享了一件商品: ${m.mediaData?.title || ""}`.trim();
             return mediaLabels[m.mediaType] || "";
         };
         const dispatchVisibleNotice = (m: ChatMessage): void => {

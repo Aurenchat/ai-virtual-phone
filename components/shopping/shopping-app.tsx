@@ -15,6 +15,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Share2,
   ShoppingCart,
   Star,
   Trash2,
@@ -45,6 +46,7 @@ import {
   formatShoppingPaymentRequestItems,
   type ShoppingPaymentStatus,
 } from "@/lib/shopping-payment-request";
+import { sendShoppingProductShare } from "@/lib/shopping-product-share";
 import { createDefaultShoppingState, loadShoppingState, saveShoppingState, SHOPPING_STATE_UPDATED_EVENT } from "@/lib/shopping-storage";
 import type { ShoppingCartItem, ShoppingCategory, ShoppingOrder, ShoppingProduct, ShoppingShippingEvent, ShoppingState } from "@/lib/shopping-types";
 import {
@@ -89,6 +91,11 @@ type ShoppingPromptDrafts = {
 
 type ShoppingCartFeedback = {
   id: number;
+};
+
+type ShoppingShareFeedback = {
+  id: number;
+  characterName: string;
 };
 
 type ResolvedShoppingShipping = {
@@ -422,12 +429,17 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [recentlyAddedProductId, setRecentlyAddedProductId] = useState<string | null>(null);
   const [cartFeedback, setCartFeedback] = useState<ShoppingCartFeedback | null>(null);
+  const [shareFeedback, setShareFeedback] = useState<ShoppingShareFeedback | null>(null);
   const [confirmRefreshOpen, setConfirmRefreshOpen] = useState(false);
   const [confirmCheckoutOpen, setConfirmCheckoutOpen] = useState(false);
   const [paymentRequestOpen, setPaymentRequestOpen] = useState(false);
   const [paymentRequestTargets, setPaymentRequestTargets] = useState<Character[]>([]);
   const [selectedPaymentRequestTargetId, setSelectedPaymentRequestTargetId] = useState("");
   const [paymentRequestError, setPaymentRequestError] = useState<string | null>(null);
+  const [productShareOpen, setProductShareOpen] = useState(false);
+  const [productShareTargets, setProductShareTargets] = useState<Character[]>([]);
+  const [selectedProductShareTargetId, setSelectedProductShareTargetId] = useState("");
+  const [productShareError, setProductShareError] = useState<string | null>(null);
   const [confirmCartDeleteItemId, setConfirmCartDeleteItemId] = useState<string | null>(null);
   const [walletState, setWalletState] = useState<WalletState>(() => loadWalletState());
   const [selectedPaymentSourceId, setSelectedPaymentSourceId] = useState<string>(WALLET_BALANCE_ACCOUNT_ID);
@@ -435,6 +447,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
   const [blackMarketOpen, setBlackMarketOpen] = useState(false);
   const [blackMarketTransition, setBlackMarketTransition] = useState(false);
   const cartFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const shareFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cartPulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blackMarketTransitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shoppingScrollRef = useRef<HTMLDivElement | null>(null);
@@ -475,6 +488,9 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
     }
     if (cartPulseTimerRef.current) {
       clearTimeout(cartPulseTimerRef.current);
+    }
+    if (shareFeedbackTimerRef.current) {
+      clearTimeout(shareFeedbackTimerRef.current);
     }
     if (blackMarketTransitionTimerRef.current) {
       clearTimeout(blackMarketTransitionTimerRef.current);
@@ -859,6 +875,30 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
     setPaymentRequestOpen(true);
   }
 
+  function openProductShareSheet() {
+    if (!selectedProduct) return;
+    const targets = loadCharacters();
+    setProductShareTargets(targets);
+    setSelectedProductShareTargetId(targets[0]?.id ?? "");
+    setProductShareError(null);
+    setProductShareOpen(true);
+  }
+
+  function shareProductWithCharacter() {
+    if (!selectedProduct) return;
+    const target = productShareTargets.find(item => item.id === selectedProductShareTargetId);
+    if (!target) {
+      setProductShareError("请选择分享对象。");
+      return;
+    }
+    sendShoppingProductShare(baseProduct(selectedProduct), target);
+    setProductShareOpen(false);
+    setProductShareError(null);
+    if (shareFeedbackTimerRef.current) clearTimeout(shareFeedbackTimerRef.current);
+    setShareFeedback({ id: Date.now(), characterName: target.name });
+    shareFeedbackTimerRef.current = setTimeout(() => setShareFeedback(null), 1700);
+  }
+
   function sendPaymentRequest() {
     if (state.cartItems.length === 0) return;
     const target = paymentRequestTargets.find(item => item.id === selectedPaymentRequestTargetId);
@@ -1174,6 +1214,13 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
         <div key={cartFeedback.id} className="cp-shopping-cart-toast" role="status" aria-live="polite">
           <ShoppingCart size={16} />
           <span>已加入购物车</span>
+        </div>
+      ) : null}
+
+      {shareFeedback ? (
+        <div key={shareFeedback.id} className="cp-shopping-cart-toast" role="status" aria-live="polite">
+          <Share2 size={16} />
+          <span>已分享给 {shareFeedback.characterName}</span>
         </div>
       ) : null}
 
@@ -1576,29 +1623,39 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
                   <span style={{ fontSize: "calc(11px*var(--app-text-scale,1))", color: "#999" }}>Price</span>
                   <strong style={{ fontSize: "calc(18px*var(--app-text-scale,1))", color: "#222" }}>{selectedProduct.priceLabel}</strong>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => addToCart(selectedProduct)}
-                  style={{
-                    background: selectedProductRecentlyAdded ? "#16a34a" : "#222",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "24px",
-                    padding: "12px 24px",
-                    fontSize: "calc(13px*var(--app-text-scale,1))",
-                    fontWeight: "bold",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    minWidth: "128px",
-                    justifyContent: "center",
-                    transform: selectedProductRecentlyAdded ? "scale(1.03)" : "scale(1)",
-                    transition: "background 160ms ease, transform 180ms ease",
-                  }}
-                >
-                  {selectedProductRecentlyAdded ? <Check size={16} strokeWidth={3} /> : <ShoppingCart size={16} />}
-                  {selectedProductRecentlyAdded ? "Added" : cartIds.has(selectedProduct.id) ? "Add Again" : "Add to Cart"}
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={openProductShareSheet}
+                    style={{ background: "#fff7ed", color: "#b45309", border: "1px solid rgba(255,107,0,0.2)", borderRadius: "24px", padding: "11px 14px", fontSize: "calc(12px*var(--app-text-scale,1))", fontWeight: 800, display: "flex", alignItems: "center", gap: "6px", justifyContent: "center", whiteSpace: "nowrap" }}
+                  >
+                    <Share2 size={15} strokeWidth={2.4} />
+                    分享给TA
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => addToCart(selectedProduct)}
+                    style={{
+                      background: selectedProductRecentlyAdded ? "#16a34a" : "#222",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "24px",
+                      padding: "12px 18px",
+                      fontSize: "calc(13px*var(--app-text-scale,1))",
+                      fontWeight: "bold",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      minWidth: "118px",
+                      justifyContent: "center",
+                      transform: selectedProductRecentlyAdded ? "scale(1.03)" : "scale(1)",
+                      transition: "background 160ms ease, transform 180ms ease",
+                    }}
+                  >
+                    {selectedProductRecentlyAdded ? <Check size={16} strokeWidth={3} /> : <ShoppingCart size={16} />}
+                    {selectedProductRecentlyAdded ? "Added" : cartIds.has(selectedProduct.id) ? "Add Again" : "Add to Cart"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -2047,6 +2104,84 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
                 setPaymentRequestError(null);
               }} style={{ flex: 1, border: "1px solid #eee", background: "#fff", color: "#555", borderRadius: "18px", padding: "12px 0", fontSize: "calc(13px*var(--app-text-scale,1))", fontWeight: 700 }}>取消</button>
               <button type="button" disabled={!selectedPaymentRequestTargetId} onClick={sendPaymentRequest} style={{ flex: 1.4, border: "none", background: selectedPaymentRequestTargetId ? "#ff6b00" : "#eee", color: selectedPaymentRequestTargetId ? "#fff" : "#aaa", borderRadius: "18px", padding: "12px 0", fontSize: "calc(13px*var(--app-text-scale,1))", fontWeight: 800 }}>发送请求</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {productShareOpen && selectedProduct && (
+        <div className="cp-shopping-translation-overlay" role="presentation" onClick={() => {
+          setProductShareOpen(false);
+          setProductShareError(null);
+        }}>
+          <div
+            className="cp-shopping-translation-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="选择商品分享对象"
+            onClick={event => event.stopPropagation()}
+            style={{ maxHeight: "min(78vh, 560px)", overflow: "hidden", display: "flex", flexDirection: "column" }}
+          >
+            <div className="cp-shopping-translation-head" style={{ flexShrink: 0 }}>
+              <span>分享给TA</span>
+              <button type="button" onClick={() => {
+                setProductShareOpen(false);
+                setProductShareError(null);
+              }}>Close</button>
+            </div>
+
+            <div style={{ background: "#fff7ed", border: "1px solid rgba(255,107,0,0.14)", borderRadius: "18px", padding: "12px 14px", marginBottom: "14px", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
+              <div style={{ width: "46px", height: "46px", borderRadius: "14px", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "calc(24px*var(--app-text-scale,1))", flexShrink: 0 }}>{selectedProduct.previewIcon}</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <strong style={{ display: "block", color: "#222", fontSize: "calc(13px*var(--app-text-scale,1))", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{selectedProduct.title}</strong>
+                <span style={{ color: "#ff6b00", fontSize: "calc(12px*var(--app-text-scale,1))", fontWeight: 700 }}>{selectedProduct.priceLabel}</span>
+              </div>
+              <Share2 size={22} color="#ff6b00" />
+            </div>
+
+            {productShareTargets.length === 0 ? (
+              <div className="cp-shopping-status cp-empty-copy" style={{ minHeight: "120px" }}><p>暂无可选择的角色</p></div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", overflowY: "auto", paddingRight: "2px", flex: "1 1 auto", minHeight: 0 }}>
+                {productShareTargets.map(target => {
+                  const active = selectedProductShareTargetId === target.id;
+                  return (
+                    <button
+                      key={target.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProductShareTargetId(target.id);
+                        setProductShareError(null);
+                      }}
+                      style={{ width: "100%", border: active ? "2px solid #ff6b00" : "1px solid #eee", background: "#fff", borderRadius: "18px", padding: "14px", display: "flex", alignItems: "center", gap: "12px", textAlign: "left", boxShadow: active ? "0 10px 24px rgba(255,107,0,0.12)" : "0 4px 14px rgba(0,0,0,0.025)" }}
+                    >
+                      <div style={{ width: "42px", height: "42px", borderRadius: "16px", background: active ? "#ff6b00" : "#f4f4f5", color: active ? "#fff" : "#555", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, overflow: "hidden" }}>
+                        {target.avatar ? <img src={target.avatar} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <span style={{ fontSize: "calc(15px*var(--app-text-scale,1))", fontWeight: 800 }}>{target.name.slice(0, 1)}</span>}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "3px" }}>
+                        <strong style={{ fontSize: "calc(13px*var(--app-text-scale,1))", color: "#222" }}>{target.name}</strong>
+                        <span style={{ fontSize: "calc(11px*var(--app-text-scale,1))", color: "#888" }}>发送商品信息到私聊</span>
+                      </div>
+                      {active ? <Check size={18} color="#ff6b00" strokeWidth={3} /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {productShareError ? (
+              <div style={{ marginTop: "12px", borderRadius: "14px", background: "#fef2f2", color: "#b91c1c", padding: "10px 12px", display: "flex", gap: "8px", alignItems: "flex-start", fontSize: "calc(12px*var(--app-text-scale,1))", lineHeight: 1.4, flexShrink: 0 }}>
+                <AlertCircle size={15} style={{ flexShrink: 0, marginTop: "1px" }} />
+                <span>{productShareError}</span>
+              </div>
+            ) : null}
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "space-between", marginTop: "14px", flexShrink: 0 }}>
+              <button type="button" onClick={() => {
+                setProductShareOpen(false);
+                setProductShareError(null);
+              }} style={{ flex: 1, border: "1px solid #eee", background: "#fff", color: "#555", borderRadius: "18px", padding: "12px 0", fontSize: "calc(13px*var(--app-text-scale,1))", fontWeight: 700 }}>取消</button>
+              <button type="button" disabled={!selectedProductShareTargetId} onClick={shareProductWithCharacter} style={{ flex: 1.4, border: "none", background: selectedProductShareTargetId ? "#ff6b00" : "#eee", color: selectedProductShareTargetId ? "#fff" : "#aaa", borderRadius: "18px", padding: "12px 0", fontSize: "calc(13px*var(--app-text-scale,1))", fontWeight: 800 }}>发送分享</button>
             </div>
           </div>
         </div>
