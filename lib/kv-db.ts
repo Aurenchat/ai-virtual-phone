@@ -252,3 +252,31 @@ export async function kvUpdateAtomic<T>(key: string, update: (value: string | nu
     _cache.set(key, committed);
     return result;
 }
+
+/** Multi-key commit, used for durable task acknowledgements and their App writes. */
+export async function kvUpdateManyAtomic<T>(keys: string[], update: (values: Map<string, string | null>) => { values: Map<string, string | null>; result: T }): Promise<T> {
+    if (!_hydrated) throw new Error("Storage is not hydrated");
+    let committed = new Map<string, string | null>();
+    const result = await kvDb.transaction("rw", kvDb.entries, async () => {
+        const rows = await kvDb.entries.bulkGet(keys);
+        const next = update(new Map(keys.map((key, i) => [key, rows[i]?.value ?? null])));
+        for (const [key, value] of next.values) {
+            if (!keys.includes(key)) throw new Error("Undeclared transaction key");
+            if (value === null) await kvDb.entries.delete(key);
+            else await kvDb.entries.put({ key, value });
+        }
+        committed = next.values;
+        return next.result;
+    });
+    for (const [key, value] of committed) {
+        if (value === null) _cache.delete(key); else _cache.set(key, value);
+    }
+    return result;
+}
+
+/** Fresh durable read; errors must reach security-sensitive callers. */
+export async function kvReadFresh(key: string): Promise<string | null> {
+    const row = await kvDb.entries.get(key);
+    if (row) _cache.set(key, row.value); else _cache.delete(key);
+    return row?.value ?? null;
+}

@@ -1,0 +1,137 @@
+{
+  "port": [
+    {
+      "tag": "BUTTON",
+      "classes": "cp-xhs-note-card cp-xhs-note-card--compact"
+    },
+    {
+      "tag": "DIV",
+      "classes": "xhs-note-real-image-frame"
+    },
+    {
+      "tag": "IMG",
+      "classes": "xhs-note-real-image"
+    },
+    {
+      "tag": "DIV",
+      "classes": "cp-xhs-note-body"
+    },
+    {
+      "tag": "STRONG",
+      "classes": ""
+    },
+    {
+      "tag": "SPAN",
+      "classes": ""
+    },
+    {
+      "tag": "P",
+      "classes": ""
+    },
+    {
+      "tag": "SPAN",
+      "classes": ""
+    },
+    {
+      "tag": "DIV",
+      "classes": "cp-xhs-note-foot"
+    },
+    {
+      "tag": "DIV",
+      "classes": "cp-xhs-note-author"
+    },
+    {
+      "tag": "DIV",
+      "classes": "cp-xhs-note-author-avatar"
+    },
+    {
+      "tag": "IMG",
+      "classes": ""
+    },
+    {
+      "tag": "SPAN",
+      "classes": ""
+    },
+    {
+      "tag": "EM",
+      "classes": ""
+    },
+    {
+      "tag": "svg",
+      "classes": "lucide lucide-heart"
+    },
+    {
+      "tag": "path",
+      "classes": ""
+    }
+  ],
+  "native": [
+    {
+      "tag": "BUTTON",
+      "classes": "cp-xhs-note-card cp-xhs-note-card--compact"
+    },
+    {
+      "tag": "DIV",
+      "classes": "cp-xhs-cover cp-xhs-cover--ivory"
+    },
+    {
+      "tag": "SPAN",
+      "classes": "cp-xhs-cover-icon"
+    },
+    {
+      "tag": "DIV",
+      "classes": "cp-xhs-note-body"
+    },
+    {
+      "tag": "STRONG",
+      "classes": ""
+    },
+    {
+      "tag": "SPAN",
+      "classes": ""
+    },
+    {
+      "tag": "P",
+      "classes": ""
+    },
+    {
+      "tag": "SPAN",
+      "classes": ""
+    },
+    {
+      "tag": "DIV",
+      "classes": "cp-xhs-note-foot"
+    },
+    {
+      "tag": "DIV",
+      "classes": "cp-xhs-note-author"
+    },
+    {
+      "tag": "DIV",
+      "classes": "cp-xhs-note-author-avatar xhs-default-avatar"
+    },
+    {
+      "tag": "IMG",
+      "classes": ""
+    },
+    {
+      "tag": "SPAN",
+      "classes": ""
+    },
+    {
+      "tag": "EM",
+      "classes": ""
+    },
+    {
+      "tag": "svg",
+      "classes": "lucide lucide-heart"
+    },
+    {
+      "tag": "path",
+      "classes": ""
+    }
+  ],
+  "sharedCardStructureEqual": true,
+  "baseline": "components/xiaohongshu/xiaohongshu-app.tsx",
+  "note": "Original production component, identical fixture posts; asset adapters differ."
+}

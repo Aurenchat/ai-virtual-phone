@@ -1,0 +1,2103 @@
+{
+  "origin": "http://127.0.0.1:51912",
+  "browser": "153.0.4234.48",
+  "fixtureOnly": true,
+  "endpoint": "local HTTP recording server with deterministic response; no real model inference",
+  "results": [
+    {
+      "name": "setup-isolated-real-stores",
+      "completed": true,
+      "value": {
+        "registration": {
+          "presets": 4,
+          "regexes": 0,
+          "worldBooks": 0,
+          "bindingUpdated": false,
+          "warnings": []
+        },
+        "importedAppId": "app_phase0.anonymous.probe_c71dfc5bd40b",
+        "viewerId": "fixture-viewer-private-id",
+        "sessionId": "sess_1790325927617_cnojq",
+        "builtinId": "builtin_default_v1",
+        "isolatedOrigin": "http://127.0.0.1:51912"
+      }
+    },
+    {
+      "name": "ai-chat-multimodal",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 0,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": false,
+          "CORE_SENTINEL": false,
+          "LONG_SENTINEL": false,
+          "ORDINARY_XHS_SENTINEL": false,
+          "GLOBAL_USER_PROFILE_SENTINEL": false,
+          "kk = Chloe": false,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": false,
+          "OtherCharacter": false,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "ai-chat-text-projection",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 1,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": false,
+          "CORE_SENTINEL": false,
+          "LONG_SENTINEL": false,
+          "ORDINARY_XHS_SENTINEL": false,
+          "GLOBAL_USER_PROFILE_SENTINEL": false,
+          "kk = Chloe": false,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": false,
+          "OtherCharacter": false,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "ai-generate-default",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 2,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": false,
+          "OtherCharacter": false,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "seed-real-character-relations",
+      "completed": true,
+      "value": "当前世界观：默认世界。\nProbeViewer是OtherCharacter的fixture colleague。\n与你有关系的角色简介（供你在提及、转述或与其互动时保持其人设一致）：\n- OtherCharacter：OTHER_BRIEF_PERSONA_SENTINEL"
+    },
+    {
+      "name": "ai-generate-with-character-relations",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 3,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "ai-generate-history-none",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 4,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "ai-generate-exclude-shortterm",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 5,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": false,
+          "CORE_SENTINEL": false,
+          "LONG_SENTINEL": false,
+          "ORDINARY_XHS_SENTINEL": false,
+          "GLOBAL_USER_PROFILE_SENTINEL": false,
+          "kk = Chloe": false,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": false,
+          "OtherCharacter": false,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "guard-default-browse-post",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 6,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "guard-default-new-post-reaction",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 7,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "guard-default-comment-reply",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 8,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "guard-default-mention-reply",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 9,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "guard-default-dm",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 10,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "guard-custom-browse-post",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 11,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "guard-custom-new-post-reaction",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 12,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "guard-custom-comment-reply",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 13,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "guard-custom-mention-reply",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 14,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "guard-custom-dm",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 15,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "register-probe-hooks",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "plugin-custom-generate",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 16,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": true,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "plugin-custom-browse-post",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 17,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": true,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "plugin-custom-new-post-reaction",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 18,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": true,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "plugin-custom-comment-reply",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 19,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": true,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "plugin-custom-mention-reply",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 20,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": true,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "plugin-custom-dm",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 21,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": true,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "plugin-ai-chat-bypass",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 22,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": false,
+          "VIEWER_PERSONALITY": false,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": false,
+          "CORE_SENTINEL": false,
+          "LONG_SENTINEL": false,
+          "ORDINARY_XHS_SENTINEL": false,
+          "GLOBAL_USER_PROFILE_SENTINEL": false,
+          "kk = Chloe": false,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": false,
+          "OtherCharacter": false,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "hook-metadata",
+      "completed": true,
+      "value": [
+        {
+          "point": "prompt.system",
+          "keys": [
+            "sessionId",
+            "isGroup",
+            "characterId",
+            "hint"
+          ]
+        },
+        {
+          "point": "llm.request",
+          "keys": [
+            "messages",
+            "purpose",
+            "sessionId"
+          ],
+          "purpose": "custom_app:app_phase0.anonymous.probe_c71dfc5bd40b",
+          "sessionId": "sess_1790325927617_cnojq"
+        },
+        {
+          "point": "prompt.system",
+          "keys": [
+            "sessionId",
+            "isGroup",
+            "characterId",
+            "hint"
+          ]
+        },
+        {
+          "point": "llm.request",
+          "keys": [
+            "messages",
+            "purpose",
+            "sessionId"
+          ],
+          "purpose": "custom_app:app_phase0.anonymous.probe_c71dfc5bd40b",
+          "sessionId": "sess_1790325927617_cnojq"
+        },
+        {
+          "point": "prompt.system",
+          "keys": [
+            "sessionId",
+            "isGroup",
+            "characterId",
+            "hint"
+          ]
+        },
+        {
+          "point": "llm.request",
+          "keys": [
+            "messages",
+            "purpose",
+            "sessionId"
+          ],
+          "purpose": "custom_app:app_phase0.anonymous.probe_c71dfc5bd40b",
+          "sessionId": "sess_1790325927617_cnojq"
+        },
+        {
+          "point": "prompt.system",
+          "keys": [
+            "sessionId",
+            "isGroup",
+            "characterId",
+            "hint"
+          ]
+        },
+        {
+          "point": "llm.request",
+          "keys": [
+            "messages",
+            "purpose",
+            "sessionId"
+          ],
+          "purpose": "custom_app:app_phase0.anonymous.probe_c71dfc5bd40b",
+          "sessionId": "sess_1790325927617_cnojq"
+        },
+        {
+          "point": "prompt.system",
+          "keys": [
+            "sessionId",
+            "isGroup",
+            "characterId",
+            "hint"
+          ]
+        },
+        {
+          "point": "llm.request",
+          "keys": [
+            "messages",
+            "purpose",
+            "sessionId"
+          ],
+          "purpose": "custom_app:app_phase0.anonymous.probe_c71dfc5bd40b",
+          "sessionId": "sess_1790325927617_cnojq"
+        },
+        {
+          "point": "prompt.system",
+          "keys": [
+            "sessionId",
+            "isGroup",
+            "characterId",
+            "hint"
+          ]
+        },
+        {
+          "point": "llm.request",
+          "keys": [
+            "messages",
+            "purpose",
+            "sessionId"
+          ],
+          "purpose": "custom_app:app_phase0.anonymous.probe_c71dfc5bd40b",
+          "sessionId": "sess_1790325927617_cnojq"
+        }
+      ]
+    },
+    {
+      "name": "install-scoped-projection-hook",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "plugin-projection-positive-control",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 23,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": false,
+          "CORE_SENTINEL": false,
+          "LONG_SENTINEL": false,
+          "ORDINARY_XHS_SENTINEL": false,
+          "GLOBAL_USER_PROFILE_SENTINEL": false,
+          "kk = Chloe": false,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": false,
+          "OtherCharacter": false,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": true,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "plugin-projection-leaves-normal-chat",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 24,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "install-failing-plugin",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "plugin-throw-still-sends",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 25,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "install-timeout-plugin",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "plugin-timeout-still-sends",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 26,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "share-card-storage",
+      "completed": true,
+      "value": {
+        "result": {
+          "sessionId": "sess_1790325927617_cnojq",
+          "messageId": "msg_1790325927902_yo71o",
+          "summary": "[匿名小红书] acct_moth / moth 发布帖子"
+        },
+        "message": {
+          "sessionId": "sess_1790325927617_cnojq",
+          "role": "user",
+          "content": "[匿名小红书] 当前聊天者分享一篇帖子。帖主 social_account accountId=acct_moth displayName=moth；现实身份 unknown。分享者不等于帖主。内容：15m, ten rounds.",
+          "mediaType": "app_card",
+          "mediaData": {
+            "appId": "app_phase0.anonymous.probe_c71dfc5bd40b",
+            "appName": "匿名小红书",
+            "appCardTitle": "moth 的帖子",
+            "appCardBody": "15m, ten rounds.",
+            "appCardSummary": "[匿名小红书] acct_moth / moth 发布帖子",
+            "appCardTone": "",
+            "appCardLayout": {
+              "author": {
+                "kind": "social_account",
+                "accountId": "acct_moth",
+                "displayName": "moth"
+              },
+              "text": "15m, ten rounds."
+            },
+            "appTags": [],
+            "appHistoryText": "[匿名小红书] 当前聊天者分享一篇帖子。帖主 social_account accountId=acct_moth displayName=moth；现实身份 unknown。分享者不等于帖主。内容：15m, ten rounds."
+          },
+          "id": "msg_1790325927902_yo71o",
+          "createdAt": "2026-09-25T08:45:27.902Z",
+          "order": 1,
+          "status": "sent"
+        }
+      }
+    },
+    {
+      "name": "share-followup-default",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 27,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "share-followup-custom",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 28,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "install-share-guard",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "plugin-share-followup-custom",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 29,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": true,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": true,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "memory-search-scope-and-fresh-disclosure",
+      "completed": true,
+      "value": {
+        "core": [
+          {
+            "id": "fixture-core",
+            "type": "core",
+            "content": "CORE_SENTINEL kk = Chloe",
+            "importance": 1,
+            "createdAt": "2026-09-25T08:45:27.597Z",
+            "updatedAt": "2026-09-25T08:45:27.597Z",
+            "metadata": {}
+          }
+        ],
+        "long": [
+          {
+            "id": "fixture-long",
+            "type": "long_term",
+            "content": "LONG_SENTINEL ordinary chat identity kk = Chloe",
+            "importance": 1,
+            "createdAt": "2026-09-25T08:45:27.597Z",
+            "updatedAt": "2026-09-25T08:45:27.597Z",
+            "metadata": {}
+          }
+        ],
+        "other": [],
+        "timeline": [],
+        "fresh": [],
+        "synonym": [],
+        "counter": 54
+      }
+    },
+    {
+      "name": "memory-add-delete-timeline-stale-disclosure",
+      "completed": true,
+      "value": {
+        "deleted": {
+          "ok": true,
+          "deletedCount": 1,
+          "deletedIds": [
+            "custom_app_tl_mugptz3q_lc2iro"
+          ]
+        },
+        "stillSearchable": {
+          "entries": [
+            {
+              "id": "custom_app_app_phase0.anonymous.probe_c71dfc5bd40b_mugptz3q_kzbj4g",
+              "type": "long_term",
+              "content": "[匿名小红书] Chloe explicitly said: moth is me. EXPLICIT_OLD_DISCLOSURE",
+              "importance": 0.6,
+              "createdAt": "2026-09-25T08:45:27.926Z",
+              "updatedAt": "2026-09-25T08:45:27.926Z",
+              "metadata": {
+                "origin": "custom_app",
+                "appId": "app_phase0.anonymous.probe_c71dfc5bd40b",
+                "appName": "匿名小红书"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "production-disclosure-rebuild-after-revoke",
+      "completed": true,
+      "value": {
+        "deletedStateWouldRebuild": true
+      }
+    },
+    {
+      "name": "timeline-501-and-counter",
+      "completed": true,
+      "value": {
+        "total": 500,
+        "viewer": 250,
+        "other": 250,
+        "oldest": "[匿名小红书] CAPACITY_1 acct_1 name_1",
+        "newest": "[匿名小红书] CAPACITY_500 acct_500 name_500",
+        "initialRetained": false,
+        "counterBefore": 54,
+        "counterAfter": 54
+      }
+    },
+    {
+      "name": "chat-after-timeline-truncation",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 30,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "evicted-timeline-not-searchable-but-private-history-retained",
+      "completed": true,
+      "value": {
+        "search": {
+          "entries": []
+        },
+        "privateHistory": [
+          {
+            "id": "initial-moth",
+            "viewerCharacterId": "fixture-viewer-private-id",
+            "accountId": "acct_moth",
+            "displayName": "moth",
+            "summary": "APP_TIMELINE_SENTINEL posted shooting."
+          }
+        ]
+      }
+    },
+    {
+      "name": "longterm-survives-short-context",
+      "completed": true,
+      "value": {
+        "entries": [
+          {
+            "id": "custom_app_app_phase0.anonymous.probe_c71dfc5bd40b_mugptze5_wjvv79",
+            "type": "long_term",
+            "content": "[匿名小红书] social_account accountId=acct_moth displayName=moth ACCOUNT_ARCHIVE_SENTINEL posted shooting.",
+            "importance": 0.6,
+            "createdAt": "2026-09-25T08:45:28.301Z",
+            "updatedAt": "2026-09-25T08:45:28.301Z",
+            "metadata": {
+              "origin": "custom_app",
+              "appId": "app_phase0.anonymous.probe_c71dfc5bd40b",
+              "appName": "匿名小红书"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "chat-after-explicit-app-longterm-write",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 31,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": true
+        }
+      }
+    },
+    {
+      "name": "timeline-summary-limit",
+      "completed": true,
+      "value": {
+        "summaryLength": 2000,
+        "tailRetained": false,
+        "metadata": {
+          "accountId": "metadata-only-account"
+        }
+      }
+    },
+    {
+      "name": "prepare-native-auto-summary-probe",
+      "completed": true,
+      "value": {
+        "counterAfterTimelineOnly": 0
+      }
+    },
+    {
+      "name": "ai-generate-triggers-native-summary",
+      "completed": true,
+      "value": {
+        "requests": [
+          {
+            "index": 32,
+            "guard": true,
+            "anonymousSource": true,
+            "ordinaryIdentity": true,
+            "otherPrivateMemory": false,
+            "roles": [
+              "system",
+              "system",
+              "user",
+              "user",
+              "system",
+              "user",
+              "system"
+            ]
+          },
+          {
+            "index": 33,
+            "guard": false,
+            "anonymousSource": true,
+            "ordinaryIdentity": true,
+            "otherPrivateMemory": false,
+            "roles": [
+              "user"
+            ]
+          }
+        ],
+        "savedSummaries": [
+          {
+            "id": "mem_lt_1790325928339_el1mpu",
+            "characterId": "fixture-viewer-private-id",
+            "sourceApp": "custom_app",
+            "type": "long_term",
+            "content": "PHASE0_RESPONSE",
+            "importance": 0.8,
+            "createdAt": "2026-09-25T08:45:28.339Z",
+            "updatedAt": "2026-09-25T08:45:28.339Z",
+            "metadata": {
+              "summarizedEvents": 257,
+              "timeSpan": "2026-09-25T08:45:27.597Z ~ 2026-09-25T08:45:28.430Z",
+              "sourceSessionIds": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "mount-real-custom-app-runner",
+      "completed": true,
+      "value": [
+        {
+          "id": "fixture-viewer-private-id",
+          "name": "ProbeViewer",
+          "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAOUlEQVR4AezXsQkAQAgDwPD77+y7gaUgF0gfrstLqjbbA7IaAwgQIECAAAECBAgQIECAwH2B6Xp/AAAA///jgXkBAAAABklEQVQDAAgKQAH5P7nEAAAAAElFTkSuQmCC",
+          "persona": "VIEWER_PERSONA: patient photographer; remembers camera techniques.",
+          "personality": "VIEWER_PERSONALITY: quiet and precise"
+        },
+        {
+          "id": "fixture-other-private-id",
+          "name": "OtherCharacter",
+          "avatar": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAOUlEQVR4AezXsQkAQAgDwPD77+y7gaUgF0gfrstLqjbbA7IaAwgQIECAAAECBAgQIECAwH2B6Xp/AAAA///jgXkBAAAABklEQVQDAAgKQAH5P7nEAAAAAElFTkSuQmCC",
+          "persona": "OTHER_PERSONA_SECRET",
+          "personality": "OTHER_PERSONALITY_SECRET"
+        }
+      ]
+    },
+    {
+      "name": "sdk-ai-chat-image",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 34,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": false,
+          "VIEWER_PERSONALITY": false,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": false,
+          "CORE_SENTINEL": false,
+          "LONG_SENTINEL": false,
+          "ORDINARY_XHS_SENTINEL": false,
+          "GLOBAL_USER_PROFILE_SENTINEL": false,
+          "kk = Chloe": false,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": false,
+          "OtherCharacter": false,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "sdk-ai-generate-image",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 35,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": true
+        }
+      }
+    },
+    {
+      "name": "sdk-share-card",
+      "completed": true,
+      "value": {
+        "result": {
+          "ok": true,
+          "sessionId": "sess_1790325927617_cnojq",
+          "messageId": "msg_1790325928417_i8v7x"
+        },
+        "message": {
+          "sessionId": "sess_1790325927617_cnojq",
+          "role": "user",
+          "content": "[匿名小红书] SDK_SHARE_SENTINEL 当前聊天者分享帖子；作者 social_account acct_moth/moth；分享者并非帖主的身份声明。",
+          "mediaType": "app_card",
+          "mediaData": {
+            "appId": "app_phase0.anonymous.probe_c71dfc5bd40b",
+            "appName": "匿名小红书",
+            "appCardTitle": "moth",
+            "appCardBody": "",
+            "appCardSummary": "",
+            "appCardTone": "",
+            "appCardLayout": {
+              "author": {
+                "kind": "social_account",
+                "accountId": "acct_moth",
+                "displayName": "moth"
+              }
+            },
+            "appTags": [],
+            "appHistoryText": "[匿名小红书] SDK_SHARE_SENTINEL 当前聊天者分享帖子；作者 social_account acct_moth/moth；分享者并非帖主的身份声明。"
+          },
+          "id": "msg_1790325928417_i8v7x",
+          "createdAt": "2026-09-25T08:45:28.417Z",
+          "order": 3,
+          "status": "sent"
+        }
+      }
+    },
+    {
+      "name": "sdk-share-followup-final-payload",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 36,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": true
+        }
+      }
+    },
+    {
+      "name": "scheduled-ai-not-supported",
+      "completed": true,
+      "value": {
+        "accepted": false,
+        "error": "Error: 未知后台动作：ai.generate"
+      }
+    },
+    {
+      "name": "lifecycle-open-positive-control",
+      "completed": true,
+      "value": {
+        "id": "open-control",
+        "result": "PHASE0_RESPONSE",
+        "createdAt": "2026-09-25T08:45:28.432Z",
+        "updatedAt": "2026-09-25T08:45:28.432Z"
+      }
+    },
+    {
+      "name": "lifecycle-close-during-generation",
+      "completed": true,
+      "value": {
+        "hostRequestCompleted": true,
+        "rows": [
+          {
+            "id": "pending-close",
+            "status": "pending",
+            "createdAt": "2026-09-25T08:45:28.434Z",
+            "updatedAt": "2026-09-25T08:45:28.434Z"
+          },
+          {
+            "id": "open-control",
+            "result": "PHASE0_RESPONSE",
+            "createdAt": "2026-09-25T08:45:28.432Z",
+            "updatedAt": "2026-09-25T08:45:28.432Z"
+          }
+        ]
+      }
+    },
+    {
+      "name": "lifecycle-generate-open-positive-control",
+      "completed": true,
+      "value": {
+        "id": "generate-open",
+        "status": "complete",
+        "result": "PHASE0_RESPONSE",
+        "createdAt": "2026-09-25T08:45:29.081Z",
+        "updatedAt": "2026-09-25T08:45:29.081Z"
+      }
+    },
+    {
+      "name": "lifecycle-generate-close-during-generation",
+      "completed": true,
+      "value": {
+        "hostRequestCompleted": true,
+        "row": {
+          "id": "generate-close",
+          "status": "pending",
+          "createdAt": "2026-09-25T08:45:29.083Z",
+          "updatedAt": "2026-09-25T08:45:29.083Z"
+        }
+      }
+    },
+    {
+      "name": "sdk-memory-current-viewer",
+      "completed": true,
+      "value": {
+        "own": {
+          "entries": [
+            {
+              "id": "custom_app_app_phase0.anonymous.probe_c71dfc5bd40b_mugptze5_wjvv79",
+              "type": "long_term",
+              "content": "[匿名小红书] social_account accountId=acct_moth displayName=moth ACCOUNT_ARCHIVE_SENTINEL posted shooting.",
+              "importance": 0.6,
+              "createdAt": "2026-09-25T08:45:28.301Z",
+              "updatedAt": "2026-09-25T08:45:28.301Z",
+              "metadata": {
+                "origin": "custom_app",
+                "appId": "app_phase0.anonymous.probe_c71dfc5bd40b",
+                "appName": "匿名小红书"
+              }
+            }
+          ]
+        },
+        "otherIdAlsoAccepted": {
+          "entries": [
+            {
+              "id": "fixture-other-long",
+              "type": "long_term",
+              "content": "OTHER_MEMORY_SECRET ownerKind=character",
+              "importance": 1,
+              "createdAt": "2026-09-25T08:45:27.597Z",
+              "updatedAt": "2026-09-25T08:45:27.597Z",
+              "metadata": {}
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "install-real-companion-plugin",
+      "completed": true,
+      "value": {
+        "result": {
+          "ok": true,
+          "name": "Phase 0 guard probe",
+          "upgraded": false,
+          "toVersion": "0.0.0"
+        },
+        "active": [
+          "phase0.guard-probe"
+        ]
+      }
+    },
+    {
+      "name": "installed-plugin-custom-generate",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 41,
+        "imageParts": 1,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": true,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": true,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": true,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": true
+        }
+      }
+    },
+    {
+      "name": "installed-plugin-share-followup",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 42,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": true,
+          "VIEWER_PERSONALITY": true,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": true,
+          "CORE_SENTINEL": true,
+          "LONG_SENTINEL": true,
+          "ORDINARY_XHS_SENTINEL": true,
+          "GLOBAL_USER_PROFILE_SENTINEL": true,
+          "kk = Chloe": true,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": true,
+          "OtherCharacter": true,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": true,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": true,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": true
+        }
+      }
+    },
+    {
+      "name": "installed-plugin-ai-chat-bypass",
+      "completed": true,
+      "value": {
+        "requestCaptured": true,
+        "requestIndex": 43,
+        "imageParts": 0,
+        "markers": {
+          "VIEWER_PERSONA": false,
+          "VIEWER_PERSONALITY": false,
+          "APP_HISTORY_SENTINEL": false,
+          "APP_TIMELINE_SENTINEL": false,
+          "TASK_SENTINEL": false,
+          "CHAT_SHORT_SENTINEL": false,
+          "CORE_SENTINEL": false,
+          "LONG_SENTINEL": false,
+          "ORDINARY_XHS_SENTINEL": false,
+          "GLOBAL_USER_PROFILE_SENTINEL": false,
+          "kk = Chloe": false,
+          "OTHER_PERSONA_SECRET": false,
+          "OTHER_BRIEF_PERSONA_SENTINEL": false,
+          "OtherCharacter": false,
+          "OTHER_CHAT_SECRET": false,
+          "OTHER_MEMORY_SECRET": false,
+          "OTHER_TIMELINE_SECRET": false,
+          "PRIVATE_BINDING_SENTINEL": false,
+          "fixture-viewer-private-id": false,
+          "fixture-other-private-id": false,
+          "严格作用域规则": false,
+          "HOOK_GUARD": false,
+          "PROMPT_HOOK_SENTINEL": false,
+          "INSTALLED_PLUGIN_GUARD": false,
+          "PLUGIN_SYSTEM_SENTINEL": false,
+          "ACCOUNT_ARCHIVE_SENTINEL": false
+        }
+      }
+    },
+    {
+      "name": "transport-image-content-validation",
+      "completed": true,
+      "value": [
+        {
+          "label": "ai-generate-default",
+          "rgb": [
+            254,
+            0,
+            2,
+            255
+          ],
+          "width": 32,
+          "height": 32
+        },
+        {
+          "label": "plugin-projection-positive-control",
+          "rgb": [
+            255,
+            0,
+            0,
+            255
+          ],
+          "width": 32,
+          "height": 32
+        },
+        {
+          "label": "sdk-ai-generate-image",
+          "rgb": [
+            254,
+            0,
+            2,
+            255
+          ],
+          "width": 32,
+          "height": 32
+        }
+      ]
+    },
+    {
+      "name": "browser-reload-persistence",
+      "completed": true,
+      "value": {
+        "appCount": 1,
+        "privateBindings": [
+          {
+            "id": "binding",
+            "accountId": "acct_other",
+            "ownerKind": "character",
+            "ownerId": "fixture-other-private-id",
+            "marker": "PRIVATE_BINDING_SENTINEL"
+          }
+        ],
+        "privateHistory": [
+          {
+            "id": "initial-moth",
+            "viewerCharacterId": "fixture-viewer-private-id",
+            "accountId": "acct_moth",
+            "displayName": "moth",
+            "summary": "APP_TIMELINE_SENTINEL posted shooting."
+          }
+        ],
+        "lifecycle": [
+          {
+            "id": "generate-close",
+            "status": "pending",
+            "createdAt": "2026-09-25T08:45:29.083Z",
+            "updatedAt": "2026-09-25T08:45:29.083Z"
+          },
+          {
+            "id": "generate-open",
+            "status": "complete",
+            "result": "PHASE0_RESPONSE",
+            "createdAt": "2026-09-25T08:45:29.081Z",
+            "updatedAt": "2026-09-25T08:45:29.081Z"
+          },
+          {
+            "id": "pending-close",
+            "status": "pending",
+            "createdAt": "2026-09-25T08:45:28.434Z",
+            "updatedAt": "2026-09-25T08:45:28.434Z"
+          },
+          {
+            "id": "open-control",
+            "result": "PHASE0_RESPONSE",
+            "createdAt": "2026-09-25T08:45:28.432Z",
+            "updatedAt": "2026-09-25T08:45:28.432Z"
+          }
+        ],
+        "timelineCount": 500,
+        "longTerm": {
+          "entries": [
+            {
+              "id": "custom_app_app_phase0.anonymous.probe_c71dfc5bd40b_mugptze5_wjvv79",
+              "type": "long_term",
+              "content": "[匿名小红书] social_account accountId=acct_moth displayName=moth ACCOUNT_ARCHIVE_SENTINEL posted shooting.",
+              "importance": 0.6,
+              "createdAt": "2026-09-25T08:45:28.301Z",
+              "updatedAt": "2026-09-25T08:45:28.301Z",
+              "metadata": {
+                "origin": "custom_app",
+                "appId": "app_phase0.anonymous.probe_c71dfc5bd40b",
+                "appName": "匿名小红书"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "capability-observations-asserted",
+      "completed": true,
+      "value": {
+        "assertions": 13,
+        "note": "Expected limitations reproduced, NOT 13 product acceptance passes."
+      }
+    }
+  ],
+  "browserErrors": []
+}

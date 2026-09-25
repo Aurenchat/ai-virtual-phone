@@ -20,6 +20,7 @@ import { loadNativeTimeline, formatTimelineForSummarization, filterTimelineByAll
 import { generateEmbedding, resolveEmbeddingModel } from "./memory-embedding";
 import { simpleLLMCall } from "./api-helpers";
 import { maybeRunCoreMemoryPipeline } from "./core-memory-builder";
+import { readMemoryRevisions, mergeMemoryProvenance } from "./memory-provenance";
 
 /** Per-character lock to prevent concurrent summarization. */
 const summarizingSet = new Set<string>();
@@ -72,6 +73,7 @@ export async function runSummarizationPipeline(
     }
 
     // Read native app data (chat messages, moments) directly — no separate event log
+    await readMemoryRevisions();
     const afterTimestamp = options?.force
         ? undefined
         : options?.sinceTimestamp ?? (getLastSummarizedTimestamp(characterId) ?? undefined);
@@ -154,6 +156,7 @@ export async function runSummarizationPipeline(
         sourceApp: dominantSource as MemoryEntry["sourceApp"],
         type: "long_term",
         content: summary,
+        provenance: mergeMemoryProvenance(allEntries),
         embedding,
         importance: 0.8,
         createdAt: now,

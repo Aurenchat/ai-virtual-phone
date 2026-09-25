@@ -4,6 +4,7 @@
 
 import type { ApiConfig } from "./settings-types";
 import { pushApiLog } from "./api-log-store";
+import { protectProviderBody } from "./custom-app-protected-policy";
 
 const SIMPLE_ANTHROPIC_AUTO_MAX_TOKENS = 8192;
 
@@ -156,6 +157,7 @@ export async function simpleLLMCall(
             });
         }
 
+        body = JSON.stringify(await protectProviderBody(JSON.parse(body), isNativeAnthropicApi(config) ? "anthropic" : isNativeGoogleApi(config) ? "gemini" : "openai-compatible"));
         const bodySize = body.length;
         const bodyTokenEstimate = Math.ceil(bodySize / 3);
         console.log("[simpleLLMCall] Request:", { url: fetchUrl.slice(0, 80), bodySize, bodyTokenEstimate, model: config.defaultModel });

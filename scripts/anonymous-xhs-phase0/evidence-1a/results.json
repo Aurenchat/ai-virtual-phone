@@ -1,0 +1,189 @@
+{
+  "origin": "http://127.0.0.1:65414",
+  "browser": "153.0.4234.48",
+  "fixtureOnly": true,
+  "endpoint": "local HTTP recording server with deterministic response; no real model inference",
+  "results": [
+    {
+      "name": "install-built-zip-in-real-host",
+      "completed": true,
+      "value": {
+        "sdkVersion": "1.0",
+        "id": "anonymous.xiaohongshu",
+        "name": "匿名小红书",
+        "version": "1.1.0-alpha.1",
+        "author": "Aurenchat",
+        "description": "与内置小红书数据完全隔离的匿名社交应用。所有参与者均使用稳定、独立的 social_account；真实身份映射只保存在应用私有数据中。",
+        "icon": "icon.svg",
+        "entry": "index.html",
+        "primaryTags": [
+          "anonymous_xiaohongshu"
+        ],
+        "permissions": [
+          "app.data.read",
+          "app.data.write",
+          "app.assets.read",
+          "characters.read",
+          "ai.generateScoped",
+          "ai.tasks",
+          "app.policy.manage",
+          "memory.source.read",
+          "memory.source.write",
+          "ui.toast"
+        ],
+        "resources": {
+          "assets": [
+            "assets/app.css",
+            "assets/app.js",
+            "assets/avatars/default-01.png",
+            "assets/avatars/default-02.png",
+            "assets/avatars/default-03.png",
+            "assets/avatars/default-04.png",
+            "assets/avatars/default-05.png",
+            "assets/avatars/default-06.png"
+          ]
+        }
+      }
+    },
+    {
+      "name": "human-only-initialization",
+      "completed": true,
+      "value": {
+        "userAccountId": "acct_7b6f9ecbda6942caa51f475c88de3729"
+      }
+    },
+    {
+      "name": "native-feed-and-two-automatic-character-accounts",
+      "completed": true,
+      "value": {
+        "accounts": [
+          {
+            "accountId": "acct_7b6f9ecbda6942caa51f475c88de3729",
+            "displayName": "moth"
+          },
+          {
+            "accountId": "acct_a20bffdc0cea4e16a903538d954cdf87",
+            "displayName": "灰蓝胶片1_0"
+          },
+          {
+            "accountId": "acct_81bb348fe9f247469a02474844dbd729",
+            "displayName": "今天吃什么1_0"
+          },
+          {
+            "accountId": "acct_4c7f923e12b8451cb543deceaf6f4b6c",
+            "displayName": "灰蓝胶片1_1"
+          },
+          {
+            "accountId": "acct_221a2adf561d430fb1a6041e8e2e102c",
+            "displayName": "今天吃什么1_1"
+          },
+          {
+            "accountId": "acct_267f7d6729fc4e82aec9dc1a2d915b8b",
+            "displayName": "灰蓝胶片1_2"
+          },
+          {
+            "accountId": "acct_cf4488986652418a8953ee196013015a",
+            "displayName": "今天吃什么1_2"
+          },
+          {
+            "accountId": "acct_c79e75f9976c41d2a8d346845ae29f0f",
+            "displayName": "灰蓝胶片1_3"
+          },
+          {
+            "accountId": "acct_1a5e18c1c6194770b258ba6f6d54df0b",
+            "displayName": "今天吃什么1_3"
+          },
+          {
+            "accountId": "acct_bdd63c311bd847e2af5dcf700cc74556",
+            "displayName": "灰蓝胶片1_4"
+          },
+          {
+            "accountId": "acct_9eb33f25959b4b709dcf3b0906b7fbab",
+            "displayName": "今天吃什么1_4"
+          },
+          {
+            "accountId": "acct_75a7b00121d948e2afb0f2b4e9ff2753",
+            "displayName": "灰蓝胶片1_5"
+          },
+          {
+            "accountId": "acct_7ebb753d412f4530a64fcd8686876555",
+            "displayName": "今天吃什么1_5"
+          },
+          {
+            "accountId": "acct_85d064aef1e641a8b215493d350dd664",
+            "displayName": "nullsignal"
+          },
+          {
+            "accountId": "acct_3af006ee839b44908ba8f2e17049d751",
+            "displayName": "citywalk_3"
+          },
+          {
+            "accountId": "acct_93a292aaf898463c9c52ce2148a75f20",
+            "displayName": "burnttoast"
+          },
+          {
+            "accountId": "acct_a238af0fc6a94e24818a55a084e044ea",
+            "displayName": "citywalk_5"
+          }
+        ],
+        "notes": 8
+      }
+    },
+    {
+      "name": "character-card-avatar-ui-and-stable-rename",
+      "completed": true,
+      "value": {
+        "accountId": "acct_85d064aef1e641a8b215493d350dd664"
+      }
+    },
+    {
+      "name": "publish-real-image-close-iframe-recover-once",
+      "completed": true,
+      "value": {
+        "noteId": "note_073d18b3b446434b85f553166e048ed2",
+        "comments": 3,
+        "image": true
+      }
+    },
+    {
+      "name": "native-detail-and-comment-reply-loop",
+      "completed": true,
+      "value": {
+        "comments": 7
+      }
+    },
+    {
+      "name": "final-provider-payload-identity-projection",
+      "completed": true,
+      "value": {
+        "requests": 11,
+        "multimodal": 6
+      }
+    },
+    {
+      "name": "source-memory-projection",
+      "completed": true,
+      "value": [
+        9,
+        10
+      ]
+    },
+    {
+      "name": "full-host-reload-persistence",
+      "completed": true,
+      "value": {
+        "notes": 9,
+        "accounts": 19
+      }
+    },
+    {
+      "name": "original-home-card-dom-comparison",
+      "completed": true,
+      "value": {
+        "sharedCardStructureEqual": true,
+        "originalColumns": 2
+      }
+    }
+  ],
+  "browserErrors": []
+}

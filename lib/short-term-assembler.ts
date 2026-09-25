@@ -5,6 +5,7 @@
 
 import { isReadingDiscussMessage, isSystemInstructionMessage, loadChatSessions, loadChatMessages, type ChatMessage } from "./chat-storage";
 import { buildGroupAdminBracketText } from "./group-admin";
+import { isCachedMemoryProvenanceValid, memorySourceEnvelope } from "./memory-provenance";
 import { formatGiftForPrompt } from "./gift-prompt";
 import { loadMomentPosts, loadMomentComments } from "./moments-storage";
 import { loadCharacters } from "./character-storage";
@@ -51,6 +52,7 @@ function formatPhotoDirectiveForPrompt(msg: ChatMessage): string {
 }
 
 export type NativeTimelineEntry = {
+    provenance?: import("./memory-provenance").MemoryProvenance;
     id: string;
     sourceApp: "chat" | "moments" | "story" | "vn" | "map" | "game" | "diary" | "xiaohongshu" | "interview_magazine" | "cocreate" | "checkphone" | "custom_app";
     sourceDetail?: "direct" | "group" | "system" | "story" | "chat_offline" | "game" | "diary_entry" | "notewall" | "xiaohongshu" | "black_market_theater" | "interview_issue" | "interview_shared_issue" | "cocreate_project" | "checkphone" | "custom_app_event"; // chat sub-type: 1:1 vs group chat vs system note
@@ -762,6 +764,7 @@ export function loadNativeTimeline(
         afterTimestamp: options?.afterTimestamp,
     });
     for (const customEntry of customAppEntries) {
+        if (!isCachedMemoryProvenanceValid(customEntry.provenance)) continue;
         const label = customEntry.appLabel || customEntry.appName || "APP";
         entries.push({
             id: customEntry.id,
@@ -772,7 +775,8 @@ export function loadNativeTimeline(
             customAppId: customEntry.appId,
             customAppName: customEntry.appName,
             customAppLabel: label,
-            content: formatStoredPromptEventContent(customEntry.summary, {
+            provenance: customEntry.provenance,
+            content: formatStoredPromptEventContent(memorySourceEnvelope(customEntry.provenance) + customEntry.summary, {
                 label,
                 timestamp: customEntry.createdAt,
                 timeAware,

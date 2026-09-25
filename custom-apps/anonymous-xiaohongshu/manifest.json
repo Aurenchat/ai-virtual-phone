@@ -1,0 +1,37 @@
+{
+  "sdkVersion": "1.0",
+  "id": "anonymous.xiaohongshu",
+  "name": "匿名小红书",
+  "version": "1.1.0-alpha.1",
+  "author": "Aurenchat",
+  "description": "与内置小红书数据完全隔离的匿名社交应用。所有参与者均使用稳定、独立的 social_account；真实身份映射只保存在应用私有数据中。",
+  "icon": "icon.svg",
+  "entry": "index.html",
+  "primaryTags": [
+    "anonymous_xiaohongshu"
+  ],
+  "permissions": [
+    "app.data.read",
+    "app.data.write",
+    "app.assets.read",
+    "characters.read",
+    "ai.generateScoped",
+    "ai.tasks",
+    "app.policy.manage",
+    "memory.source.read",
+    "memory.source.write",
+    "ui.toast"
+  ],
+  "resources": {
+    "assets": [
+      "assets/app.css",
+      "assets/app.js",
+      "assets/avatars/default-01.png",
+      "assets/avatars/default-02.png",
+      "assets/avatars/default-03.png",
+      "assets/avatars/default-04.png",
+      "assets/avatars/default-05.png",
+      "assets/avatars/default-06.png"
+    ]
+  }
+}

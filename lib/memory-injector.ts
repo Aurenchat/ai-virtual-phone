@@ -2,6 +2,7 @@
 // Formats long-term memory entries into injectable prompt text.
 
 import type { MemoryEntry } from "./memory-types";
+import { memorySourceEnvelope } from "./memory-provenance";
 
 /**
  * Format long-term memories for prompt injection.
@@ -13,7 +14,7 @@ export function formatLongTermMemories(memories: MemoryEntry[]): string {
 
     const lines: string[] = [];
     for (const entry of memories) {
-        lines.push(`- ${entry.content}`);
+        lines.push(`- ${memorySourceEnvelope(entry.provenance)}${entry.content}`);
     }
     return lines.join("\n");
 }
@@ -23,7 +24,7 @@ export function formatCoreMemories(memories: MemoryEntry[]): string {
 
     const lines: string[] = [];
     for (const entry of memories) {
-        lines.push(`- ${entry.content}`);
+        lines.push(`- ${memorySourceEnvelope(entry.provenance)}${entry.content}`);
     }
     return lines.join("\n");
 }

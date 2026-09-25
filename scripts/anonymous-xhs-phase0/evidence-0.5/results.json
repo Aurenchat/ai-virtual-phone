@@ -1,0 +1,1111 @@
+{
+  "origin": "http://127.0.0.1:49804",
+  "browser": "153.0.4234.48",
+  "fixtureOnly": true,
+  "endpoint": "local HTTP recording server with deterministic response; no real model inference",
+  "results": [
+    {
+      "name": "setup-real-importer-host-and-idb",
+      "completed": true,
+      "value": {
+        "permissions": [
+          "ai.chat",
+          "ai.generate",
+          "ai.generateScoped",
+          "ai.tasks",
+          "app.policy.manage",
+          "characters.read",
+          "memory.write",
+          "memory.search",
+          "memory.readShortTerm",
+          "memory.source.read",
+          "memory.source.write",
+          "app.data.read",
+          "app.data.write",
+          "chat.read",
+          "chat.sendCard"
+        ],
+        "viewerId": "private-viewer-id"
+      }
+    },
+    {
+      "name": "legacy-ai-chat-no-policy",
+      "completed": true,
+      "value": {
+        "result": {
+          "text": "PHASE0_RESPONSE",
+          "finishReason": "stop",
+          "wasTruncated": false
+        },
+        "captures": [
+          0
+        ]
+      }
+    },
+    {
+      "name": "scoped-multimodal-default-deny",
+      "completed": true,
+      "value": {
+        "result": {
+          "content": "PHASE0_RESPONSE",
+          "raw": {
+            "choices": [
+              {
+                "message": {
+                  "role": "assistant",
+                  "content": "PHASE0_RESPONSE"
+                },
+                "finish_reason": "stop"
+              }
+            ]
+          }
+        },
+        "captures": [
+          1
+        ]
+      }
+    },
+    {
+      "name": "scoped-no-sources-means-no-persona",
+      "completed": true,
+      "value": {
+        "result": {
+          "content": "PHASE0_RESPONSE",
+          "raw": {
+            "choices": [
+              {
+                "message": {
+                  "role": "assistant",
+                  "content": "PHASE0_RESPONSE"
+                },
+                "finish_reason": "stop"
+              }
+            ]
+          }
+        },
+        "captures": [
+          2
+        ]
+      }
+    },
+    {
+      "name": "scoped-reject-unknown-policy-and-legacy-memory",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "scoped-reject-image-overflow-and-disabled-vision",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "source-write-two-viewers-and-two-entities",
+      "completed": true,
+      "value": {
+        "revision": 0,
+        "entries": [
+          {
+            "id": "source:[\"[\\\"app_phase05.probe_ea517a052bef\\\",\\\"social\\\",\\\"acct_a\\\",\\\"private-viewer-id\\\"]\",0,\"e1\"]",
+            "characterId": "private-viewer-id",
+            "sourceApp": "custom_app",
+            "type": "long_term",
+            "content": "acct_a / moth posted photography. OWN_SOURCE_MEMORY",
+            "importance": 0.8,
+            "createdAt": "2026-09-25T14:13:06.683Z",
+            "updatedAt": "2026-09-25T14:13:06.683Z",
+            "provenance": {
+              "sources": [
+                {
+                  "sourceKind": "custom_app",
+                  "sourceAppId": "app_phase05.probe_ea517a052bef",
+                  "sourceNamespace": "social",
+                  "sourceEntityId": "acct_a",
+                  "viewerCharacterId": "private-viewer-id",
+                  "revision": 0
+                }
+              ],
+              "mixed": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "scoped-own-memory-plus-image-plus-own-timeline",
+      "completed": true,
+      "value": {
+        "result": {
+          "content": "PHASE0_RESPONSE",
+          "raw": {
+            "choices": [
+              {
+                "message": {
+                  "role": "assistant",
+                  "content": "PHASE0_RESPONSE"
+                },
+                "finish_reason": "stop"
+              }
+            ]
+          }
+        },
+        "captures": [
+          3
+        ]
+      }
+    },
+    {
+      "name": "register-persistent-required-policy",
+      "completed": true,
+      "value": {
+        "ok": true
+      }
+    },
+    {
+      "name": "protected-scoped-generation",
+      "completed": true,
+      "value": {
+        "result": {
+          "content": "PHASE0_RESPONSE",
+          "raw": {
+            "choices": [
+              {
+                "message": {
+                  "role": "assistant",
+                  "content": "PHASE0_RESPONSE"
+                },
+                "finish_reason": "stop"
+              }
+            ]
+          }
+        },
+        "captures": [
+          4
+        ]
+      }
+    },
+    {
+      "name": "protected-legacy-ai-chat",
+      "completed": true,
+      "value": {
+        "result": {
+          "text": "PHASE0_RESPONSE",
+          "finishReason": "stop",
+          "wasTruncated": false
+        },
+        "captures": [
+          5
+        ]
+      }
+    },
+    {
+      "name": "select-Anthropic",
+      "completed": true,
+      "value": "Anthropic"
+    },
+    {
+      "name": "native-Anthropic-scoped-image-and-policy",
+      "completed": true,
+      "value": {
+        "result": {
+          "content": "PHASE0_RESPONSE",
+          "raw": {
+            "content": [
+              {
+                "type": "text",
+                "text": "PHASE0_RESPONSE"
+              }
+            ],
+            "stop_reason": "end_turn"
+          }
+        },
+        "captures": [
+          6
+        ]
+      }
+    },
+    {
+      "name": "native-Anthropic-simple-policy",
+      "completed": true,
+      "value": {
+        "result": {
+          "text": "PHASE0_RESPONSE",
+          "finishReason": "end_turn",
+          "wasTruncated": false
+        },
+        "captures": [
+          7
+        ]
+      }
+    },
+    {
+      "name": "select-Google",
+      "completed": true,
+      "value": "Google"
+    },
+    {
+      "name": "native-Google-scoped-image-and-policy",
+      "completed": true,
+      "value": {
+        "result": {
+          "content": "PHASE0_RESPONSE",
+          "raw": {
+            "candidates": [
+              {
+                "content": {
+                  "parts": [
+                    {
+                      "text": "PHASE0_RESPONSE"
+                    }
+                  ]
+                },
+                "finishReason": "STOP"
+              }
+            ]
+          }
+        },
+        "captures": [
+          8
+        ]
+      }
+    },
+    {
+      "name": "native-Google-simple-policy",
+      "completed": true,
+      "value": {
+        "result": {
+          "text": "PHASE0_RESPONSE",
+          "finishReason": "STOP",
+          "wasTruncated": false
+        },
+        "captures": [
+          9
+        ]
+      }
+    },
+    {
+      "name": "restore-compatible-provider",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "install-optional-plugin-message-replacement",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "terminal-guard-after-plugin-replacement",
+      "completed": true,
+      "value": {
+        "result": {
+          "text": "PHASE0_RESPONSE",
+          "appendMessages": [
+            {
+              "id": "custom-app-generated-1790345586857-0",
+              "role": "assistant",
+              "content": "PHASE0_RESPONSE",
+              "createdAt": "2026-09-25T14:13:06.857Z"
+            }
+          ],
+          "messages": [
+            {
+              "id": "custom-app-generated-1790345586857-0",
+              "role": "assistant",
+              "content": "PHASE0_RESPONSE",
+              "createdAt": "2026-09-25T14:13:06.857Z"
+            }
+          ]
+        },
+        "captures": [
+          10
+        ]
+      }
+    },
+    {
+      "name": "bind-default",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "protected-native-chat-default",
+      "completed": true,
+      "value": {
+        "result": {
+          "parts": [
+            {
+              "text": "PHASE0_RESPONSE"
+            }
+          ]
+        },
+        "captures": [
+          11
+        ]
+      }
+    },
+    {
+      "name": "protected-legacy-ai-generate-default",
+      "completed": true,
+      "value": {
+        "result": {
+          "text": "PHASE0_RESPONSE",
+          "appendMessages": [
+            {
+              "id": "custom-app-generated-1790345586877-0",
+              "role": "assistant",
+              "content": "PHASE0_RESPONSE",
+              "createdAt": "2026-09-25T14:13:06.877Z"
+            }
+          ],
+          "messages": [
+            {
+              "id": "custom-app-generated-1790345586877-0",
+              "role": "assistant",
+              "content": "PHASE0_RESPONSE",
+              "createdAt": "2026-09-25T14:13:06.877Z"
+            }
+          ]
+        },
+        "captures": [
+          12
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-default-npcFeed",
+      "completed": true,
+      "value": {
+        "result": {
+          "fixtureResponseParseError": "XiaohongshuGenerationError: 没有解析到小红书笔记。"
+        },
+        "captures": [
+          13
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-default-npcReaction",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "likeCount": 0,
+            "saveCount": 0,
+            "recentLikeNames": [],
+            "recentSaveNames": [],
+            "comments": [],
+            "directMessages": [],
+            "followerNames": []
+          }
+        },
+        "captures": [
+          14
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-default-activity",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comments": []
+          }
+        },
+        "captures": [
+          15
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-default-reaction",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comment": "",
+            "liked": false,
+            "saved": false,
+            "followedAuthor": false
+          }
+        },
+        "captures": [
+          16
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-default-npcComment",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comments": []
+          }
+        },
+        "captures": [
+          17
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-default-moreComments",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comments": []
+          }
+        },
+        "captures": [
+          18
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-default-dm",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "messages": [
+              "PHASE0_RESPONSE"
+            ]
+          }
+        },
+        "captures": [
+          19
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-default-comment",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comment": "",
+            "liked": false,
+            "saved": false,
+            "followedAuthor": false
+          }
+        },
+        "captures": [
+          20
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-default-mention",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comment": ""
+          }
+        },
+        "captures": [
+          21
+        ]
+      }
+    },
+    {
+      "name": "bind-custom",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "protected-native-chat-custom",
+      "completed": true,
+      "value": {
+        "result": {
+          "parts": [
+            {
+              "text": "PHASE0_RESPONSE"
+            }
+          ]
+        },
+        "captures": [
+          22
+        ]
+      }
+    },
+    {
+      "name": "protected-legacy-ai-generate-custom",
+      "completed": true,
+      "value": {
+        "result": {
+          "text": "PHASE0_RESPONSE",
+          "appendMessages": [
+            {
+              "id": "custom-app-generated-1790345586939-0",
+              "role": "assistant",
+              "content": "PHASE0_RESPONSE",
+              "createdAt": "2026-09-25T14:13:06.939Z"
+            }
+          ],
+          "messages": [
+            {
+              "id": "custom-app-generated-1790345586939-0",
+              "role": "assistant",
+              "content": "PHASE0_RESPONSE",
+              "createdAt": "2026-09-25T14:13:06.939Z"
+            }
+          ]
+        },
+        "captures": [
+          23
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-custom-npcFeed",
+      "completed": true,
+      "value": {
+        "result": {
+          "fixtureResponseParseError": "XiaohongshuGenerationError: 没有解析到小红书笔记。"
+        },
+        "captures": [
+          24
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-custom-npcReaction",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "likeCount": 0,
+            "saveCount": 0,
+            "recentLikeNames": [],
+            "recentSaveNames": [],
+            "comments": [],
+            "directMessages": [],
+            "followerNames": []
+          }
+        },
+        "captures": [
+          25
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-custom-activity",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comments": []
+          }
+        },
+        "captures": [
+          26
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-custom-reaction",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comment": "",
+            "liked": false,
+            "saved": false,
+            "followedAuthor": false
+          }
+        },
+        "captures": [
+          27
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-custom-npcComment",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comments": []
+          }
+        },
+        "captures": [
+          28
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-custom-moreComments",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comments": []
+          }
+        },
+        "captures": [
+          29
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-custom-dm",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "messages": [
+              "PHASE0_RESPONSE"
+            ]
+          }
+        },
+        "captures": [
+          30
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-custom-comment",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comment": "",
+            "liked": false,
+            "saved": false,
+            "followedAuthor": false
+          }
+        },
+        "captures": [
+          31
+        ]
+      }
+    },
+    {
+      "name": "protected-native-flow-custom-mention",
+      "completed": true,
+      "value": {
+        "result": {
+          "result": {
+            "comment": ""
+          }
+        },
+        "captures": [
+          32
+        ]
+      }
+    },
+    {
+      "name": "existing-share-api-keeps-author-projection",
+      "completed": true,
+      "value": {
+        "sessionId": "sess_1790345586529_v5x7s",
+        "role": "user",
+        "content": "[匿名小红书] The current chatter shared a post. Author social_account acct_a / moth. Sharing does not identify the sharer as the author.",
+        "mediaType": "app_card",
+        "mediaData": {
+          "appId": "app_phase05.probe_ea517a052bef",
+          "appName": "Capability probe",
+          "appCardTitle": "Post by moth",
+          "appCardBody": "Photography",
+          "appCardSummary": "Photography",
+          "appCardTone": "",
+          "appCardLayout": {
+            "author": {
+              "kind": "social_account",
+              "accountId": "acct_a",
+              "displayName": "moth"
+            }
+          },
+          "appTags": [],
+          "appHistoryText": "[匿名小红书] The current chatter shared a post. Author social_account acct_a / moth. Sharing does not identify the sharer as the author."
+        },
+        "id": "msg_1790345586986_u955t",
+        "createdAt": "2026-09-25T14:13:06.986Z",
+        "order": 1,
+        "status": "sent"
+      }
+    },
+    {
+      "name": "share-followup-has-terminal-policy",
+      "completed": true,
+      "value": {
+        "result": {
+          "parts": [
+            {
+              "text": "PHASE0_RESPONSE"
+            }
+          ]
+        },
+        "captures": [
+          33
+        ]
+      }
+    },
+    {
+      "name": "configure-native-summary-api",
+      "completed": true,
+      "value": "capture"
+    },
+    {
+      "name": "protected-native-timeline-summary",
+      "completed": true,
+      "value": {
+        "result": {
+          "success": true
+        },
+        "captures": [
+          34
+        ]
+      }
+    },
+    {
+      "name": "protected-native-core-summary",
+      "completed": true,
+      "value": {
+        "result": {
+          "success": true,
+          "rebuiltCount": 1
+        },
+        "captures": [
+          35
+        ]
+      }
+    },
+    {
+      "name": "derived-memory-lineage-survives-summary",
+      "completed": true,
+      "value": [
+        {
+          "id": "mem_lt_1790345586997_milr48",
+          "type": "long_term",
+          "provenance": {
+            "sources": [
+              {
+                "sourceKind": "custom_app",
+                "sourceAppId": "app_phase05.probe_ea517a052bef",
+                "sourceNamespace": "social",
+                "sourceEntityId": "acct_a",
+                "viewerCharacterId": "private-viewer-id",
+                "revision": 0
+              },
+              {
+                "sourceKind": "custom_app",
+                "sourceAppId": "app_phase05.probe_ea517a052bef",
+                "sourceNamespace": "social",
+                "sourceEntityId": "acct_b",
+                "viewerCharacterId": "private-viewer-id",
+                "revision": 0
+              }
+            ],
+            "mixed": true
+          }
+        },
+        {
+          "id": "mem_core_1790345587003_zkmy9s",
+          "type": "core",
+          "provenance": {
+            "sources": [
+              {
+                "sourceKind": "custom_app",
+                "sourceAppId": "app_phase05.probe_ea517a052bef",
+                "sourceNamespace": "social",
+                "sourceEntityId": "acct_a",
+                "viewerCharacterId": "private-viewer-id",
+                "revision": 0
+              },
+              {
+                "sourceKind": "custom_app",
+                "sourceAppId": "app_phase05.probe_ea517a052bef",
+                "sourceNamespace": "social",
+                "sourceEntityId": "acct_b",
+                "viewerCharacterId": "private-viewer-id",
+                "revision": 0
+              }
+            ],
+            "mixed": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "invalidation-no-evidence-resurrection",
+      "completed": true,
+      "value": {
+        "revision": 1,
+        "remaining": [
+          "core",
+          "long_term",
+          "source:[\"[\\\"app_phase05.probe_ea517a052bef\\\",\\\"social\\\",\\\"acct_b\\\",\\\"private-viewer-id\\\"]\",0,\"e2\"]"
+        ]
+      }
+    },
+    {
+      "name": "native-long-recall-after-timeline-eviction",
+      "completed": true,
+      "value": {
+        "found": 1
+      }
+    },
+    {
+      "name": "ordinary-chat-recalls-source-after-eviction",
+      "completed": true,
+      "value": {
+        "result": {
+          "parts": [
+            {
+              "text": "PHASE0_RESPONSE"
+            }
+          ]
+        },
+        "captures": [
+          36
+        ]
+      }
+    },
+    {
+      "name": "protected-policy-corrupt-registry-fails-closed",
+      "completed": true,
+      "value": {
+        "requestsSent": 0
+      }
+    },
+    {
+      "name": "unauthorized-app-cannot-call-new-capabilities",
+      "completed": true,
+      "value": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "name": "durable-task-start-and-dedupe",
+      "completed": true,
+      "value": {
+        "taskId": "e5e0902c-ff79-4d7b-838e-2825901b455e",
+        "appId": "app_phase05.probe_ea517a052bef",
+        "idempotencyKey": "durable-one",
+        "requestFingerprint": "8b32de11d4ef2e05625ffae0926d370b9aacac79c39da80a0a8839dc88f37acb",
+        "status": "running",
+        "createdAt": "2026-09-25T14:13:07.291Z"
+      }
+    },
+    {
+      "name": "closed-iframe-result-completes-in-host",
+      "completed": true,
+      "value": {
+        "taskId": "e5e0902c-ff79-4d7b-838e-2825901b455e",
+        "appId": "app_phase05.probe_ea517a052bef",
+        "idempotencyKey": "durable-one",
+        "requestFingerprint": "8b32de11d4ef2e05625ffae0926d370b9aacac79c39da80a0a8839dc88f37acb",
+        "status": "completed",
+        "createdAt": "2026-09-25T14:13:07.291Z",
+        "result": {
+          "content": "PHASE0_RESPONSE",
+          "raw": {
+            "choices": [
+              {
+                "message": {
+                  "role": "assistant",
+                  "content": "PHASE0_RESPONSE"
+                },
+                "finish_reason": "stop"
+              }
+            ]
+          }
+        },
+        "completedAt": "2026-09-25T14:13:08.097Z"
+      }
+    },
+    {
+      "name": "reload-host-retains-unconsumed-result-and-policy",
+      "completed": true,
+      "value": {
+        "taskId": "e5e0902c-ff79-4d7b-838e-2825901b455e",
+        "appId": "app_phase05.probe_ea517a052bef",
+        "idempotencyKey": "durable-one",
+        "requestFingerprint": "8b32de11d4ef2e05625ffae0926d370b9aacac79c39da80a0a8839dc88f37acb",
+        "status": "completed",
+        "createdAt": "2026-09-25T14:13:07.291Z",
+        "result": {
+          "content": "PHASE0_RESPONSE",
+          "raw": {
+            "choices": [
+              {
+                "message": {
+                  "role": "assistant",
+                  "content": "PHASE0_RESPONSE"
+                },
+                "finish_reason": "stop"
+              }
+            ]
+          }
+        },
+        "completedAt": "2026-09-25T14:13:08.097Z"
+      }
+    },
+    {
+      "name": "atomic-consume-commits-once",
+      "completed": true,
+      "value": {
+        "results": [
+          {
+            "applied": true
+          },
+          {
+            "applied": false
+          }
+        ],
+        "saved": [
+          {
+            "text": "parsed result",
+            "id": "post-1",
+            "updatedAt": "2026-09-25T14:13:08.287Z"
+          }
+        ]
+      }
+    },
+    {
+      "name": "policy-still-enforced-after-reload",
+      "completed": true,
+      "value": {
+        "result": {
+          "content": "PHASE0_RESPONSE",
+          "raw": {
+            "choices": [
+              {
+                "message": {
+                  "role": "assistant",
+                  "content": "PHASE0_RESPONSE"
+                },
+                "finish_reason": "stop"
+              }
+            ]
+          }
+        },
+        "captures": [
+          38
+        ]
+      }
+    },
+    {
+      "name": "consumed-dedupe-survives-reload",
+      "completed": true,
+      "value": {
+        "taskId": "e5e0902c-ff79-4d7b-838e-2825901b455e",
+        "appId": "app_phase05.probe_ea517a052bef",
+        "idempotencyKey": "durable-one",
+        "requestFingerprint": "8b32de11d4ef2e05625ffae0926d370b9aacac79c39da80a0a8839dc88f37acb",
+        "status": "consumed",
+        "createdAt": "2026-09-25T14:13:07.291Z",
+        "completedAt": "2026-09-25T14:13:08.097Z",
+        "consumedAt": "2026-09-25T14:13:08.287Z"
+      }
+    },
+    {
+      "name": "task-invalid-policy-fails-without-http",
+      "completed": true,
+      "value": {
+        "taskId": "08de6e70-c630-476c-a3c0-b5360c7f92fe",
+        "appId": "app_phase05.probe_ea517a052bef",
+        "idempotencyKey": "invalid-policy",
+        "requestFingerprint": "85e5b2dfeb4ad96f613e8fa9eb3bf049bd333b3fc2de4a760be487da21148c67",
+        "status": "failed",
+        "createdAt": "2026-09-25T14:13:08.320Z",
+        "error": "Error: Unknown context policy category",
+        "completedAt": "2026-09-25T14:13:08.320Z"
+      }
+    },
+    {
+      "name": "cross-tab-active-owner-and-host-restart",
+      "completed": true,
+      "value": {
+        "taskId": "ecfa06fd-d792-42e7-9276-e6b920fa844f",
+        "appId": "app_phase05.probe_ea517a052bef",
+        "idempotencyKey": "interrupt-host",
+        "requestFingerprint": "8b32de11d4ef2e05625ffae0926d370b9aacac79c39da80a0a8839dc88f37acb",
+        "status": "failed",
+        "createdAt": "2026-09-25T14:13:08.334Z",
+        "error": "HOST_INTERRUPTED: execution owner closed; no automatic retry",
+        "completedAt": "2026-09-25T14:13:08.614Z"
+      }
+    },
+    {
+      "name": "cancelled-task-does-not-publish-result",
+      "completed": true,
+      "value": {
+        "taskId": "5979c9fb-4a74-4ef8-aa83-63cc7d286007",
+        "appId": "app_phase05.probe_ea517a052bef",
+        "idempotencyKey": "cancel-one",
+        "requestFingerprint": "8b32de11d4ef2e05625ffae0926d370b9aacac79c39da80a0a8839dc88f37acb",
+        "status": "cancelled",
+        "createdAt": "2026-09-25T14:13:08.653Z",
+        "completedAt": "2026-09-25T14:13:08.669Z"
+      }
+    },
+    {
+      "name": "uninstall-cleans-task-results",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "uninstalled-task-start-is-rejected",
+      "completed": true,
+      "value": true
+    },
+    {
+      "name": "all-required-http-payloads-saved",
+      "completed": true,
+      "value": {
+        "count": 41,
+        "labels": [
+          "legacy-ai-chat-no-policy",
+          "scoped-multimodal-default-deny",
+          "scoped-no-sources-means-no-persona",
+          "scoped-own-memory-plus-image-plus-own-timeline",
+          "protected-scoped-generation",
+          "protected-legacy-ai-chat",
+          "native-Anthropic-scoped-image-and-policy",
+          "native-Anthropic-simple-policy",
+          "native-Google-scoped-image-and-policy",
+          "native-Google-simple-policy",
+          "terminal-guard-after-plugin-replacement",
+          "protected-native-chat-default",
+          "protected-legacy-ai-generate-default",
+          "protected-native-flow-default-npcFeed",
+          "protected-native-flow-default-npcReaction",
+          "protected-native-flow-default-activity",
+          "protected-native-flow-default-reaction",
+          "protected-native-flow-default-npcComment",
+          "protected-native-flow-default-moreComments",
+          "protected-native-flow-default-dm",
+          "protected-native-flow-default-comment",
+          "protected-native-flow-default-mention",
+          "protected-native-chat-custom",
+          "protected-legacy-ai-generate-custom",
+          "protected-native-flow-custom-npcFeed",
+          "protected-native-flow-custom-npcReaction",
+          "protected-native-flow-custom-activity",
+          "protected-native-flow-custom-reaction",
+          "protected-native-flow-custom-npcComment",
+          "protected-native-flow-custom-moreComments",
+          "protected-native-flow-custom-dm",
+          "protected-native-flow-custom-comment",
+          "protected-native-flow-custom-mention",
+          "share-followup-has-terminal-policy",
+          "protected-native-timeline-summary",
+          "protected-native-core-summary",
+          "ordinary-chat-recalls-source-after-eviction",
+          "durable-task-start-and-dedupe",
+          "policy-still-enforced-after-reload",
+          "cross-tab-active-owner-and-host-restart",
+          "cancelled-task-does-not-publish-result"
+        ],
+        "note": "Real Host HTTP, deterministic local provider. Not a semantic model compliance test."
+      }
+    }
+  ],
+  "browserErrors": []
+}

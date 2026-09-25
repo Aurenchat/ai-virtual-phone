@@ -5,7 +5,7 @@ import type { ContentAppId } from "./settings-types";
 export type MemoryEntry = {
     id: string;
     characterId: string;
-    sourceApp: ContentAppId;
+    sourceApp: ContentAppId | "custom_app";
     type: "long_term" | "core";
     content: string;
     embedding?: number[];
@@ -14,6 +14,7 @@ export type MemoryEntry = {
     updatedAt: string;
     sourceMessageIds?: string[];
     metadata?: Record<string, unknown>;
+    provenance?: import("./memory-provenance").MemoryProvenance;
 };
 
 export type MemoryConfig = {

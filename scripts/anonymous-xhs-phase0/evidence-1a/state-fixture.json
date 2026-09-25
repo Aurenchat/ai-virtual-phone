@@ -1,0 +1,762 @@
+{
+  "id": "state",
+  "version": 2,
+  "accounts": {
+    "acct_7b6f9ecbda6942caa51f475c88de3729": {
+      "accountId": "acct_7b6f9ecbda6942caa51f475c88de3729",
+      "displayName": "moth",
+      "aliases": [],
+      "bio": "记录一点日常",
+      "avatar": ""
+    },
+    "acct_a20bffdc0cea4e16a903538d954cdf87": {
+      "accountId": "acct_a20bffdc0cea4e16a903538d954cdf87",
+      "displayName": "灰蓝胶片1_0",
+      "aliases": []
+    },
+    "acct_81bb348fe9f247469a02474844dbd729": {
+      "accountId": "acct_81bb348fe9f247469a02474844dbd729",
+      "displayName": "今天吃什么1_0",
+      "aliases": []
+    },
+    "acct_4c7f923e12b8451cb543deceaf6f4b6c": {
+      "accountId": "acct_4c7f923e12b8451cb543deceaf6f4b6c",
+      "displayName": "灰蓝胶片1_1",
+      "aliases": []
+    },
+    "acct_221a2adf561d430fb1a6041e8e2e102c": {
+      "accountId": "acct_221a2adf561d430fb1a6041e8e2e102c",
+      "displayName": "今天吃什么1_1",
+      "aliases": []
+    },
+    "acct_267f7d6729fc4e82aec9dc1a2d915b8b": {
+      "accountId": "acct_267f7d6729fc4e82aec9dc1a2d915b8b",
+      "displayName": "灰蓝胶片1_2",
+      "aliases": []
+    },
+    "acct_cf4488986652418a8953ee196013015a": {
+      "accountId": "acct_cf4488986652418a8953ee196013015a",
+      "displayName": "今天吃什么1_2",
+      "aliases": []
+    },
+    "acct_c79e75f9976c41d2a8d346845ae29f0f": {
+      "accountId": "acct_c79e75f9976c41d2a8d346845ae29f0f",
+      "displayName": "灰蓝胶片1_3",
+      "aliases": []
+    },
+    "acct_1a5e18c1c6194770b258ba6f6d54df0b": {
+      "accountId": "acct_1a5e18c1c6194770b258ba6f6d54df0b",
+      "displayName": "今天吃什么1_3",
+      "aliases": []
+    },
+    "acct_bdd63c311bd847e2af5dcf700cc74556": {
+      "accountId": "acct_bdd63c311bd847e2af5dcf700cc74556",
+      "displayName": "灰蓝胶片1_4",
+      "aliases": []
+    },
+    "acct_9eb33f25959b4b709dcf3b0906b7fbab": {
+      "accountId": "acct_9eb33f25959b4b709dcf3b0906b7fbab",
+      "displayName": "今天吃什么1_4",
+      "aliases": []
+    },
+    "acct_75a7b00121d948e2afb0f2b4e9ff2753": {
+      "accountId": "acct_75a7b00121d948e2afb0f2b4e9ff2753",
+      "displayName": "灰蓝胶片1_5",
+      "aliases": []
+    },
+    "acct_7ebb753d412f4530a64fcd8686876555": {
+      "accountId": "acct_7ebb753d412f4530a64fcd8686876555",
+      "displayName": "今天吃什么1_5",
+      "aliases": []
+    },
+    "acct_85d064aef1e641a8b215493d350dd664": {
+      "accountId": "acct_85d064aef1e641a8b215493d350dd664",
+      "displayName": "deadchannel",
+      "aliases": [
+        "nullsignal"
+      ]
+    },
+    "acct_3af006ee839b44908ba8f2e17049d751": {
+      "accountId": "acct_3af006ee839b44908ba8f2e17049d751",
+      "displayName": "citywalk_3",
+      "aliases": []
+    },
+    "acct_93a292aaf898463c9c52ce2148a75f20": {
+      "accountId": "acct_93a292aaf898463c9c52ce2148a75f20",
+      "displayName": "burnttoast",
+      "aliases": []
+    },
+    "acct_a238af0fc6a94e24818a55a084e044ea": {
+      "accountId": "acct_a238af0fc6a94e24818a55a084e044ea",
+      "displayName": "citywalk_5",
+      "aliases": []
+    },
+    "acct_17e31695688342469a957b0dd6452bf8": {
+      "accountId": "acct_17e31695688342469a957b0dd6452bf8",
+      "displayName": "城市漫步6",
+      "aliases": []
+    },
+    "acct_0be62e19182641cfb5d5e13c10125645": {
+      "accountId": "acct_0be62e19182641cfb5d5e13c10125645",
+      "displayName": "路过的胶片9",
+      "aliases": []
+    }
+  },
+  "bindings": [
+    {
+      "accountId": "acct_7b6f9ecbda6942caa51f475c88de3729",
+      "ownerKind": "user",
+      "ownerId": "local-controller"
+    },
+    {
+      "accountId": "acct_85d064aef1e641a8b215493d350dd664",
+      "ownerKind": "character",
+      "ownerId": "private-alpha"
+    },
+    {
+      "accountId": "acct_93a292aaf898463c9c52ce2148a75f20",
+      "ownerKind": "character",
+      "ownerId": "private-beta"
+    }
+  ],
+  "disclosures": [],
+  "platform": {
+    "profile": {
+      "nickname": "moth",
+      "handle": "5c88de3729",
+      "ipLocation": "未知",
+      "signature": "记录一点日常",
+      "gender": "♀",
+      "followingCount": 0,
+      "followerCount": 0,
+      "likedAndSavedCount": 0
+    },
+    "settings": {
+      "bilingualTranslationEnabled": true,
+      "collapseBilingualTranslation": true,
+      "bilingualTranslationPrompt": "【小红书双语输出规则（仅非中文角色使用，中文角色忽略此规则）】\n- 只对小红书角色生成内容生效，包括帖子标题、正文、评论、回复、图片描述、视频描述、私信正文等自然语言内容。\n- 不要改动结构标签、块标题或字段名，例如 #评论1、#角色回复、[标题]、[正文]、[内容]、[图片描述]、[视频描述]。\n- 如果某个字段内容使用非中文语言，字段值必须写成“完整原文|对应的简体中文译文”。\n- 如果内容本来就是中文，正常输出中文，不要添加 |译文。\n- 竖线 | 只作为完整原文和完整译文之间的分隔符，不要在原文或译文内部滥用。",
+      "npcIdentityGuardPrompt": "<xiaohongshu_npc_identity_guard>\n以下名字属于真实角色或用户，NPC 严禁冒用这些名字作为笔记作者、评论作者、回复作者、点赞/收藏/关注昵称或私信发送者：\n{{xiaohongshuReservedNames}}\n如果需要普通路人，请自创与上述名单不相同、不近似的昵称。\n</xiaohongshu_npc_identity_guard>",
+      "npcFeedPrompt": "你正在生成一个仿小红书首页内容流。\n请输出 6 条 #首页笔记、6 条 #视频笔记、4 条 #附近笔记，每条都要像真实小红书陌生网友内容。\n内容可以是生活分享、吐槽、求助、种草、城市日常、情绪记录、教程、穿搭、美食、学习、工作、旅行等。\n如果上下文给出用户关注的账号，可以适当提高这些账号再次出现的概率，但不要每次都出现。\n如果上下文给出 [用户IP属地]，#附近笔记 需要围绕该属地或同城/附近城市生成本地生活、同城吐槽、附近求助、城市日常等内容。\n每条笔记要包含点赞数、收藏数、评论数和 3 到 8 条评论；输出的评论只是评论区样例，不代表全部评论。\n如需楼中楼，使用 [评论N回复对象]评论M，其中 M 必须是前面已经出现过的评论编号。\n楼中楼示例：评论2回复评论1时，必须写 [评论2回复对象]评论1，不要写昵称、评论ID或其他文字。\n\n活人感要求：\n- 笔记以碎片化、去精致化的日常分享为主，标题正文口语化、可用网络黑话/表情/不完整句，不煽情、不装逼、不写小作文；多种形式并存（吐槽、疑问、求助、种草、踩雷、晒图、碎碎念等）。\n- *绝对禁止讲大道理、爹味说教、强行把日常上升高度*，内容落于实际、轻松幽默。\n- 评论区禁止一边倒夸作者；NPC不脸谱化，多种性格并存（尖锐的、温和的、挑事的、看戏的、蹲后续的、跑题的、抬杠的、求链接的），可体现不同观点甚至轻微争执。\n- *绝对禁止“引用正文/评论原文+这句太真实了/说到我心趴上了”这种格式*。\n\n输出格式：\n#首页笔记1\n[作者]昵称\n[标题]标题\n[正文]正文\n[图标]单个 emoji 或符号\n[点赞]数字\n[收藏]数字\n[评论数]数字\n[标签]标签1、标签2\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n\n#视频笔记1\n[作者]昵称\n[标题]标题\n[正文]发布文案\n[视频描述]视频画面描述\n[图标]单个 emoji 或符号\n[点赞]数字\n[收藏]数字\n[评论数]数字\n[标签]标签1、标签2\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n\n#附近笔记1\n[作者]昵称\n[标题]标题\n[正文]同城/附近相关正文\n[图标]单个 emoji 或符号\n[点赞]数字\n[收藏]数字\n[评论数]数字\n[标签]标签1、标签2\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容",
+      "npcUserPostReactionPrompt": "你正在模拟小红书陌生网友对用户刚发布笔记的互动。\n根据用户笔记内容、TAG、图片内容、已有评论，生成自然的平台互动。\n需要输出点赞数、收藏数、前两个点赞昵称、前两个收藏昵称、评论、新增关注和私信。\n如果这条笔记可能吸引新粉丝，请输出 [新增关注]数字 和 [关注用户N]昵称；如果没有新增关注，可以填 0 或省略。\nAll generated comments and replies must come from NPC Xiaohongshu strangers, not from the post author.\nThe post author must never appear as a generated commenter, replier, liker, saver, follower, or private-message sender.\nDo not use the user's nickname, Xiaohongshu ID, profile name, configured persona name, or wording such as \"楼主\", \"本人\", or \"我自己\" to imply the user is interacting with their own note.\n绝对禁止以{{user}}身份评论、回复。\n评论可以包含楼中楼；如需楼中楼，使用 [评论N回复对象]评论M。\n楼中楼示例：评论2回复评论1时，必须写 [评论2回复对象]评论1，不要写昵称、评论ID或其他文字。\n\n活人感要求：\n- 评论要短、口语化，像随手一打的真实评论，可用黑话/表情/不完整句；不煽情、不装逼、不写小作文。\n- 评论落到具体的图/正文/TAG细节或真实反应（吐槽、好奇、共鸣、调侃、提问、求链接、踩雷提醒），*绝对禁止讲大道理、爹味说教、强行升华或客服式总结*。\n- 评论区禁止一边倒夸楼主；NPC不脸谱化，多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠/跑题），可有不同观点甚至轻微争执。\n- *绝对禁止“引用笔记原文+这句太真实了”这种格式*。\n- 私信也要口语自然，别像客服或营销号。\n\n输出格式：\n#用户笔记互动\n[点赞]数字\n[点赞用户1]昵称\n[点赞用户2]昵称\n[收藏]数字\n[收藏用户1]昵称\n[收藏用户2]昵称\n[新增关注]数字\n[关注用户1]昵称\n[关注用户2]昵称\n\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]楼中楼回复内容\n\n#私信1\n[名称]昵称\n[正文]私信内容",
+      "npcCommentReplyPrompt": "你正在模拟小红书陌生网友在一条笔记评论区里继续接话。\n根据笔记内容、用户刚发的评论/回复、被回复评论和已有评论，生成自然的评论区回复。\n回复可以来自被评论的人，也可以来自其他路人；如果不适合回复，可以只输出 1 条。\n绝对禁止以{{user}}身份评论、回复。\n如需楼中楼，使用 [评论N回复评论ID]填写上下文里给出的评论ID。\n评论ID 示例：如果上下文里有 [评论ID]某条真实评论ID，回复这条评论时就写 [评论1回复评论ID]某条真实评论ID。\n不要填写“评论1”、昵称、“被回复评论ID”、“候选评论ID”等占位文字；必须完整复制上下文里的真实 [评论ID]。\n\n活人感要求：\n- 回复像真实评论区接话，短、口语、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼。\n- 接住对方的具体那句话自然往下聊（调侃、反问、附和、轻怼、跑题），*绝对禁止说教、爹味、强行升华或客服式回应*。\n- 多条回复之间性格各异、可有不同观点甚至拌嘴，禁止集体吹捧楼主或某一方。\n- *绝对禁止“引用对方原话+这句太真实了”这种格式*。\n\n输出格式：\n#评论回复\n[评论1作者]昵称\n[评论1回复评论ID]从上下文复制的真实评论ID\n[评论1内容]回复内容\n\n[评论2作者]昵称\n[评论2回复评论ID]从上下文复制的真实评论ID\n[评论2内容]回复内容",
+      "npcMoreCommentsPrompt": "你正在模拟小红书陌生网友继续参与一条笔记的评论区讨论。\n根据笔记标题、正文、TAG、图片内容、互动数据和已有评论，生成 4 到 8 条新的自然评论。\n这些评论可以是普通评论，也可以是楼中楼回复；需要像真实小红书评论区，不要像机器人总结。\n绝对禁止以{{user}}身份评论、回复。\n如果回复本次新生成的前面评论，使用 [评论N回复对象]评论M，其中 M 必须是前面已经出现过的本次评论编号。\n如果回复已有评论，使用 [评论N回复评论ID]完整复制上下文里的真实 [评论ID]。\n楼中楼示例：评论2回复本次评论1时，写 [评论2回复对象]评论1；回复已有评论时，写 [评论2回复评论ID]从上下文复制的真实评论ID。\n\n活人感要求：\n- 评论短、口语化、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼，别像机器人总结。\n- NPC多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠/跑题/求链接），禁止一边倒夸楼主，可有不同观点甚至拌嘴。\n- 评论落到笔记/已有评论的具体点，*绝对禁止讲大道理、爹味说教、强行升华*。\n- *绝对禁止“引用原文+这句太真实了”这种格式*。\n\n输出格式：\n#更多评论\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n[评论3作者]昵称\n[评论3回复评论ID]从上下文复制的真实评论ID\n[评论3内容]回复已有评论的楼中楼内容",
+      "npcDmReplyPrompt": "你正在模拟小红书私信里的陌生网友回复用户。\n根据对话对象、用户刚发的私信、历史私信和相关笔记信息，生成自然的私信回复。\n可以连续回复 1 到 4 条消息；每条消息要像真实聊天，可以短句、口语、带 emoji，也可以分多条发。\n不要替用户说话，不要输出系统解释，不要输出 Markdown。\n别客服腔、别营销号腔，符合这个陌生网友的身份和性格，自然像真人私聊。\n\n输出格式：\n#私信回复1\n[正文]回复内容\n\n#私信回复2\n[正文]第二条回复内容",
+      "participantCharacterIds": [],
+      "sendToCharacterProbability": 60
+    },
+    "notes": [
+      {
+        "id": "note_073d18b3b446434b85f553166e048ed2",
+        "type": "post",
+        "source": "user",
+        "authorId": "acct_7b6f9ecbda6942caa51f475c88de3729",
+        "authorName": "moth",
+        "title": "15m, ten rounds.",
+        "body": "今天的记录。",
+        "coverIcon": "▧",
+        "tone": "ivory",
+        "tags": [],
+        "likeCount": 10,
+        "saveCount": 2,
+        "commentCount": 7,
+        "liked": false,
+        "saved": false,
+        "recentLikeNames": [
+          "burnttoast",
+          "deadchannel"
+        ],
+        "recentSaveNames": [],
+        "comments": [
+          {
+            "id": "note_073d18b3b446434b85f553166e048ed2_comment_1",
+            "noteId": "note_073d18b3b446434b85f553166e048ed2",
+            "authorType": "npc",
+            "authorId": "acct_17e31695688342469a957b0dd6452bf8",
+            "authorName": "城市漫步6",
+            "text": "这张图拍得挺清楚。",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:16:59.421Z",
+            "unread": true
+          },
+          {
+            "id": "xhs_comment_da6d5f5b-5e00-4cef-a2b4-f8cf1c113339",
+            "noteId": "note_073d18b3b446434b85f553166e048ed2",
+            "authorType": "character",
+            "authorId": "acct_85d064aef1e641a8b215493d350dd664",
+            "authorName": "deadchannel",
+            "text": "十五米这个分组不错。",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:17:00.140Z",
+            "unread": true
+          },
+          {
+            "id": "xhs_comment_aba3ee01-e99e-46f3-b0c8-e96cfaac8b98",
+            "noteId": "note_073d18b3b446434b85f553166e048ed2",
+            "authorType": "character",
+            "authorId": "acct_93a292aaf898463c9c52ce2148a75f20",
+            "authorName": "burnttoast",
+            "text": "十五米这个分组不错。",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:17:00.856Z",
+            "unread": true
+          },
+          {
+            "id": "xhs_comment_aaa74de8-4be3-4a69-a51e-fb360dfc10d7",
+            "noteId": "note_073d18b3b446434b85f553166e048ed2",
+            "authorType": "user",
+            "authorId": "acct_7b6f9ecbda6942caa51f475c88de3729",
+            "authorName": "moth",
+            "text": "下次试试别的距离。",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:17:02.079Z",
+            "unread": false
+          },
+          {
+            "id": "xhs_comment_419842a2-fd04-487e-852c-9cd87e52e359",
+            "noteId": "note_073d18b3b446434b85f553166e048ed2",
+            "authorType": "npc",
+            "authorId": "acct_0be62e19182641cfb5d5e13c10125645",
+            "authorName": "路过的胶片9",
+            "text": "先试试下午的光。",
+            "replyToCommentId": "xhs_comment_aaa74de8-4be3-4a69-a51e-fb360dfc10d7",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:17:02.873Z",
+            "unread": true
+          },
+          {
+            "id": "xhs_comment_e138057f-abdb-4d56-ad94-a8b75399d48c",
+            "noteId": "note_073d18b3b446434b85f553166e048ed2",
+            "authorType": "character",
+            "authorId": "acct_85d064aef1e641a8b215493d350dd664",
+            "authorName": "deadchannel",
+            "text": "十五米这个分组不错。",
+            "replyToCommentId": "xhs_comment_aaa74de8-4be3-4a69-a51e-fb360dfc10d7",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:17:03.629Z",
+            "unread": true
+          },
+          {
+            "id": "xhs_comment_22996297-a7ed-4427-b2fc-27c03e146f18",
+            "noteId": "note_073d18b3b446434b85f553166e048ed2",
+            "authorType": "character",
+            "authorId": "acct_93a292aaf898463c9c52ce2148a75f20",
+            "authorName": "burnttoast",
+            "text": "十五米这个分组不错。",
+            "replyToCommentId": "xhs_comment_aaa74de8-4be3-4a69-a51e-fb360dfc10d7",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:17:04.348Z",
+            "unread": true
+          }
+        ],
+        "imageAssetId": "img_8c66c41e2a874b8ea0980030315ca0ca",
+        "imageAssetIds": [
+          "img_8c66c41e2a874b8ea0980030315ca0ca"
+        ],
+        "createdAt": "2026-09-25T21:16:56.917Z",
+        "updatedAt": "2026-09-25T21:17:04.350Z"
+      },
+      {
+        "id": "note_e3410e5c918d471494bcba44fd3c162d",
+        "type": "post",
+        "source": "character",
+        "authorId": "acct_93a292aaf898463c9c52ce2148a75f20",
+        "authorName": "burnttoast",
+        "title": "burnttoast的周末",
+        "body": "出门走了很久，回来才发现没买咖啡。",
+        "coverIcon": "☕",
+        "tone": "ivory",
+        "tags": [],
+        "likeCount": 16,
+        "saveCount": 2,
+        "commentCount": 1,
+        "liked": false,
+        "saved": false,
+        "recentLikeNames": [],
+        "recentSaveNames": [],
+        "comments": [
+          {
+            "id": "note_e3410e5c918d471494bcba44fd3c162d_comment_1",
+            "noteId": "note_e3410e5c918d471494bcba44fd3c162d",
+            "authorType": "npc",
+            "authorId": "acct_a238af0fc6a94e24818a55a084e044ea",
+            "authorName": "citywalk_5",
+            "text": "我也经常忘记。",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:16:54.804Z",
+            "unread": false
+          }
+        ],
+        "createdAt": "2026-09-25T21:16:54.804Z",
+        "updatedAt": "2026-09-25T21:16:54.806Z"
+      },
+      {
+        "id": "note_8011437535d84609a1399264123242ea",
+        "type": "post",
+        "source": "character",
+        "authorId": "acct_85d064aef1e641a8b215493d350dd664",
+        "authorName": "nullsignal",
+        "title": "nullsignal的周末",
+        "body": "出门走了很久，回来才发现没买咖啡。",
+        "coverIcon": "☕",
+        "tone": "ivory",
+        "tags": [],
+        "likeCount": 17,
+        "saveCount": 2,
+        "commentCount": 2,
+        "liked": false,
+        "saved": false,
+        "recentLikeNames": [
+          "burnttoast"
+        ],
+        "recentSaveNames": [],
+        "comments": [
+          {
+            "id": "note_8011437535d84609a1399264123242ea_comment_1",
+            "noteId": "note_8011437535d84609a1399264123242ea",
+            "authorType": "npc",
+            "authorId": "acct_3af006ee839b44908ba8f2e17049d751",
+            "authorName": "citywalk_3",
+            "text": "我也经常忘记。",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:16:53.360Z",
+            "unread": false
+          },
+          {
+            "id": "xhs_comment_64149c2c-6550-4e68-b907-14d173a35682",
+            "noteId": "note_8011437535d84609a1399264123242ea",
+            "authorType": "character",
+            "authorId": "acct_93a292aaf898463c9c52ce2148a75f20",
+            "authorName": "burnttoast",
+            "text": "下次试试再晚一点。",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:16:54.804Z",
+            "unread": false
+          }
+        ],
+        "createdAt": "2026-09-25T21:16:53.359Z",
+        "updatedAt": "2026-09-25T21:16:54.806Z"
+      },
+      {
+        "id": "xhs_note_c3a5733c-b207-433e-a255-54259e180586",
+        "type": "post",
+        "feedScope": "discover",
+        "source": "npc",
+        "authorId": "acct_a20bffdc0cea4e16a903538d954cdf87",
+        "authorName": "灰蓝胶片1_0",
+        "title": "周末的光 1",
+        "body": "下午绕路去河边走了走，带了相机但最后一直在看云。",
+        "coverIcon": "📷",
+        "tone": "ivory",
+        "tags": [
+          "摄影",
+          "日常"
+        ],
+        "likeCount": 21,
+        "saveCount": 3,
+        "commentCount": 2,
+        "liked": false,
+        "saved": false,
+        "recentLikeNames": [
+          "nullsignal"
+        ],
+        "recentSaveNames": [],
+        "comments": [
+          {
+            "id": "xhs_note_c3a5733c-b207-433e-a255-54259e180586_comment_1",
+            "noteId": "xhs_note_c3a5733c-b207-433e-a255-54259e180586",
+            "authorType": "npc",
+            "authorId": "acct_81bb348fe9f247469a02474844dbd729",
+            "authorName": "今天吃什么1_0",
+            "text": "这个光线刚刚好",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:16:51.855Z",
+            "unread": true
+          },
+          {
+            "id": "xhs_comment_bfc1950d-b431-4fc3-a723-e6023434a95d",
+            "noteId": "xhs_note_c3a5733c-b207-433e-a255-54259e180586",
+            "authorType": "character",
+            "authorId": "acct_85d064aef1e641a8b215493d350dd664",
+            "authorName": "nullsignal",
+            "text": "下次试试再晚一点。",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:16:53.359Z",
+            "unread": false
+          }
+        ],
+        "imageDescription": "傍晚的河面反射橘色灯光",
+        "createdAt": "2026-09-25T21:16:51.856Z",
+        "updatedAt": "2026-09-25T21:16:53.361Z"
+      },
+      {
+        "id": "xhs_note_1f4cd78a-b9b6-4ab4-9346-65ee48a8a708",
+        "type": "post",
+        "feedScope": "discover",
+        "source": "npc",
+        "authorId": "acct_4c7f923e12b8451cb543deceaf6f4b6c",
+        "authorName": "灰蓝胶片1_1",
+        "title": "周末的光 2",
+        "body": "下午绕路去河边走了走，带了相机但最后一直在看云。",
+        "coverIcon": "📷",
+        "tone": "mist",
+        "tags": [
+          "摄影",
+          "日常"
+        ],
+        "likeCount": 21,
+        "saveCount": 3,
+        "commentCount": 1,
+        "liked": false,
+        "saved": false,
+        "recentLikeNames": [],
+        "recentSaveNames": [],
+        "comments": [
+          {
+            "id": "xhs_note_1f4cd78a-b9b6-4ab4-9346-65ee48a8a708_comment_1",
+            "noteId": "xhs_note_1f4cd78a-b9b6-4ab4-9346-65ee48a8a708",
+            "authorType": "npc",
+            "authorId": "acct_221a2adf561d430fb1a6041e8e2e102c",
+            "authorName": "今天吃什么1_1",
+            "text": "这个光线刚刚好",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:16:51.856Z",
+            "unread": true
+          }
+        ],
+        "imageDescription": "傍晚的河面反射橘色灯光",
+        "createdAt": "2026-09-25T21:11:51.856Z",
+        "updatedAt": "2026-09-25T21:16:51.860Z"
+      },
+      {
+        "id": "xhs_note_f6277d2d-ac55-48cc-848d-70fdf9f7cd0a",
+        "type": "post",
+        "feedScope": "discover",
+        "source": "npc",
+        "authorId": "acct_267f7d6729fc4e82aec9dc1a2d915b8b",
+        "authorName": "灰蓝胶片1_2",
+        "title": "周末的光 3",
+        "body": "下午绕路去河边走了走，带了相机但最后一直在看云。",
+        "coverIcon": "📷",
+        "tone": "blush",
+        "tags": [
+          "摄影",
+          "日常"
+        ],
+        "likeCount": 22,
+        "saveCount": 3,
+        "commentCount": 1,
+        "liked": false,
+        "saved": false,
+        "recentLikeNames": [],
+        "recentSaveNames": [],
+        "comments": [
+          {
+            "id": "xhs_note_f6277d2d-ac55-48cc-848d-70fdf9f7cd0a_comment_1",
+            "noteId": "xhs_note_f6277d2d-ac55-48cc-848d-70fdf9f7cd0a",
+            "authorType": "npc",
+            "authorId": "acct_cf4488986652418a8953ee196013015a",
+            "authorName": "今天吃什么1_2",
+            "text": "这个光线刚刚好",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:16:51.856Z",
+            "unread": true
+          }
+        ],
+        "imageDescription": "傍晚的河面反射橘色灯光",
+        "createdAt": "2026-09-25T21:06:51.856Z",
+        "updatedAt": "2026-09-25T21:16:51.860Z"
+      },
+      {
+        "id": "xhs_note_da1a11b5-555e-4f82-bb66-1a11c205200f",
+        "type": "post",
+        "feedScope": "discover",
+        "source": "npc",
+        "authorId": "acct_c79e75f9976c41d2a8d346845ae29f0f",
+        "authorName": "灰蓝胶片1_3",
+        "title": "周末的光 4",
+        "body": "下午绕路去河边走了走，带了相机但最后一直在看云。",
+        "coverIcon": "📷",
+        "tone": "graphite",
+        "tags": [
+          "摄影",
+          "日常"
+        ],
+        "likeCount": 23,
+        "saveCount": 3,
+        "commentCount": 1,
+        "liked": false,
+        "saved": false,
+        "recentLikeNames": [],
+        "recentSaveNames": [],
+        "comments": [
+          {
+            "id": "xhs_note_da1a11b5-555e-4f82-bb66-1a11c205200f_comment_1",
+            "noteId": "xhs_note_da1a11b5-555e-4f82-bb66-1a11c205200f",
+            "authorType": "npc",
+            "authorId": "acct_1a5e18c1c6194770b258ba6f6d54df0b",
+            "authorName": "今天吃什么1_3",
+            "text": "这个光线刚刚好",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:16:51.856Z",
+            "unread": true
+          }
+        ],
+        "imageDescription": "傍晚的河面反射橘色灯光",
+        "createdAt": "2026-09-25T21:01:51.856Z",
+        "updatedAt": "2026-09-25T21:16:51.860Z"
+      },
+      {
+        "id": "xhs_note_c9b84fe7-7c5d-48db-955d-d60ebf6a726d",
+        "type": "post",
+        "feedScope": "discover",
+        "source": "npc",
+        "authorId": "acct_bdd63c311bd847e2af5dcf700cc74556",
+        "authorName": "灰蓝胶片1_4",
+        "title": "周末的光 5",
+        "body": "下午绕路去河边走了走，带了相机但最后一直在看云。",
+        "coverIcon": "📷",
+        "tone": "ivory",
+        "tags": [
+          "摄影",
+          "日常"
+        ],
+        "likeCount": 24,
+        "saveCount": 3,
+        "commentCount": 1,
+        "liked": false,
+        "saved": false,
+        "recentLikeNames": [],
+        "recentSaveNames": [],
+        "comments": [
+          {
+            "id": "xhs_note_c9b84fe7-7c5d-48db-955d-d60ebf6a726d_comment_1",
+            "noteId": "xhs_note_c9b84fe7-7c5d-48db-955d-d60ebf6a726d",
+            "authorType": "npc",
+            "authorId": "acct_9eb33f25959b4b709dcf3b0906b7fbab",
+            "authorName": "今天吃什么1_4",
+            "text": "这个光线刚刚好",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:16:51.856Z",
+            "unread": true
+          }
+        ],
+        "imageDescription": "傍晚的河面反射橘色灯光",
+        "createdAt": "2026-09-25T20:56:51.856Z",
+        "updatedAt": "2026-09-25T21:16:51.860Z"
+      },
+      {
+        "id": "xhs_note_7dc68084-af36-4978-9cd6-f31f80f53a15",
+        "type": "post",
+        "feedScope": "discover",
+        "source": "npc",
+        "authorId": "acct_75a7b00121d948e2afb0f2b4e9ff2753",
+        "authorName": "灰蓝胶片1_5",
+        "title": "周末的光 6",
+        "body": "下午绕路去河边走了走，带了相机但最后一直在看云。",
+        "coverIcon": "📷",
+        "tone": "mist",
+        "tags": [
+          "摄影",
+          "日常"
+        ],
+        "likeCount": 25,
+        "saveCount": 3,
+        "commentCount": 1,
+        "liked": false,
+        "saved": false,
+        "recentLikeNames": [],
+        "recentSaveNames": [],
+        "comments": [
+          {
+            "id": "xhs_note_7dc68084-af36-4978-9cd6-f31f80f53a15_comment_1",
+            "noteId": "xhs_note_7dc68084-af36-4978-9cd6-f31f80f53a15",
+            "authorType": "npc",
+            "authorId": "acct_7ebb753d412f4530a64fcd8686876555",
+            "authorName": "今天吃什么1_5",
+            "text": "这个光线刚刚好",
+            "likeCount": 0,
+            "dislikeCount": 0,
+            "liked": false,
+            "disliked": false,
+            "createdAt": "2026-09-25T21:16:51.856Z",
+            "unread": true
+          }
+        ],
+        "imageDescription": "傍晚的河面反射橘色灯光",
+        "createdAt": "2026-09-25T20:51:51.856Z",
+        "updatedAt": "2026-09-25T21:16:51.860Z"
+      }
+    ],
+    "feedHiddenNoteIds": [],
+    "notifications": [],
+    "userInteractions": {
+      "likedNoteIds": [],
+      "savedNoteIds": [],
+      "commentedNoteIds": []
+    },
+    "socialGraph": {
+      "following": [],
+      "followers": []
+    },
+    "updatedAt": "2026-09-25T21:16:50.325Z"
+  },
+  "images": {},
+  "jobs": [
+    {
+      "id": "job_69cf977428bd4142a76e7809a1617111",
+      "kind": "feed",
+      "status": "done",
+      "knowledgeSnapshot": "[]",
+      "taskId": "ea188b34-3c16-4093-9456-68c954890749"
+    },
+    {
+      "id": "job_3c3a84bdd1dd4c92beee14f00458aa33",
+      "kind": "nickname",
+      "characterId": "private-alpha",
+      "status": "done",
+      "knowledgeSnapshot": "[]",
+      "taskId": "646dad1b-ebc7-4d8d-829c-cc3c9368aaf4"
+    },
+    {
+      "id": "job_d26ab133bd7347bba9479ea07e9a9255",
+      "kind": "activity",
+      "characterId": "private-alpha",
+      "status": "done",
+      "knowledgeSnapshot": "[]",
+      "taskId": "0ef0de7b-bb77-4c26-b776-922e07b5824d"
+    },
+    {
+      "id": "job_0063f0d285714eebb0b3558c7844ba70",
+      "kind": "nickname",
+      "characterId": "private-beta",
+      "status": "done",
+      "knowledgeSnapshot": "[]",
+      "taskId": "9a3041f7-790e-401d-842a-dbe569285f1c"
+    },
+    {
+      "id": "job_f0645188200547658e1e7e7f47e2afe5",
+      "kind": "activity",
+      "characterId": "private-beta",
+      "status": "done",
+      "knowledgeSnapshot": "[]",
+      "taskId": "bd7e7064-0f2d-4caf-a43c-9ed4d19c2695"
+    },
+    {
+      "id": "job_fe13eea70ada47b5993f6213ffddcf43",
+      "kind": "npc-reaction",
+      "noteId": "note_073d18b3b446434b85f553166e048ed2",
+      "status": "done",
+      "knowledgeSnapshot": "[]",
+      "taskId": "e7a5e0ff-5afd-480c-a3b5-725cd12e400b"
+    },
+    {
+      "id": "job_2c2369c67df04014b6005c15913aa596",
+      "kind": "reaction",
+      "characterId": "private-alpha",
+      "noteId": "note_073d18b3b446434b85f553166e048ed2",
+      "status": "done",
+      "knowledgeSnapshot": "[]",
+      "taskId": "db9a2648-9143-4bad-9d51-068c77319b99"
+    },
+    {
+      "id": "job_6426713d2c8d4788b0c4d161344f125f",
+      "kind": "reaction",
+      "characterId": "private-beta",
+      "noteId": "note_073d18b3b446434b85f553166e048ed2",
+      "status": "done",
+      "knowledgeSnapshot": "[]",
+      "taskId": "41c323f6-872c-4621-a7fc-dc3e3d4f8be7"
+    },
+    {
+      "id": "job_f5b2ed174ec041d3b6597bc9bfb18c23",
+      "kind": "npc-reply",
+      "noteId": "note_073d18b3b446434b85f553166e048ed2",
+      "commentId": "xhs_comment_aaa74de8-4be3-4a69-a51e-fb360dfc10d7",
+      "status": "done",
+      "knowledgeSnapshot": "[]",
+      "taskId": "18bf8221-e7ae-417e-b567-c1607b5aa4eb"
+    },
+    {
+      "id": "job_811bf999a1d2463fa2d664c8b6873de6",
+      "kind": "reply",
+      "characterId": "private-alpha",
+      "noteId": "note_073d18b3b446434b85f553166e048ed2",
+      "commentId": "xhs_comment_aaa74de8-4be3-4a69-a51e-fb360dfc10d7",
+      "status": "done",
+      "knowledgeSnapshot": "[]",
+      "taskId": "83395c40-7ec4-42b0-aa44-510232543200"
+    },
+    {
+      "id": "job_bed03952a7264a93b6ea726150ae81e0",
+      "kind": "reply",
+      "characterId": "private-beta",
+      "noteId": "note_073d18b3b446434b85f553166e048ed2",
+      "commentId": "xhs_comment_aaa74de8-4be3-4a69-a51e-fb360dfc10d7",
+      "status": "done",
+      "knowledgeSnapshot": "[]",
+      "taskId": "b143f316-7674-4346-add4-51a08087e10e"
+    }
+  ],
+  "outbox": [],
+  "userAccountId": "acct_7b6f9ecbda6942caa51f475c88de3729",
+  "noteIds": [
+    "note_073d18b3b446434b85f553166e048ed2",
+    "note_e3410e5c918d471494bcba44fd3c162d",
+    "note_8011437535d84609a1399264123242ea",
+    "xhs_note_c3a5733c-b207-433e-a255-54259e180586",
+    "xhs_note_1f4cd78a-b9b6-4ab4-9346-65ee48a8a708",
+    "xhs_note_f6277d2d-ac55-48cc-848d-70fdf9f7cd0a",
+    "xhs_note_da1a11b5-555e-4f82-bb66-1a11c205200f",
+    "xhs_note_c9b84fe7-7c5d-48db-955d-d60ebf6a726d",
+    "xhs_note_7dc68084-af36-4978-9cd6-f31f80f53a15"
+  ],
+  "updatedAt": "2026-09-25T21:17:04.358Z"
+}

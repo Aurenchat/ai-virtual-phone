@@ -5,16 +5,17 @@
 //    绕过 opencode.ai 未开放浏览器 CORS 的问题。
 
 import type { LlmRequestPayload } from "./llm-provider-adapter";
+import { protectProviderBody } from "./custom-app-protected-policy";
 
 export type FetchLlmPayloadOptions = {
     signal?: AbortSignal;
 };
 
-export function fetchLlmPayload(
+export async function fetchLlmPayload(
     payload: LlmRequestPayload,
     options: FetchLlmPayloadOptions = {},
 ): Promise<Response> {
-    const bodyText = JSON.stringify(payload.body);
+    const bodyText = JSON.stringify(await protectProviderBody(payload.body, payload.providerKind));
     if (payload.serverProxy) {
         return fetch("/api/llm-proxy", {
             method: "POST",

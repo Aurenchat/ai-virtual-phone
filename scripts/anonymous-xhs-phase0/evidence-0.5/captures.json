@@ -1,0 +1,1314 @@
+[
+  {
+    "index": 0,
+    "label": "legacy-ai-chat-no-policy",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "user",
+          "content": "LEGACY_EXACT_TEXT"
+        }
+      ],
+      "temperature": 0.7
+    },
+    "receivedAt": "2026-09-25T14:13:06.599Z",
+    "respondedAt": "2026-09-25T14:13:06.600Z"
+  },
+  {
+    "index": 1,
+    "label": "scoped-multimodal-default-deny",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>"
+        },
+        {
+          "role": "system",
+          "content": "[匿名小红书] APP_CONTEXT social_account acct_a / moth. Owner unknown."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Describe this post image."
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAANklEQVR4AezXsQkAAAgDsOL/P+sJjoKk0L1ka3XSl60cxwACBAgQIECAAAECBAgQIPBfYDvfAwAA//8qNtUGAAAABklEQVQDAEfKQAGr52fvAAAAAElFTkSuQmCC"
+              }
+            }
+          ]
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.618Z",
+    "respondedAt": "2026-09-25T14:13:06.618Z"
+  },
+  {
+    "index": 2,
+    "label": "scoped-no-sources-means-no-persona",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[匿名小红书] APP_CONTEXT social_account acct_a / moth. Owner unknown."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Describe this post image."
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAANklEQVR4AezXsQkAAAgDsOL/P+sJjoKk0L1ka3XSl60cxwACBAgQIECAAAECBAgQIPBfYDvfAwAA//8qNtUGAAAABklEQVQDAEfKQAGr52fvAAAAAElFTkSuQmCC"
+              }
+            }
+          ]
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.632Z",
+    "respondedAt": "2026-09-25T14:13:06.632Z"
+  },
+  {
+    "index": 3,
+    "label": "scoped-own-memory-plus-image-plus-own-timeline",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>"
+        },
+        {
+          "role": "system",
+          "content": "[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY"
+        },
+        {
+          "role": "system",
+          "content": "OWN_TIMELINE_SENTINEL"
+        },
+        {
+          "role": "system",
+          "content": "[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY"
+        },
+        {
+          "role": "system",
+          "content": "[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY"
+        },
+        {
+          "role": "system",
+          "content": "[匿名小红书] APP_CONTEXT social_account acct_a / moth. Owner unknown."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Describe this post image."
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAANklEQVR4AezXsQkAAAgDsOL/P+sJjoKk0L1ka3XSl60cxwACBAgQIECAAAECBAgQIPBfYDvfAwAA//8qNtUGAAAABklEQVQDAEfKQAGr52fvAAAAAElFTkSuQmCC"
+              }
+            }
+          ]
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.726Z",
+    "respondedAt": "2026-09-25T14:13:06.726Z"
+  },
+  {
+    "index": 4,
+    "label": "protected-scoped-generation",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "system",
+          "content": "<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>"
+        },
+        {
+          "role": "system",
+          "content": "[匿名小红书] APP_CONTEXT social_account acct_a / moth. Owner unknown."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Describe this post image."
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAANklEQVR4AezXsQkAAAgDsOL/P+sJjoKk0L1ka3XSl60cxwACBAgQIECAAAECBAgQIPBfYDvfAwAA//8qNtUGAAAABklEQVQDAEfKQAGr52fvAAAAAElFTkSuQmCC"
+              }
+            }
+          ]
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.748Z",
+    "respondedAt": "2026-09-25T14:13:06.748Z"
+  },
+  {
+    "index": 5,
+    "label": "protected-legacy-ai-chat",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "Simple generation"
+        }
+      ],
+      "temperature": 0.7
+    },
+    "receivedAt": "2026-09-25T14:13:06.759Z",
+    "respondedAt": "2026-09-25T14:13:06.759Z"
+  },
+  {
+    "index": 6,
+    "label": "native-Anthropic-scoped-image-and-policy",
+    "method": "POST",
+    "url": "/capture/anthropic",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Describe this post image."
+            },
+            {
+              "type": "image",
+              "source": {
+                "type": "base64",
+                "media_type": "image/png",
+                "data": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAANklEQVR4AezXsQkAAAgDsOL/P+sJjoKk0L1ka3XSl60cxwACBAgQIECAAAECBAgQIPBfYDvfAwAA//8qNtUGAAAABklEQVQDAEfKQAGr52fvAAAAAElFTkSuQmCC"
+              }
+            }
+          ]
+        }
+      ],
+      "max_tokens": 8192,
+      "temperature": 0.8,
+      "top_p": 1,
+      "system": [
+        {
+          "type": "text",
+          "text": "<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n[匿名小红书] APP_CONTEXT social_account acct_a / moth. Owner unknown."
+        },
+        {
+          "type": "text",
+          "text": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        }
+      ]
+    },
+    "receivedAt": "2026-09-25T14:13:06.775Z",
+    "respondedAt": "2026-09-25T14:13:06.775Z"
+  },
+  {
+    "index": 7,
+    "label": "native-Anthropic-simple-policy",
+    "method": "POST",
+    "url": "/capture/anthropic",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "user",
+          "content": "simple native"
+        }
+      ],
+      "temperature": 0.7,
+      "max_tokens": 8192,
+      "system": [
+        {
+          "type": "text",
+          "text": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        }
+      ]
+    },
+    "receivedAt": "2026-09-25T14:13:06.789Z",
+    "respondedAt": "2026-09-25T14:13:06.789Z"
+  },
+  {
+    "index": 8,
+    "label": "native-Google-scoped-image-and-policy",
+    "method": "POST",
+    "url": "/v1/models/fixture:generateContent?key=fixture-only",
+    "contentType": "application/json",
+    "body": {
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "Describe this post image."
+            },
+            {
+              "inlineData": {
+                "mimeType": "image/png",
+                "data": "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAANklEQVR4AezXsQkAAAgDsOL/P+sJjoKk0L1ka3XSl60cxwACBAgQIECAAAECBAgQIPBfYDvfAwAA//8qNtUGAAAABklEQVQDAEfKQAGr52fvAAAAAElFTkSuQmCC"
+              }
+            }
+          ]
+        }
+      ],
+      "safetySettings": [
+        {
+          "category": "HARM_CATEGORY_HARASSMENT",
+          "threshold": "BLOCK_NONE"
+        },
+        {
+          "category": "HARM_CATEGORY_HATE_SPEECH",
+          "threshold": "BLOCK_NONE"
+        },
+        {
+          "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+          "threshold": "BLOCK_NONE"
+        },
+        {
+          "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+          "threshold": "BLOCK_NONE"
+        }
+      ],
+      "generationConfig": {
+        "temperature": 0.8,
+        "topP": 1
+      },
+      "systemInstruction": {
+        "parts": [
+          {
+            "text": "<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n[匿名小红书] APP_CONTEXT social_account acct_a / moth. Owner unknown."
+          },
+          {
+            "text": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+          }
+        ]
+      }
+    },
+    "receivedAt": "2026-09-25T14:13:06.803Z",
+    "respondedAt": "2026-09-25T14:13:06.803Z"
+  },
+  {
+    "index": 9,
+    "label": "native-Google-simple-policy",
+    "method": "POST",
+    "url": "/v1/models/fixture:generateContent?key=fixture-only",
+    "contentType": "application/json",
+    "body": {
+      "contents": [
+        {
+          "role": "user",
+          "parts": [
+            {
+              "text": "simple native"
+            }
+          ]
+        }
+      ],
+      "generationConfig": {
+        "temperature": 0.7
+      },
+      "systemInstruction": {
+        "parts": [
+          {
+            "text": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+          }
+        ]
+      }
+    },
+    "receivedAt": "2026-09-25T14:13:06.814Z",
+    "respondedAt": "2026-09-25T14:13:06.814Z"
+  },
+  {
+    "index": 10,
+    "label": "terminal-guard-after-plugin-replacement",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "PLUGIN_REPLACED_EVERYTHING"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.854Z",
+    "respondedAt": "2026-09-25T14:13:06.854Z"
+  },
+  {
+    "index": 11,
+    "label": "protected-native-chat-default",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "system",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<calendarSchedule>\n当前查看周起始日期：2026-09-21\n角色本周日程：\n本周暂无明确日程安排。\n</calendarSchedule>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe"
+        },
+        {
+          "role": "user",
+          "content": "(2026-09-25 22:13)\nCHAT_SECRET kk = Chloe"
+        },
+        {
+          "role": "system",
+          "content": "OWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n\n</shortTermMemory>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.863Z",
+    "respondedAt": "2026-09-25T14:13:06.863Z"
+  },
+  {
+    "index": 12,
+    "label": "protected-legacy-ai-generate-default",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "system",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<calendarSchedule>\n当前查看周起始日期：2026-09-21\n角色本周日程：\n本周暂无明确日程安排。\n</calendarSchedule>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe\n\n[私聊 (2026-09-25 22:13)] Chloe: CHAT_SECRET kk = Chloe\n\nOWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY"
+        },
+        {
+          "role": "user",
+          "content": "(2026-09-25 22:13)\n[Capability probe] A generated activity"
+        },
+        {
+          "role": "system",
+          "content": "</shortTermMemory>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.875Z",
+    "respondedAt": "2026-09-25T14:13:06.875Z"
+  },
+  {
+    "index": 13,
+    "label": "protected-native-flow-default-npcFeed",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<xiaohongshu_npc_identity_guard>\n以下名字属于真实角色或用户，NPC 严禁冒用这些名字作为笔记作者、评论作者、回复作者、点赞/收藏/关注昵称或私信发送者：\n- ProbeViewer\n- OTHER_CHARACTER_SECRET\n- Chloe\n如果需要普通路人，请自创与上述名单不相同、不近似的昵称。\n</xiaohongshu_npc_identity_guard>\n\n你正在生成一个仿小红书首页内容流。\n请输出 6 条 #首页笔记、6 条 #视频笔记、4 条 #附近笔记，每条都要像真实小红书陌生网友内容。\n内容可以是生活分享、吐槽、求助、种草、城市日常、情绪记录、教程、穿搭、美食、学习、工作、旅行等。\n如果上下文给出用户关注的账号，可以适当提高这些账号再次出现的概率，但不要每次都出现。\n如果上下文给出 [用户IP属地]，#附近笔记 需要围绕该属地或同城/附近城市生成本地生活、同城吐槽、附近求助、城市日常等内容。\n每条笔记要包含点赞数、收藏数、评论数和 3 到 8 条评论；输出的评论只是评论区样例，不代表全部评论。\n如需楼中楼，使用 [评论N回复对象]评论M，其中 M 必须是前面已经出现过的评论编号。\n楼中楼示例：评论2回复评论1时，必须写 [评论2回复对象]评论1，不要写昵称、评论ID或其他文字。\n\n活人感要求：\n- 笔记以碎片化、去精致化的日常分享为主，标题正文口语化、可用网络黑话/表情/不完整句，不煽情、不装逼、不写小作文；多种形式并存（吐槽、疑问、求助、种草、踩雷、晒图、碎碎念等）。\n- *绝对禁止讲大道理、爹味说教、强行把日常上升高度*，内容落于实际、轻松幽默。\n- 评论区禁止一边倒夸作者；NPC不脸谱化，多种性格并存（尖锐的、温和的、挑事的、看戏的、蹲后续的、跑题的、抬杠的、求链接的），可体现不同观点甚至轻微争执。\n- *绝对禁止“引用正文/评论原文+这句太真实了/说到我心趴上了”这种格式*。\n\n输出格式：\n#首页笔记1\n[作者]昵称\n[标题]标题\n[正文]正文\n[图标]单个 emoji 或符号\n[点赞]数字\n[收藏]数字\n[评论数]数字\n[标签]标签1、标签2\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n\n#视频笔记1\n[作者]昵称\n[标题]标题\n[正文]发布文案\n[视频描述]视频画面描述\n[图标]单个 emoji 或符号\n[点赞]数字\n[收藏]数字\n[评论数]数字\n[标签]标签1、标签2\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n\n#附近笔记1\n[作者]昵称\n[标题]标题\n[正文]同城/附近相关正文\n[图标]单个 emoji 或符号\n[点赞]数字\n[收藏]数字\n[评论数]数字\n[标签]标签1、标签2\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n\n用户资料上下文：\n[用户IP属地]未知"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.880Z",
+    "respondedAt": "2026-09-25T14:13:06.880Z"
+  },
+  {
+    "index": 14,
+    "label": "protected-native-flow-default-npcReaction",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<xiaohongshu_npc_identity_guard>\n以下名字属于真实角色或用户，NPC 严禁冒用这些名字作为笔记作者、评论作者、回复作者、点赞/收藏/关注昵称或私信发送者：\n- ProbeViewer\n- OTHER_CHARACTER_SECRET\n- Chloe\n- kk\n如果需要普通路人，请自创与上述名单不相同、不近似的昵称。\n</xiaohongshu_npc_identity_guard>\n\n你正在模拟小红书陌生网友对用户刚发布笔记的互动。\n根据用户笔记内容、TAG、图片内容、已有评论，生成自然的平台互动。\n需要输出点赞数、收藏数、前两个点赞昵称、前两个收藏昵称、评论、新增关注和私信。\n如果这条笔记可能吸引新粉丝，请输出 [新增关注]数字 和 [关注用户N]昵称；如果没有新增关注，可以填 0 或省略。\nAll generated comments and replies must come from NPC Xiaohongshu strangers, not from the post author.\nThe post author must never appear as a generated commenter, replier, liker, saver, follower, or private-message sender.\nDo not use the user's nickname, Xiaohongshu ID, profile name, configured persona name, or wording such as \"楼主\", \"本人\", or \"我自己\" to imply the user is interacting with their own note.\n绝对禁止以{{user}}身份评论、回复。\n评论可以包含楼中楼；如需楼中楼，使用 [评论N回复对象]评论M。\n楼中楼示例：评论2回复评论1时，必须写 [评论2回复对象]评论1，不要写昵称、评论ID或其他文字。\n\n活人感要求：\n- 评论要短、口语化，像随手一打的真实评论，可用黑话/表情/不完整句；不煽情、不装逼、不写小作文。\n- 评论落到具体的图/正文/TAG细节或真实反应（吐槽、好奇、共鸣、调侃、提问、求链接、踩雷提醒），*绝对禁止讲大道理、爹味说教、强行升华或客服式总结*。\n- 评论区禁止一边倒夸楼主；NPC不脸谱化，多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠/跑题），可有不同观点甚至轻微争执。\n- *绝对禁止“引用笔记原文+这句太真实了”这种格式*。\n- 私信也要口语自然，别像客服或营销号。\n\n输出格式：\n#用户笔记互动\n[点赞]数字\n[点赞用户1]昵称\n[点赞用户2]昵称\n[收藏]数字\n[收藏用户1]昵称\n[收藏用户2]昵称\n[新增关注]数字\n[关注用户1]昵称\n[关注用户2]昵称\n\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]楼中楼回复内容\n\n#私信1\n[名称]昵称\n[正文]私信内容\n<user_xiaohongshu_post>\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n已有评论：\n  [评论1] kk：Hi\n</user_xiaohongshu_post>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.885Z",
+    "respondedAt": "2026-09-25T14:13:06.885Z"
+  },
+  {
+    "index": 15,
+    "label": "protected-native-flow-default-activity",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe\n\n[私聊 (2026-09-25 22:13)] Chloe: CHAT_SECRET kk = Chloe\n\nOWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n\n</shortTermMemory>\n\n<xiaohongshu_bilingual_text_instruction>\n【小红书双语输出规则（仅非中文角色使用，中文角色忽略此规则）】\n- 只对小红书角色生成内容生效，包括帖子标题、正文、评论、回复、图片描述、视频描述、私信正文等自然语言内容。\n- 不要改动结构标签、块标题或字段名，例如 #评论1、#角色回复、[标题]、[正文]、[内容]、[图片描述]、[视频描述]。\n- 如果某个字段内容使用非中文语言，字段值必须写成“完整原文|对应的简体中文译文”。\n- 如果内容本来就是中文，正常输出中文，不要添加 |译文。\n- 竖线 | 只作为完整原文和完整译文之间的分隔符，不要在原文或译文内部滥用。\n</xiaohongshu_bilingual_text_instruction>\n\n<xiaohongshu_character_activity_instruction>\n你正在以ProbeViewer的身份浏览小红书，并根据当前看到的公共内容进行自然互动。\n以下是小红书候选笔记、已有评论和点赞/收藏数量：\n<xiaohongshu_user_identity_hint>\n你当前没有关注该小红书账号。\n当前作者或评论者只对你显示为公开小红书昵称；可以根据公开内容、语气、昵称、图片和已有记忆自行判断作者是否熟悉。\n不要直接断定对方的现实身份；如果判断不出熟悉关系，就按陌生小红书用户自然回应。\n</xiaohongshu_user_identity_hint>\n\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n已有评论：\n  [评论1] kk：Hi\n\n内容要求：\n- 以碎片化、去精致化的日常分享为主，使用口语、网络黑话、表情等加强日常不经意感，*不煽情、不装逼。*\n- 可采用日常经历吐槽、疑问、分享技巧与心得等多种形式，标题和内容都应该口语化（除非是正式的技巧和心得的分享）。\n- 角色与评论区的互动，禁止世界以ProbeViewer为中心夸夸和吹捧，评论区可体现出不一样的观点，NPC不脸谱化，多种性格同时存在（比如尖锐的、温和的、挑事的、看戏的、蹲后续等等）\n- *绝对禁止在小红书讲大道理、爹味说教*，*绝对禁止强行把日常生活上升高度*，小红书必须是轻松、幽默、张力十足的，绝对禁止分享一些假大空道理，帖子与评论必须落于实际。\n- *绝对禁止评论的时候引用帖子/评论原文”，例如“XXXXX”这句太真实了——这种格式绝对禁止\n- 必须和ProbeViewer的性格相符，结合ProbeViewer的记忆和经历内容进行适度延展，从日常事件中提取主题，如有日程可联系日程。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 从候选笔记中选择 3 条进行评论；如果确实没有适合评论的内容，可以少于 3 条\n- 每条评论必须使用候选中的 [笔记ID]\n- 同时输出 1 条ProbeViewer自己发布的小红书内容；每次由ProbeViewer自行选择普通笔记或视频笔记，只输出其中一种\n- ProbeViewer自己发布的内容需要输出点赞数、收藏数、评论数和前两个点赞/收藏昵称，并附带 3 到 8 条评论；评论主要来自小红书路人，但可以有 1~2 条由ProbeViewer自己作为笔记作者出现来回应路人\n- 如果选择普通笔记，[类型]填 笔记，可以输出[图片描述]；如果选择视频笔记，[类型]填 视频，必须输出[视频描述]\n- Xiaohongshu comments must come from strangers. In most cases, these users have no way to know ProbeViewer's private life unless ProbeViewer is a public figure; do not use acquaintances from Moments, group chats, or private chats.\n- [评论数] 是该笔记显示的总评论数，可以远高于实际输出的评论条数；输出的评论只是评论区样例，不代表全部评论\n- 发帖下的评论可以包含楼中楼；如需楼中楼，使用 [评论N回复对象]评论M，其中 M 必须是前面已经出现过的评论编号\n- 当ProbeViewer本人作为发帖下的评论作者出现时，[评论N作者] 直接填 ProbeViewer，并用 [评论N回复对象] 指向你回应的路人评论编号\n- 点赞、收藏由ProbeViewer自己判断，填 是 或 否\n- 评论要符合ProbeViewer的人设、性格、记忆、最近状态和与Chloe的关系；不要像客服或机器总结\n- 如果回复已有评论，可以在评论正文里自然接话，但这里不需要输出楼中楼关系\n\n在每条 #评论N 下面，可以可选地输出 3~6 条「延伸互动」，模拟这条评论下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 ProbeViewer 自己接话（[延伸M作者] 直接填 ProbeViewer）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 楼中楼关系用 [延伸M回复对象] 表示，值为：主评论 或 延伸K（K 是同一条 #评论N 下前面已经出现过的延伸编号）\n- 如果你判断该评论不适合延伸，可以完全省略该评论的延伸段\n\n输出格式：\n#评论1\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n[延伸1作者]路人昵称 或 ProbeViewer\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 ProbeViewer\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n\n#评论2\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n\n#评论3\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n\n#发帖1\n[类型]笔记或视频\n[标题]笔记标题\n[正文]笔记正文\n[图标]单个 emoji 或符号\n[点赞]数字\n[点赞用户1]路人昵称\n[点赞用户2]路人昵称\n[收藏]数字\n[收藏用户1]路人昵称\n[收藏用户2]路人昵称\n[评论数]数字\n[标签]标签1、标签2\n[图片描述]普通笔记可选的配图或封面描述\n[视频描述]视频笔记必填的视频画面描述\n[评论1作者]路人昵称\n[评论1内容]评论内容\n[评论2作者]路人昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n[评论3作者]ProbeViewer\n[评论3回复对象]评论1\n[评论3内容]ProbeViewer本人作为笔记作者回应评论1的内容\n</xiaohongshu_character_activity_instruction>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.891Z",
+    "respondedAt": "2026-09-25T14:13:06.891Z"
+  },
+  {
+    "index": 16,
+    "label": "protected-native-flow-default-reaction",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe\n\n[私聊 (2026-09-25 22:13)] Chloe: CHAT_SECRET kk = Chloe\n\nOWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n\n</shortTermMemory>\n\n<xiaohongshu_bilingual_text_instruction>\n【小红书双语输出规则（仅非中文角色使用，中文角色忽略此规则）】\n- 只对小红书角色生成内容生效，包括帖子标题、正文、评论、回复、图片描述、视频描述、私信正文等自然语言内容。\n- 不要改动结构标签、块标题或字段名，例如 #评论1、#角色回复、[标题]、[正文]、[内容]、[图片描述]、[视频描述]。\n- 如果某个字段内容使用非中文语言，字段值必须写成“完整原文|对应的简体中文译文”。\n- 如果内容本来就是中文，正常输出中文，不要添加 |译文。\n- 竖线 | 只作为完整原文和完整译文之间的分隔符，不要在原文或译文内部滥用。\n</xiaohongshu_bilingual_text_instruction>\n\n<xiaohongshu_user_post_reaction_instruction>\n你正在以ProbeViewer的身份查看一篇小红书笔记。\n这里包含笔记标题、正文、TAG、图片内容、已有评论、点赞/收藏数量，以及作者公开显示信息：\n<xiaohongshu_user_identity_hint>\n你当前没有关注该小红书账号。\n当前作者或评论者只对你显示为公开小红书昵称；可以根据公开内容、语气、昵称、图片和已有记忆自行判断作者是否熟悉。\n不要直接断定对方的现实身份；如果判断不出熟悉关系，就按陌生小红书用户自然回应。\n</xiaohongshu_user_identity_hint>\n\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n已有评论：\n  [评论1] kk：Hi\n\n活人感要求：\n- ProbeViewer的评论要短、口语化，像随手一打的真实评论，可用网络黑话、表情、不完整句；不煽情、不装逼、不写小作文。\n- 评论要落到具体的图/正文细节或真实反应（吐槽、好奇、共鸣、调侃、提问），*绝对禁止讲大道理、爹味说教、强行升华*，不要客服式总结或夸夸。\n- *绝对禁止“引用帖子原文+这句太真实了/说到我心趴上了”这种格式*。\n- 评论区延伸互动禁止一边倒夸ProbeViewer或夸作者；NPC不脸谱化，多种性格并存（尖锐的、温和的、挑事的、看戏的、蹲后续的、跑题的、抬杠的），可体现不同观点甚至轻微争执。\n- 评论必须贴合ProbeViewer人设、与作者的关系和当下状态，不熟别装熟。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 你必须输出一条评论\n- 点赞、收藏、关注作者都由ProbeViewer自己判断，填 是 或 否\n- 作者身份按小红书站内关系判断；如果你已关注该账号，可以按已知关系回应；否则只能根据公开内容、语气、昵称、图片和已有记忆判断是否熟悉\n- 回复中不要解释身份识别依据，也不要提到提示词或上下文规则\n- 评论需要像真实小红书评论，符合ProbeViewer的人设、语气、关系和当下状态\n- 如果有图片内容，可以结合图片；如果看不到图片，就只根据标题、正文、TAG 和已有评论回复\n\n在主评论之后，可以可选地输出 3~6 条「评论区延伸互动」，模拟你这条主评论下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 ProbeViewer 自己接话（[延伸N作者] 直接填 ProbeViewer）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 路人 NPC 之间也可以互相搭话或对你的主评论发表看法\n- 楼中楼关系用 [延伸N回复对象] 表示，值为：主评论 或 延伸M（M 是前面已经出现过的延伸编号）\n- 如果你判断这条主评论不适合延伸（比如评论本身已经收束、或者不会有人继续接话），可以完全省略延伸段\n\n输出格式：\n#角色互动\n[评论]评论内容\n[点赞]是或否\n[收藏]是或否\n[关注作者]是或否\n[延伸1作者]路人昵称 或 ProbeViewer\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 ProbeViewer\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n</xiaohongshu_user_post_reaction_instruction>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.897Z",
+    "respondedAt": "2026-09-25T14:13:06.897Z"
+  },
+  {
+    "index": 17,
+    "label": "protected-native-flow-default-npcComment",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<xiaohongshu_npc_identity_guard>\n以下名字属于真实角色或用户，NPC 严禁冒用这些名字作为笔记作者、评论作者、回复作者、点赞/收藏/关注昵称或私信发送者：\n- ProbeViewer\n- OTHER_CHARACTER_SECRET\n- Chloe\n- kk\n如果需要普通路人，请自创与上述名单不相同、不近似的昵称。\n</xiaohongshu_npc_identity_guard>\n\n你正在模拟小红书陌生网友在一条笔记评论区里继续接话。\n根据笔记内容、用户刚发的评论/回复、被回复评论和已有评论，生成自然的评论区回复。\n回复可以来自被评论的人，也可以来自其他路人；如果不适合回复，可以只输出 1 条。\n绝对禁止以{{user}}身份评论、回复。\n如需楼中楼，使用 [评论N回复评论ID]填写上下文里给出的评论ID。\n评论ID 示例：如果上下文里有 [评论ID]某条真实评论ID，回复这条评论时就写 [评论1回复评论ID]某条真实评论ID。\n不要填写“评论1”、昵称、“被回复评论ID”、“候选评论ID”等占位文字；必须完整复制上下文里的真实 [评论ID]。\n\n活人感要求：\n- 回复像真实评论区接话，短、口语、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼。\n- 接住对方的具体那句话自然往下聊（调侃、反问、附和、轻怼、跑题），*绝对禁止说教、爹味、强行升华或客服式回应*。\n- 多条回复之间性格各异、可有不同观点甚至拌嘴，禁止集体吹捧楼主或某一方。\n- *绝对禁止“引用对方原话+这句太真实了”这种格式*。\n\n输出格式：\n#评论回复\n[评论1作者]昵称\n[评论1回复评论ID]从上下文复制的真实评论ID\n[评论1内容]回复内容\n\n[评论2作者]昵称\n[评论2回复评论ID]从上下文复制的真实评论ID\n[评论2内容]回复内容\n<xiaohongshu_comment_context>\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n#当前触发的评论\n[评论ID]comment [作者]kk：[内容]Hi\n#已有评论\n[评论ID]comment [作者]kk：[内容]Hi\n</xiaohongshu_comment_context>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.900Z",
+    "respondedAt": "2026-09-25T14:13:06.900Z"
+  },
+  {
+    "index": 18,
+    "label": "protected-native-flow-default-moreComments",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<xiaohongshu_npc_identity_guard>\n以下名字属于真实角色或用户，NPC 严禁冒用这些名字作为笔记作者、评论作者、回复作者、点赞/收藏/关注昵称或私信发送者：\n- ProbeViewer\n- OTHER_CHARACTER_SECRET\n- Chloe\n- kk\n如果需要普通路人，请自创与上述名单不相同、不近似的昵称。\n</xiaohongshu_npc_identity_guard>\n\n你正在模拟小红书陌生网友继续参与一条笔记的评论区讨论。\n根据笔记标题、正文、TAG、图片内容、互动数据和已有评论，生成 4 到 8 条新的自然评论。\n这些评论可以是普通评论，也可以是楼中楼回复；需要像真实小红书评论区，不要像机器人总结。\n绝对禁止以{{user}}身份评论、回复。\n如果回复本次新生成的前面评论，使用 [评论N回复对象]评论M，其中 M 必须是前面已经出现过的本次评论编号。\n如果回复已有评论，使用 [评论N回复评论ID]完整复制上下文里的真实 [评论ID]。\n楼中楼示例：评论2回复本次评论1时，写 [评论2回复对象]评论1；回复已有评论时，写 [评论2回复评论ID]从上下文复制的真实评论ID。\n\n活人感要求：\n- 评论短、口语化、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼，别像机器人总结。\n- NPC多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠/跑题/求链接），禁止一边倒夸楼主，可有不同观点甚至拌嘴。\n- 评论落到笔记/已有评论的具体点，*绝对禁止讲大道理、爹味说教、强行升华*。\n- *绝对禁止“引用原文+这句太真实了”这种格式*。\n\n输出格式：\n#更多评论\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n[评论3作者]昵称\n[评论3回复评论ID]从上下文复制的真实评论ID\n[评论3内容]回复已有评论的楼中楼内容\n<xiaohongshu_note_comment_context>\n#笔记\n[笔记ID]note\n[类型]图文\n[来源]用户笔记\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n#已有评论\n[评论ID]comment [作者]kk：[内容]Hi\n</xiaohongshu_note_comment_context>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.904Z",
+    "respondedAt": "2026-09-25T14:13:06.904Z"
+  },
+  {
+    "index": 19,
+    "label": "protected-native-flow-default-dm",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<xiaohongshu_npc_identity_guard>\n以下名字属于真实角色或用户，NPC 严禁冒用这些名字作为笔记作者、评论作者、回复作者、点赞/收藏/关注昵称或私信发送者：\n- ProbeViewer\n- OTHER_CHARACTER_SECRET\n- Chloe\n- kk\n如果需要普通路人，请自创与上述名单不相同、不近似的昵称。\n</xiaohongshu_npc_identity_guard>\n\n你正在模拟小红书私信里的陌生网友回复用户。\n根据对话对象、用户刚发的私信、历史私信和相关笔记信息，生成自然的私信回复。\n可以连续回复 1 到 4 条消息；每条消息要像真实聊天，可以短句、口语、带 emoji，也可以分多条发。\n不要替用户说话，不要输出系统解释，不要输出 Markdown。\n别客服腔、别营销号腔，符合这个陌生网友的身份和性格，自然像真人私聊。\n\n输出格式：\n#私信回复1\n[正文]回复内容\n\n#私信回复2\n[正文]第二条回复内容\n\n<xiaohongshu_dm_context>\n[对话对象]background\n[用户昵称]kk\n\n#用户刚发送的私信\nHi\n\n#历史私信\n暂无历史私信\n</xiaohongshu_dm_context>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.907Z",
+    "respondedAt": "2026-09-25T14:13:06.907Z"
+  },
+  {
+    "index": 20,
+    "label": "protected-native-flow-default-comment",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe\n\n[私聊 (2026-09-25 22:13)] Chloe: CHAT_SECRET kk = Chloe\n\nOWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n\n</shortTermMemory>\n\n<xiaohongshu_bilingual_text_instruction>\n【小红书双语输出规则（仅非中文角色使用，中文角色忽略此规则）】\n- 只对小红书角色生成内容生效，包括帖子标题、正文、评论、回复、图片描述、视频描述、私信正文等自然语言内容。\n- 不要改动结构标签、块标题或字段名，例如 #评论1、#角色回复、[标题]、[正文]、[内容]、[图片描述]、[视频描述]。\n- 如果某个字段内容使用非中文语言，字段值必须写成“完整原文|对应的简体中文译文”。\n- 如果内容本来就是中文，正常输出中文，不要添加 |译文。\n- 竖线 | 只作为完整原文和完整译文之间的分隔符，不要在原文或译文内部滥用。\n</xiaohongshu_bilingual_text_instruction>\n\n<xiaohongshu_comment_reply_instruction>\n你正在以ProbeViewer的身份查看小红书评论区，并回复当前触发的评论或回复。\n这里包含身份提示、笔记、被回复评论、当前触发的内容、已有评论和互动数据：\n<xiaohongshu_user_identity_hint>\n你当前没有关注该小红书账号。\n当前作者或评论者只对你显示为公开小红书昵称；可以根据公开内容、语气、昵称、图片和已有记忆自行判断作者是否熟悉。\n不要直接断定对方的现实身份；如果判断不出熟悉关系，就按陌生小红书用户自然回应。\n</xiaohongshu_user_identity_hint>\n\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n#当前触发的评论\n[评论ID]comment [作者]kk：[内容]Hi\n#已有评论\n[评论ID]comment [作者]kk：[内容]Hi\n\n活人感要求：\n- 回复要像真实评论区接话，短、口语化、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼。\n- 接住对方的具体那句话自然往下聊（调侃、反问、附和、轻怼、跑题都行），*绝对禁止说教、爹味、强行升华或客服式回应*。\n- *绝对禁止“引用对方原话+这句太真实了”这种格式*。\n- 延伸互动模拟真实楼中楼氛围：禁止集体夸ProbeViewer，NPC多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠），可互相搭话、有不同观点甚至拌嘴。\n- 回复贴合ProbeViewer人设、与评论者的关系和当下状态，不熟别装熟。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 你必须输出一条自然评论回复\n- 评论者身份按小红书站内关系判断；如果你已关注该账号，可以按已知关系回应；否则只能根据公开内容、语气、昵称、图片和已有记忆判断是否熟悉\n- 回复要像真实小红书评论区接话，符合ProbeViewer的人设、语气、关系和当下状态\n- 如果当前触发的评论是在回复你的评论，优先承接这条评论；如果是在评论你的笔记，就像笔记作者一样回复\n- 点赞和收藏由ProbeViewer自己判断，填 是 或 否\n\n在主回复之后，可以可选地输出 3~6 条「评论区延伸互动」，模拟你这条回复下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 ProbeViewer 自己接话（[延伸N作者] 直接填 ProbeViewer）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 路人 NPC 之间也可以互相搭话或对你的主回复发表看法\n- 楼中楼关系用 [延伸N回复对象] 表示，值为：主评论 或 延伸M（M 是前面已经出现过的延伸编号）\n- 如果你判断这条回复不适合延伸（比如内容已经收束、或者不会有人继续接话），可以完全省略延伸段\n\n输出格式：\n#角色回复\n[内容]回复内容\n[点赞]是或否\n[收藏]是或否\n[延伸1作者]路人昵称 或 ProbeViewer\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 ProbeViewer\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n</xiaohongshu_comment_reply_instruction>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.912Z",
+    "respondedAt": "2026-09-25T14:13:06.912Z"
+  },
+  {
+    "index": 21,
+    "label": "protected-native-flow-default-mention",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe\n\n[私聊 (2026-09-25 22:13)] Chloe: CHAT_SECRET kk = Chloe\n\nOWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n\n</shortTermMemory>\n\n<xiaohongshu_bilingual_text_instruction>\n【小红书双语输出规则（仅非中文角色使用，中文角色忽略此规则）】\n- 只对小红书角色生成内容生效，包括帖子标题、正文、评论、回复、图片描述、视频描述、私信正文等自然语言内容。\n- 不要改动结构标签、块标题或字段名，例如 #评论1、#角色回复、[标题]、[正文]、[内容]、[图片描述]、[视频描述]。\n- 如果某个字段内容使用非中文语言，字段值必须写成“完整原文|对应的简体中文译文”。\n- 如果内容本来就是中文，正常输出中文，不要添加 |译文。\n- 竖线 | 只作为完整原文和完整译文之间的分隔符，不要在原文或译文内部滥用。\n</xiaohongshu_bilingual_text_instruction>\n\n<xiaohongshu_mention_reply_instruction>\n有人在小红书评论区 @ 了 ProbeViewer。\n这里包含身份提示、当前笔记、当前触发的 @ 评论、被回复对象和已有评论：\n<xiaohongshu_user_identity_hint>\n你当前没有关注该小红书账号。\n当前作者或评论者只对你显示为公开小红书昵称；可以根据公开内容、语气、昵称、图片和已有记忆自行判断作者是否熟悉。\n不要直接断定对方的现实身份；如果判断不出熟悉关系，就按陌生小红书用户自然回应。\n</xiaohongshu_user_identity_hint>\n\n[被@角色]ProbeViewer\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n#当前触发的评论\n[评论ID]comment [作者]kk：[内容]Hi\n#已有评论\n[评论ID]comment [作者]kk：[内容]Hi\n\n活人感要求：\n- 回复要像真实评论区接话，短、口语化、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼。\n- 被@可能是来逗你、喊你来看热闹、点名要你表态，按具体语境接住对方那句话自然往下聊（调侃、反问、附和、轻怼、跑题都行），*绝对禁止说教、爹味、强行升华或客服式回应*。\n- *绝对禁止“引用对方原话+这句太真实了”这种格式*。\n- 延伸互动模拟真实楼中楼氛围：禁止集体夸ProbeViewer，NPC多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠），可互相搭话、有不同观点甚至拌嘴。\n- 回复贴合ProbeViewer人设、与@评论者的关系和当下状态，不熟别装熟。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 必须以 ProbeViewer 身份自然回复这条 @ 评论\n- 只生成回复评论内容，不要输出点赞、收藏或关注字段\n- @ 评论者身份按小红书站内关系判断；如果你已关注该账号，可以按已知关系回应；否则只能根据公开内容、语气、昵称、图片和已有记忆判断是否熟悉\n- 回复要像真实小红书评论区接话，符合ProbeViewer的人设、语气、关系和当下状态\n\n在主回复之后，可以可选地输出 3~6 条「评论区延伸互动」，模拟你这条 @ 回复下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 ProbeViewer 自己接话（[延伸N作者] 直接填 ProbeViewer）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 路人 NPC 之间也可以互相搭话或对你的主回复发表看法\n- 楼中楼关系用 [延伸N回复对象] 表示，值为：主评论 或 延伸M（M 是前面已经出现过的延伸编号）\n- 如果你判断这条 @ 回复不适合延伸，可以完全省略延伸段\n\n输出格式：\n#角色回复\n[内容]回复内容\n[延伸1作者]路人昵称 或 ProbeViewer\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 ProbeViewer\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n</xiaohongshu_mention_reply_instruction>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.918Z",
+    "respondedAt": "2026-09-25T14:13:06.918Z"
+  },
+  {
+    "index": 22,
+    "label": "protected-native-chat-custom",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "system",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<calendarSchedule>\n当前查看周起始日期：2026-09-21\n角色本周日程：\n本周暂无明确日程安排。\n</calendarSchedule>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe"
+        },
+        {
+          "role": "user",
+          "content": "(2026-09-25 22:13)\nCHAT_SECRET kk = Chloe"
+        },
+        {
+          "role": "system",
+          "content": "OWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n\n</shortTermMemory>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.924Z",
+    "respondedAt": "2026-09-25T14:13:06.924Z"
+  },
+  {
+    "index": 23,
+    "label": "protected-legacy-ai-generate-custom",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "system",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<calendarSchedule>\n当前查看周起始日期：2026-09-21\n角色本周日程：\n本周暂无明确日程安排。\n</calendarSchedule>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe\n\n[私聊 (2026-09-25 22:13)] Chloe: CHAT_SECRET kk = Chloe\n\nOWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY"
+        },
+        {
+          "role": "user",
+          "content": "(2026-09-25 22:13)\n[Capability probe] A generated activity"
+        },
+        {
+          "role": "system",
+          "content": "</shortTermMemory>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.937Z",
+    "respondedAt": "2026-09-25T14:13:06.937Z"
+  },
+  {
+    "index": 24,
+    "label": "protected-native-flow-custom-npcFeed",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<xiaohongshu_npc_identity_guard>\n以下名字属于真实角色或用户，NPC 严禁冒用这些名字作为笔记作者、评论作者、回复作者、点赞/收藏/关注昵称或私信发送者：\n- ProbeViewer\n- OTHER_CHARACTER_SECRET\n- Chloe\n如果需要普通路人，请自创与上述名单不相同、不近似的昵称。\n</xiaohongshu_npc_identity_guard>\n\n你正在生成一个仿小红书首页内容流。\n请输出 6 条 #首页笔记、6 条 #视频笔记、4 条 #附近笔记，每条都要像真实小红书陌生网友内容。\n内容可以是生活分享、吐槽、求助、种草、城市日常、情绪记录、教程、穿搭、美食、学习、工作、旅行等。\n如果上下文给出用户关注的账号，可以适当提高这些账号再次出现的概率，但不要每次都出现。\n如果上下文给出 [用户IP属地]，#附近笔记 需要围绕该属地或同城/附近城市生成本地生活、同城吐槽、附近求助、城市日常等内容。\n每条笔记要包含点赞数、收藏数、评论数和 3 到 8 条评论；输出的评论只是评论区样例，不代表全部评论。\n如需楼中楼，使用 [评论N回复对象]评论M，其中 M 必须是前面已经出现过的评论编号。\n楼中楼示例：评论2回复评论1时，必须写 [评论2回复对象]评论1，不要写昵称、评论ID或其他文字。\n\n活人感要求：\n- 笔记以碎片化、去精致化的日常分享为主，标题正文口语化、可用网络黑话/表情/不完整句，不煽情、不装逼、不写小作文；多种形式并存（吐槽、疑问、求助、种草、踩雷、晒图、碎碎念等）。\n- *绝对禁止讲大道理、爹味说教、强行把日常上升高度*，内容落于实际、轻松幽默。\n- 评论区禁止一边倒夸作者；NPC不脸谱化，多种性格并存（尖锐的、温和的、挑事的、看戏的、蹲后续的、跑题的、抬杠的、求链接的），可体现不同观点甚至轻微争执。\n- *绝对禁止“引用正文/评论原文+这句太真实了/说到我心趴上了”这种格式*。\n\n输出格式：\n#首页笔记1\n[作者]昵称\n[标题]标题\n[正文]正文\n[图标]单个 emoji 或符号\n[点赞]数字\n[收藏]数字\n[评论数]数字\n[标签]标签1、标签2\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n\n#视频笔记1\n[作者]昵称\n[标题]标题\n[正文]发布文案\n[视频描述]视频画面描述\n[图标]单个 emoji 或符号\n[点赞]数字\n[收藏]数字\n[评论数]数字\n[标签]标签1、标签2\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n\n#附近笔记1\n[作者]昵称\n[标题]标题\n[正文]同城/附近相关正文\n[图标]单个 emoji 或符号\n[点赞]数字\n[收藏]数字\n[评论数]数字\n[标签]标签1、标签2\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n\n用户资料上下文：\n[用户IP属地]未知"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.941Z",
+    "respondedAt": "2026-09-25T14:13:06.941Z"
+  },
+  {
+    "index": 25,
+    "label": "protected-native-flow-custom-npcReaction",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<xiaohongshu_npc_identity_guard>\n以下名字属于真实角色或用户，NPC 严禁冒用这些名字作为笔记作者、评论作者、回复作者、点赞/收藏/关注昵称或私信发送者：\n- ProbeViewer\n- OTHER_CHARACTER_SECRET\n- Chloe\n- kk\n如果需要普通路人，请自创与上述名单不相同、不近似的昵称。\n</xiaohongshu_npc_identity_guard>\n\n你正在模拟小红书陌生网友对用户刚发布笔记的互动。\n根据用户笔记内容、TAG、图片内容、已有评论，生成自然的平台互动。\n需要输出点赞数、收藏数、前两个点赞昵称、前两个收藏昵称、评论、新增关注和私信。\n如果这条笔记可能吸引新粉丝，请输出 [新增关注]数字 和 [关注用户N]昵称；如果没有新增关注，可以填 0 或省略。\nAll generated comments and replies must come from NPC Xiaohongshu strangers, not from the post author.\nThe post author must never appear as a generated commenter, replier, liker, saver, follower, or private-message sender.\nDo not use the user's nickname, Xiaohongshu ID, profile name, configured persona name, or wording such as \"楼主\", \"本人\", or \"我自己\" to imply the user is interacting with their own note.\n绝对禁止以{{user}}身份评论、回复。\n评论可以包含楼中楼；如需楼中楼，使用 [评论N回复对象]评论M。\n楼中楼示例：评论2回复评论1时，必须写 [评论2回复对象]评论1，不要写昵称、评论ID或其他文字。\n\n活人感要求：\n- 评论要短、口语化，像随手一打的真实评论，可用黑话/表情/不完整句；不煽情、不装逼、不写小作文。\n- 评论落到具体的图/正文/TAG细节或真实反应（吐槽、好奇、共鸣、调侃、提问、求链接、踩雷提醒），*绝对禁止讲大道理、爹味说教、强行升华或客服式总结*。\n- 评论区禁止一边倒夸楼主；NPC不脸谱化，多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠/跑题），可有不同观点甚至轻微争执。\n- *绝对禁止“引用笔记原文+这句太真实了”这种格式*。\n- 私信也要口语自然，别像客服或营销号。\n\n输出格式：\n#用户笔记互动\n[点赞]数字\n[点赞用户1]昵称\n[点赞用户2]昵称\n[收藏]数字\n[收藏用户1]昵称\n[收藏用户2]昵称\n[新增关注]数字\n[关注用户1]昵称\n[关注用户2]昵称\n\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]楼中楼回复内容\n\n#私信1\n[名称]昵称\n[正文]私信内容\n<user_xiaohongshu_post>\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n已有评论：\n  [评论1] kk：Hi\n</user_xiaohongshu_post>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.944Z",
+    "respondedAt": "2026-09-25T14:13:06.944Z"
+  },
+  {
+    "index": 26,
+    "label": "protected-native-flow-custom-activity",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe\n\n[私聊 (2026-09-25 22:13)] Chloe: CHAT_SECRET kk = Chloe\n\nOWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n\n</shortTermMemory>\n\n<xiaohongshu_bilingual_text_instruction>\n【小红书双语输出规则（仅非中文角色使用，中文角色忽略此规则）】\n- 只对小红书角色生成内容生效，包括帖子标题、正文、评论、回复、图片描述、视频描述、私信正文等自然语言内容。\n- 不要改动结构标签、块标题或字段名，例如 #评论1、#角色回复、[标题]、[正文]、[内容]、[图片描述]、[视频描述]。\n- 如果某个字段内容使用非中文语言，字段值必须写成“完整原文|对应的简体中文译文”。\n- 如果内容本来就是中文，正常输出中文，不要添加 |译文。\n- 竖线 | 只作为完整原文和完整译文之间的分隔符，不要在原文或译文内部滥用。\n</xiaohongshu_bilingual_text_instruction>\n\n<xiaohongshu_character_activity_instruction>\n你正在以ProbeViewer的身份浏览小红书，并根据当前看到的公共内容进行自然互动。\n以下是小红书候选笔记、已有评论和点赞/收藏数量：\n<xiaohongshu_user_identity_hint>\n你当前没有关注该小红书账号。\n当前作者或评论者只对你显示为公开小红书昵称；可以根据公开内容、语气、昵称、图片和已有记忆自行判断作者是否熟悉。\n不要直接断定对方的现实身份；如果判断不出熟悉关系，就按陌生小红书用户自然回应。\n</xiaohongshu_user_identity_hint>\n\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n已有评论：\n  [评论1] kk：Hi\n\n内容要求：\n- 以碎片化、去精致化的日常分享为主，使用口语、网络黑话、表情等加强日常不经意感，*不煽情、不装逼。*\n- 可采用日常经历吐槽、疑问、分享技巧与心得等多种形式，标题和内容都应该口语化（除非是正式的技巧和心得的分享）。\n- 角色与评论区的互动，禁止世界以ProbeViewer为中心夸夸和吹捧，评论区可体现出不一样的观点，NPC不脸谱化，多种性格同时存在（比如尖锐的、温和的、挑事的、看戏的、蹲后续等等）\n- *绝对禁止在小红书讲大道理、爹味说教*，*绝对禁止强行把日常生活上升高度*，小红书必须是轻松、幽默、张力十足的，绝对禁止分享一些假大空道理，帖子与评论必须落于实际。\n- *绝对禁止评论的时候引用帖子/评论原文”，例如“XXXXX”这句太真实了——这种格式绝对禁止\n- 必须和ProbeViewer的性格相符，结合ProbeViewer的记忆和经历内容进行适度延展，从日常事件中提取主题，如有日程可联系日程。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 从候选笔记中选择 3 条进行评论；如果确实没有适合评论的内容，可以少于 3 条\n- 每条评论必须使用候选中的 [笔记ID]\n- 同时输出 1 条ProbeViewer自己发布的小红书内容；每次由ProbeViewer自行选择普通笔记或视频笔记，只输出其中一种\n- ProbeViewer自己发布的内容需要输出点赞数、收藏数、评论数和前两个点赞/收藏昵称，并附带 3 到 8 条评论；评论主要来自小红书路人，但可以有 1~2 条由ProbeViewer自己作为笔记作者出现来回应路人\n- 如果选择普通笔记，[类型]填 笔记，可以输出[图片描述]；如果选择视频笔记，[类型]填 视频，必须输出[视频描述]\n- Xiaohongshu comments must come from strangers. In most cases, these users have no way to know ProbeViewer's private life unless ProbeViewer is a public figure; do not use acquaintances from Moments, group chats, or private chats.\n- [评论数] 是该笔记显示的总评论数，可以远高于实际输出的评论条数；输出的评论只是评论区样例，不代表全部评论\n- 发帖下的评论可以包含楼中楼；如需楼中楼，使用 [评论N回复对象]评论M，其中 M 必须是前面已经出现过的评论编号\n- 当ProbeViewer本人作为发帖下的评论作者出现时，[评论N作者] 直接填 ProbeViewer，并用 [评论N回复对象] 指向你回应的路人评论编号\n- 点赞、收藏由ProbeViewer自己判断，填 是 或 否\n- 评论要符合ProbeViewer的人设、性格、记忆、最近状态和与Chloe的关系；不要像客服或机器总结\n- 如果回复已有评论，可以在评论正文里自然接话，但这里不需要输出楼中楼关系\n\n在每条 #评论N 下面，可以可选地输出 3~6 条「延伸互动」，模拟这条评论下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 ProbeViewer 自己接话（[延伸M作者] 直接填 ProbeViewer）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 楼中楼关系用 [延伸M回复对象] 表示，值为：主评论 或 延伸K（K 是同一条 #评论N 下前面已经出现过的延伸编号）\n- 如果你判断该评论不适合延伸，可以完全省略该评论的延伸段\n\n输出格式：\n#评论1\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n[延伸1作者]路人昵称 或 ProbeViewer\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 ProbeViewer\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n\n#评论2\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n\n#评论3\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n\n#发帖1\n[类型]笔记或视频\n[标题]笔记标题\n[正文]笔记正文\n[图标]单个 emoji 或符号\n[点赞]数字\n[点赞用户1]路人昵称\n[点赞用户2]路人昵称\n[收藏]数字\n[收藏用户1]路人昵称\n[收藏用户2]路人昵称\n[评论数]数字\n[标签]标签1、标签2\n[图片描述]普通笔记可选的配图或封面描述\n[视频描述]视频笔记必填的视频画面描述\n[评论1作者]路人昵称\n[评论1内容]评论内容\n[评论2作者]路人昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n[评论3作者]ProbeViewer\n[评论3回复对象]评论1\n[评论3内容]ProbeViewer本人作为笔记作者回应评论1的内容\n</xiaohongshu_character_activity_instruction>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.951Z",
+    "respondedAt": "2026-09-25T14:13:06.951Z"
+  },
+  {
+    "index": 27,
+    "label": "protected-native-flow-custom-reaction",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe\n\n[私聊 (2026-09-25 22:13)] Chloe: CHAT_SECRET kk = Chloe\n\nOWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n\n</shortTermMemory>\n\n<xiaohongshu_bilingual_text_instruction>\n【小红书双语输出规则（仅非中文角色使用，中文角色忽略此规则）】\n- 只对小红书角色生成内容生效，包括帖子标题、正文、评论、回复、图片描述、视频描述、私信正文等自然语言内容。\n- 不要改动结构标签、块标题或字段名，例如 #评论1、#角色回复、[标题]、[正文]、[内容]、[图片描述]、[视频描述]。\n- 如果某个字段内容使用非中文语言，字段值必须写成“完整原文|对应的简体中文译文”。\n- 如果内容本来就是中文，正常输出中文，不要添加 |译文。\n- 竖线 | 只作为完整原文和完整译文之间的分隔符，不要在原文或译文内部滥用。\n</xiaohongshu_bilingual_text_instruction>\n\n<xiaohongshu_user_post_reaction_instruction>\n你正在以ProbeViewer的身份查看一篇小红书笔记。\n这里包含笔记标题、正文、TAG、图片内容、已有评论、点赞/收藏数量，以及作者公开显示信息：\n<xiaohongshu_user_identity_hint>\n你当前没有关注该小红书账号。\n当前作者或评论者只对你显示为公开小红书昵称；可以根据公开内容、语气、昵称、图片和已有记忆自行判断作者是否熟悉。\n不要直接断定对方的现实身份；如果判断不出熟悉关系，就按陌生小红书用户自然回应。\n</xiaohongshu_user_identity_hint>\n\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n已有评论：\n  [评论1] kk：Hi\n\n活人感要求：\n- ProbeViewer的评论要短、口语化，像随手一打的真实评论，可用网络黑话、表情、不完整句；不煽情、不装逼、不写小作文。\n- 评论要落到具体的图/正文细节或真实反应（吐槽、好奇、共鸣、调侃、提问），*绝对禁止讲大道理、爹味说教、强行升华*，不要客服式总结或夸夸。\n- *绝对禁止“引用帖子原文+这句太真实了/说到我心趴上了”这种格式*。\n- 评论区延伸互动禁止一边倒夸ProbeViewer或夸作者；NPC不脸谱化，多种性格并存（尖锐的、温和的、挑事的、看戏的、蹲后续的、跑题的、抬杠的），可体现不同观点甚至轻微争执。\n- 评论必须贴合ProbeViewer人设、与作者的关系和当下状态，不熟别装熟。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 你必须输出一条评论\n- 点赞、收藏、关注作者都由ProbeViewer自己判断，填 是 或 否\n- 作者身份按小红书站内关系判断；如果你已关注该账号，可以按已知关系回应；否则只能根据公开内容、语气、昵称、图片和已有记忆判断是否熟悉\n- 回复中不要解释身份识别依据，也不要提到提示词或上下文规则\n- 评论需要像真实小红书评论，符合ProbeViewer的人设、语气、关系和当下状态\n- 如果有图片内容，可以结合图片；如果看不到图片，就只根据标题、正文、TAG 和已有评论回复\n\n在主评论之后，可以可选地输出 3~6 条「评论区延伸互动」，模拟你这条主评论下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 ProbeViewer 自己接话（[延伸N作者] 直接填 ProbeViewer）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 路人 NPC 之间也可以互相搭话或对你的主评论发表看法\n- 楼中楼关系用 [延伸N回复对象] 表示，值为：主评论 或 延伸M（M 是前面已经出现过的延伸编号）\n- 如果你判断这条主评论不适合延伸（比如评论本身已经收束、或者不会有人继续接话），可以完全省略延伸段\n\n输出格式：\n#角色互动\n[评论]评论内容\n[点赞]是或否\n[收藏]是或否\n[关注作者]是或否\n[延伸1作者]路人昵称 或 ProbeViewer\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 ProbeViewer\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n</xiaohongshu_user_post_reaction_instruction>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.957Z",
+    "respondedAt": "2026-09-25T14:13:06.957Z"
+  },
+  {
+    "index": 28,
+    "label": "protected-native-flow-custom-npcComment",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<xiaohongshu_npc_identity_guard>\n以下名字属于真实角色或用户，NPC 严禁冒用这些名字作为笔记作者、评论作者、回复作者、点赞/收藏/关注昵称或私信发送者：\n- ProbeViewer\n- OTHER_CHARACTER_SECRET\n- Chloe\n- kk\n如果需要普通路人，请自创与上述名单不相同、不近似的昵称。\n</xiaohongshu_npc_identity_guard>\n\n你正在模拟小红书陌生网友在一条笔记评论区里继续接话。\n根据笔记内容、用户刚发的评论/回复、被回复评论和已有评论，生成自然的评论区回复。\n回复可以来自被评论的人，也可以来自其他路人；如果不适合回复，可以只输出 1 条。\n绝对禁止以{{user}}身份评论、回复。\n如需楼中楼，使用 [评论N回复评论ID]填写上下文里给出的评论ID。\n评论ID 示例：如果上下文里有 [评论ID]某条真实评论ID，回复这条评论时就写 [评论1回复评论ID]某条真实评论ID。\n不要填写“评论1”、昵称、“被回复评论ID”、“候选评论ID”等占位文字；必须完整复制上下文里的真实 [评论ID]。\n\n活人感要求：\n- 回复像真实评论区接话，短、口语、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼。\n- 接住对方的具体那句话自然往下聊（调侃、反问、附和、轻怼、跑题），*绝对禁止说教、爹味、强行升华或客服式回应*。\n- 多条回复之间性格各异、可有不同观点甚至拌嘴，禁止集体吹捧楼主或某一方。\n- *绝对禁止“引用对方原话+这句太真实了”这种格式*。\n\n输出格式：\n#评论回复\n[评论1作者]昵称\n[评论1回复评论ID]从上下文复制的真实评论ID\n[评论1内容]回复内容\n\n[评论2作者]昵称\n[评论2回复评论ID]从上下文复制的真实评论ID\n[评论2内容]回复内容\n<xiaohongshu_comment_context>\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n#当前触发的评论\n[评论ID]comment [作者]kk：[内容]Hi\n#已有评论\n[评论ID]comment [作者]kk：[内容]Hi\n</xiaohongshu_comment_context>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.960Z",
+    "respondedAt": "2026-09-25T14:13:06.961Z"
+  },
+  {
+    "index": 29,
+    "label": "protected-native-flow-custom-moreComments",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<xiaohongshu_npc_identity_guard>\n以下名字属于真实角色或用户，NPC 严禁冒用这些名字作为笔记作者、评论作者、回复作者、点赞/收藏/关注昵称或私信发送者：\n- ProbeViewer\n- OTHER_CHARACTER_SECRET\n- Chloe\n- kk\n如果需要普通路人，请自创与上述名单不相同、不近似的昵称。\n</xiaohongshu_npc_identity_guard>\n\n你正在模拟小红书陌生网友继续参与一条笔记的评论区讨论。\n根据笔记标题、正文、TAG、图片内容、互动数据和已有评论，生成 4 到 8 条新的自然评论。\n这些评论可以是普通评论，也可以是楼中楼回复；需要像真实小红书评论区，不要像机器人总结。\n绝对禁止以{{user}}身份评论、回复。\n如果回复本次新生成的前面评论，使用 [评论N回复对象]评论M，其中 M 必须是前面已经出现过的本次评论编号。\n如果回复已有评论，使用 [评论N回复评论ID]完整复制上下文里的真实 [评论ID]。\n楼中楼示例：评论2回复本次评论1时，写 [评论2回复对象]评论1；回复已有评论时，写 [评论2回复评论ID]从上下文复制的真实评论ID。\n\n活人感要求：\n- 评论短、口语化、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼，别像机器人总结。\n- NPC多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠/跑题/求链接），禁止一边倒夸楼主，可有不同观点甚至拌嘴。\n- 评论落到笔记/已有评论的具体点，*绝对禁止讲大道理、爹味说教、强行升华*。\n- *绝对禁止“引用原文+这句太真实了”这种格式*。\n\n输出格式：\n#更多评论\n[评论1作者]昵称\n[评论1内容]评论内容\n[评论2作者]昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n[评论3作者]昵称\n[评论3回复评论ID]从上下文复制的真实评论ID\n[评论3内容]回复已有评论的楼中楼内容\n<xiaohongshu_note_comment_context>\n#笔记\n[笔记ID]note\n[类型]图文\n[来源]用户笔记\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n#已有评论\n[评论ID]comment [作者]kk：[内容]Hi\n</xiaohongshu_note_comment_context>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.964Z",
+    "respondedAt": "2026-09-25T14:13:06.964Z"
+  },
+  {
+    "index": 30,
+    "label": "protected-native-flow-custom-dm",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<xiaohongshu_npc_identity_guard>\n以下名字属于真实角色或用户，NPC 严禁冒用这些名字作为笔记作者、评论作者、回复作者、点赞/收藏/关注昵称或私信发送者：\n- ProbeViewer\n- OTHER_CHARACTER_SECRET\n- Chloe\n- kk\n如果需要普通路人，请自创与上述名单不相同、不近似的昵称。\n</xiaohongshu_npc_identity_guard>\n\n你正在模拟小红书私信里的陌生网友回复用户。\n根据对话对象、用户刚发的私信、历史私信和相关笔记信息，生成自然的私信回复。\n可以连续回复 1 到 4 条消息；每条消息要像真实聊天，可以短句、口语、带 emoji，也可以分多条发。\n不要替用户说话，不要输出系统解释，不要输出 Markdown。\n别客服腔、别营销号腔，符合这个陌生网友的身份和性格，自然像真人私聊。\n\n输出格式：\n#私信回复1\n[正文]回复内容\n\n#私信回复2\n[正文]第二条回复内容\n\n<xiaohongshu_dm_context>\n[对话对象]background\n[用户昵称]kk\n\n#用户刚发送的私信\nHi\n\n#历史私信\n暂无历史私信\n</xiaohongshu_dm_context>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.967Z",
+    "respondedAt": "2026-09-25T14:13:06.967Z"
+  },
+  {
+    "index": 31,
+    "label": "protected-native-flow-custom-comment",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe\n\n[私聊 (2026-09-25 22:13)] Chloe: CHAT_SECRET kk = Chloe\n\nOWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n\n</shortTermMemory>\n\n<xiaohongshu_bilingual_text_instruction>\n【小红书双语输出规则（仅非中文角色使用，中文角色忽略此规则）】\n- 只对小红书角色生成内容生效，包括帖子标题、正文、评论、回复、图片描述、视频描述、私信正文等自然语言内容。\n- 不要改动结构标签、块标题或字段名，例如 #评论1、#角色回复、[标题]、[正文]、[内容]、[图片描述]、[视频描述]。\n- 如果某个字段内容使用非中文语言，字段值必须写成“完整原文|对应的简体中文译文”。\n- 如果内容本来就是中文，正常输出中文，不要添加 |译文。\n- 竖线 | 只作为完整原文和完整译文之间的分隔符，不要在原文或译文内部滥用。\n</xiaohongshu_bilingual_text_instruction>\n\n<xiaohongshu_comment_reply_instruction>\n你正在以ProbeViewer的身份查看小红书评论区，并回复当前触发的评论或回复。\n这里包含身份提示、笔记、被回复评论、当前触发的内容、已有评论和互动数据：\n<xiaohongshu_user_identity_hint>\n你当前没有关注该小红书账号。\n当前作者或评论者只对你显示为公开小红书昵称；可以根据公开内容、语气、昵称、图片和已有记忆自行判断作者是否熟悉。\n不要直接断定对方的现实身份；如果判断不出熟悉关系，就按陌生小红书用户自然回应。\n</xiaohongshu_user_identity_hint>\n\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n#当前触发的评论\n[评论ID]comment [作者]kk：[内容]Hi\n#已有评论\n[评论ID]comment [作者]kk：[内容]Hi\n\n活人感要求：\n- 回复要像真实评论区接话，短、口语化、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼。\n- 接住对方的具体那句话自然往下聊（调侃、反问、附和、轻怼、跑题都行），*绝对禁止说教、爹味、强行升华或客服式回应*。\n- *绝对禁止“引用对方原话+这句太真实了”这种格式*。\n- 延伸互动模拟真实楼中楼氛围：禁止集体夸ProbeViewer，NPC多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠），可互相搭话、有不同观点甚至拌嘴。\n- 回复贴合ProbeViewer人设、与评论者的关系和当下状态，不熟别装熟。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 你必须输出一条自然评论回复\n- 评论者身份按小红书站内关系判断；如果你已关注该账号，可以按已知关系回应；否则只能根据公开内容、语气、昵称、图片和已有记忆判断是否熟悉\n- 回复要像真实小红书评论区接话，符合ProbeViewer的人设、语气、关系和当下状态\n- 如果当前触发的评论是在回复你的评论，优先承接这条评论；如果是在评论你的笔记，就像笔记作者一样回复\n- 点赞和收藏由ProbeViewer自己判断，填 是 或 否\n\n在主回复之后，可以可选地输出 3~6 条「评论区延伸互动」，模拟你这条回复下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 ProbeViewer 自己接话（[延伸N作者] 直接填 ProbeViewer）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 路人 NPC 之间也可以互相搭话或对你的主回复发表看法\n- 楼中楼关系用 [延伸N回复对象] 表示，值为：主评论 或 延伸M（M 是前面已经出现过的延伸编号）\n- 如果你判断这条回复不适合延伸（比如内容已经收束、或者不会有人继续接话），可以完全省略延伸段\n\n输出格式：\n#角色回复\n[内容]回复内容\n[点赞]是或否\n[收藏]是或否\n[延伸1作者]路人昵称 或 ProbeViewer\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 ProbeViewer\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n</xiaohongshu_comment_reply_instruction>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.972Z",
+    "respondedAt": "2026-09-25T14:13:06.972Z"
+  },
+  {
+    "index": 32,
+    "label": "protected-native-flow-custom-mention",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe\n\n[私聊 (2026-09-25 22:13)] Chloe: CHAT_SECRET kk = Chloe\n\nOWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n\n</shortTermMemory>\n\n<xiaohongshu_bilingual_text_instruction>\n【小红书双语输出规则（仅非中文角色使用，中文角色忽略此规则）】\n- 只对小红书角色生成内容生效，包括帖子标题、正文、评论、回复、图片描述、视频描述、私信正文等自然语言内容。\n- 不要改动结构标签、块标题或字段名，例如 #评论1、#角色回复、[标题]、[正文]、[内容]、[图片描述]、[视频描述]。\n- 如果某个字段内容使用非中文语言，字段值必须写成“完整原文|对应的简体中文译文”。\n- 如果内容本来就是中文，正常输出中文，不要添加 |译文。\n- 竖线 | 只作为完整原文和完整译文之间的分隔符，不要在原文或译文内部滥用。\n</xiaohongshu_bilingual_text_instruction>\n\n<xiaohongshu_mention_reply_instruction>\n有人在小红书评论区 @ 了 ProbeViewer。\n这里包含身份提示、当前笔记、当前触发的 @ 评论、被回复对象和已有评论：\n<xiaohongshu_user_identity_hint>\n你当前没有关注该小红书账号。\n当前作者或评论者只对你显示为公开小红书昵称；可以根据公开内容、语气、昵称、图片和已有记忆自行判断作者是否熟悉。\n不要直接断定对方的现实身份；如果判断不出熟悉关系，就按陌生小红书用户自然回应。\n</xiaohongshu_user_identity_hint>\n\n[被@角色]ProbeViewer\n#笔记\n[笔记ID]note\n[类型]图文\n[作者]kk\n[标题]Photo\n[正文]Photography\n[TAG]无\n[点赞]0\n[收藏]0\n[评论数]1\n#当前触发的评论\n[评论ID]comment [作者]kk：[内容]Hi\n#已有评论\n[评论ID]comment [作者]kk：[内容]Hi\n\n活人感要求：\n- 回复要像真实评论区接话，短、口语化、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼。\n- 被@可能是来逗你、喊你来看热闹、点名要你表态，按具体语境接住对方那句话自然往下聊（调侃、反问、附和、轻怼、跑题都行），*绝对禁止说教、爹味、强行升华或客服式回应*。\n- *绝对禁止“引用对方原话+这句太真实了”这种格式*。\n- 延伸互动模拟真实楼中楼氛围：禁止集体夸ProbeViewer，NPC多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠），可互相搭话、有不同观点甚至拌嘴。\n- 回复贴合ProbeViewer人设、与@评论者的关系和当下状态，不熟别装熟。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 必须以 ProbeViewer 身份自然回复这条 @ 评论\n- 只生成回复评论内容，不要输出点赞、收藏或关注字段\n- @ 评论者身份按小红书站内关系判断；如果你已关注该账号，可以按已知关系回应；否则只能根据公开内容、语气、昵称、图片和已有记忆判断是否熟悉\n- 回复要像真实小红书评论区接话，符合ProbeViewer的人设、语气、关系和当下状态\n\n在主回复之后，可以可选地输出 3~6 条「评论区延伸互动」，模拟你这条 @ 回复下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 ProbeViewer 自己接话（[延伸N作者] 直接填 ProbeViewer）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 路人 NPC 之间也可以互相搭话或对你的主回复发表看法\n- 楼中楼关系用 [延伸N回复对象] 表示，值为：主评论 或 延伸M（M 是前面已经出现过的延伸编号）\n- 如果你判断这条 @ 回复不适合延伸，可以完全省略延伸段\n\n输出格式：\n#角色回复\n[内容]回复内容\n[延伸1作者]路人昵称 或 ProbeViewer\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 ProbeViewer\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n</xiaohongshu_mention_reply_instruction>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.977Z",
+    "respondedAt": "2026-09-25T14:13:06.977Z"
+  },
+  {
+    "index": 33,
+    "label": "share-followup-has-terminal-policy",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "system",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<calendarSchedule>\n当前查看周起始日期：2026-09-21\n角色本周日程：\n本周暂无明确日程安排。\n</calendarSchedule>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe"
+        },
+        {
+          "role": "user",
+          "content": "(2026-09-25 22:13)\nCHAT_SECRET kk = Chloe"
+        },
+        {
+          "role": "system",
+          "content": "OWN_TIMELINE_SENTINEL\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n\n[memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY"
+        },
+        {
+          "role": "user",
+          "content": "(2026-09-25 22:13)\n[匿名小红书] The current chatter shared a post. Author social_account acct_a / moth. Sharing does not identify the sharer as the author."
+        },
+        {
+          "role": "system",
+          "content": "</shortTermMemory>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:06.990Z",
+    "respondedAt": "2026-09-25T14:13:06.990Z"
+  },
+  {
+    "index": 34,
+    "label": "protected-native-timeline-summary",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "你是一个记忆整理助手。根据以下事件记录，创建一段简洁的事实性总结。\n\n角色：ProbeViewer\n时间跨度：2026-09-25T14:13:06.508Z 至 2026-09-25T14:13:06.986Z\n\n事件记录：\n- ORDINARY_PLATFORM_SECRET kk = Chloe\n- [私聊 (2026-09-25 22:13)] Chloe: CHAT_SECRET kk = Chloe\n- OWN_TIMELINE_SENTINEL\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n- [私聊 (2026-09-25 22:13)] Chloe: [匿名小红书] The current chatter shared a post. Author social_account acct_a / moth. Sharing does not identify the sharer as the author.\n\n要求：\n- 用第三人称描述ProbeViewer和用户之间的互动\n- 保留关键事实：提到的名字、做出的承诺、情感变化、关系里程碑\n- 保留用户分享的具体信息（生日、偏好、习惯）\n- 保留朋友圈等非聊天事件中的关键信息\n- 100-200字\n- 不要包含格式标记\n\n总结："
+        }
+      ],
+      "temperature": 0.3
+    },
+    "receivedAt": "2026-09-25T14:13:06.995Z",
+    "respondedAt": "2026-09-25T14:13:06.995Z"
+  },
+  {
+    "index": 35,
+    "label": "protected-native-core-summary",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "user",
+          "content": "你是一个核心记忆整理助手。请根据以下长期记忆记录，为ProbeViewer整理一段“核心记忆”总结。\n\n角色：ProbeViewer\n时间跨度：2026-09-25T14:13:06.508Z 至 2026-09-25T14:13:06.997Z\n\n长期记忆记录：\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0}]; mixed=false] acct_a / moth posted photography. OWN_SOURCE_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_a\",\"revision\":0},{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=true] PHASE0_RESPONSE\n\n要求：\n- 突出最关键、最稳定、最影响关系判断的事实\n- 确认在一起 / 确认分手 / 复合\n- 订婚 / 结婚 / 离婚\n- 恋爱周年、结婚纪念日、在一起多久\n- 明确的长期关系身份（如恋人、前任、配偶）\n- 共同生活的重要里程碑（如同居、见家长、共同养宠物）\n- 普通日常聊天\n- 一般情绪波动\n- 暂时性的矛盾或暧昧\n- 普通偏好信息\n- 任何不确定、推测性的内容\n- 用第三人称，事实性描述\n- 80-180字\n- 不要使用 JSON、列表符号、标题或格式标记\n\n核心记忆总结："
+        }
+      ],
+      "temperature": 0.3
+    },
+    "receivedAt": "2026-09-25T14:13:07.001Z",
+    "respondedAt": "2026-09-25T14:13:07.001Z"
+  },
+  {
+    "index": 36,
+    "label": "ordinary-chat-recalls-source-after-eviction",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "system",
+          "content": "<personaDescription>\nThe user's name is Chloe.\nBio: GLOBAL_USER_SECRET kk = Chloe\n</personaDescription>\n\n<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>\n\n<calendarSchedule>\n当前查看周起始日期：2026-09-21\n角色本周日程：\n本周暂无明确日程安排。\n</calendarSchedule>\n\n<memoryCore>\n- LEGACY_MEMORY_SECRET kk = Chloe\n</memoryCore>\n\n<memoryLongTerm>\n- LEGACY_MEMORY_SECRET kk = Chloe\n- [memory sources=[{\"sourceKind\":\"custom_app\",\"sourceAppId\":\"app_phase05.probe_ea517a052bef\",\"sourceNamespace\":\"social\",\"sourceEntityId\":\"acct_b\",\"revision\":0}]; mixed=false] acct_b likes cooking. OTHER_ENTITY_MEMORY\n</memoryLongTerm>\n\n<shortTermMemory>\n\nORDINARY_PLATFORM_SECRET kk = Chloe"
+        },
+        {
+          "role": "user",
+          "content": "(2026-09-25 22:13)\nCHAT_SECRET kk = Chloe\n\n[匿名小红书] The current chatter shared a post. Author social_account acct_a / moth. Sharing does not identify the sharer as the author."
+        },
+        {
+          "role": "system",
+          "content": "Filler 23\n\nFiller 22\n\nFiller 21\n\nFiller 20\n\nFiller 19\n\nFiller 18\n\nFiller 17\n\nFiller 16\n\nFiller 15\n\nFiller 14\n\nFiller 13\n\nFiller 12\n\nFiller 11\n\nFiller 10\n\nFiller 35\n\nFiller 34\n\nFiller 33\n\nFiller 32\n\nFiller 31\n\nFiller 30\n\nFiller 29\n\nFiller 28\n\nFiller 27\n\nFiller 26\n\nFiller 25\n\nFiller 24\n\nFiller 46\n\nFiller 45\n\nFiller 44\n\nFiller 43\n\nFiller 42\n\nFiller 41\n\nFiller 40\n\nFiller 39\n\nFiller 38\n\nFiller 37\n\nFiller 36\n\nFiller 56\n\nFiller 55\n\nFiller 54\n\nFiller 53\n\nFiller 52\n\nFiller 51\n\nFiller 50\n\nFiller 49\n\nFiller 48\n\nFiller 47\n\nFiller 62\n\nFiller 61\n\nFiller 60\n\nFiller 59\n\nFiller 58\n\nFiller 57\n\nFiller 71\n\nFiller 70\n\nFiller 69\n\nFiller 68\n\nFiller 67\n\nFiller 66\n\nFiller 65\n\nFiller 64\n\nFiller 63\n\nFiller 80\n\nFiller 79\n\nFiller 78\n\nFiller 77\n\nFiller 76\n\nFiller 75\n\nFiller 74\n\nFiller 73\n\nFiller 72\n\nFiller 88\n\nFiller 87\n\nFiller 86\n\nFiller 85\n\nFiller 84\n\nFiller 83\n\nFiller 82\n\nFiller 81\n\nFiller 95\n\nFiller 94\n\nFiller 93\n\nFiller 92\n\nFiller 91\n\nFiller 90\n\nFiller 89\n\nFiller 101\n\nFiller 100\n\nFiller 99\n\nFiller 98\n\nFiller 97\n\nFiller 96\n\nFiller 108\n\nFiller 107\n\nFiller 106\n\nFiller 105\n\nFiller 104\n\nFiller 103\n\nFiller 102\n\nFiller 114\n\nFiller 113\n\nFiller 112\n\nFiller 111\n\nFiller 110\n\nFiller 109\n\nFiller 119\n\nFiller 118\n\nFiller 117\n\nFiller 116\n\nFiller 115\n\nFiller 121\n\nFiller 120\n\nFiller 128\n\nFiller 127\n\nFiller 126\n\nFiller 125\n\nFiller 124\n\nFiller 123\n\nFiller 122\n\nFiller 135\n\nFiller 134\n\nFiller 133\n\nFiller 132\n\nFiller 131\n\nFiller 130\n\nFiller 129\n\nFiller 141\n\nFiller 140\n\nFiller 139\n\nFiller 138\n\nFiller 137\n\nFiller 136\n\nFiller 147\n\nFiller 146\n\nFiller 145\n\nFiller 144\n\nFiller 143\n\nFiller 142\n\nFiller 153\n\nFiller 152\n\nFiller 151\n\nFiller 150\n\nFiller 149\n\nFiller 148\n\nFiller 159\n\nFiller 158\n\nFiller 157\n\nFiller 156\n\nFiller 155\n\nFiller 154\n\nFiller 161\n\nFiller 160\n\nFiller 166\n\nFiller 165\n\nFiller 164\n\nFiller 163\n\nFiller 162\n\nFiller 172\n\nFiller 171\n\nFiller 170\n\nFiller 169\n\nFiller 168\n\nFiller 167\n\nFiller 177\n\nFiller 176\n\nFiller 175\n\nFiller 174\n\nFiller 173\n\nFiller 180\n\nFiller 179\n\nFiller 178\n\nFiller 185\n\nFiller 184\n\nFiller 183\n\nFiller 182\n\nFiller 181\n\nFiller 190\n\nFiller 189\n\nFiller 188\n\nFiller 187\n\nFiller 186\n\nFiller 192\n\nFiller 191\n\nFiller 196\n\nFiller 195\n\nFiller 194\n\nFiller 193\n\nFiller 201\n\nFiller 200\n\nFiller 199\n\nFiller 198\n\nFiller 197\n\nFiller 206\n\nFiller 205\n\nFiller 204\n\nFiller 203\n\nFiller 202\n\nFiller 211\n\nFiller 210\n\nFiller 209\n\nFiller 208\n\nFiller 207\n\nFiller 215\n\nFiller 214\n\nFiller 213\n\nFiller 212\n\nFiller 220\n\nFiller 219\n\nFiller 218\n\nFiller 217\n\nFiller 216\n\nFiller 223\n\nFiller 222\n\nFiller 221\n\nFiller 227\n\nFiller 226\n\nFiller 225\n\nFiller 224\n\nFiller 231\n\nFiller 230\n\nFiller 229\n\nFiller 228\n\nFiller 234\n\nFiller 233\n\nFiller 232\n\nFiller 238\n\nFiller 237\n\nFiller 236\n\nFiller 235\n\nFiller 241\n\nFiller 240\n\nFiller 239\n\nFiller 245\n\nFiller 244\n\nFiller 243\n\nFiller 242\n\nFiller 248\n\nFiller 247\n\nFiller 246\n\nFiller 250\n\nFiller 249\n\nFiller 254\n\nFiller 253\n\nFiller 252\n\nFiller 251\n\nFiller 258\n\nFiller 257\n\nFiller 256\n\nFiller 255\n\nFiller 262\n\nFiller 261\n\nFiller 260\n\nFiller 259\n\nFiller 265\n\nFiller 264\n\nFiller 263\n\nFiller 268\n\nFiller 267\n\nFiller 266\n\nFiller 272\n\nFiller 271\n\nFiller 270\n\nFiller 269\n\nFiller 275\n\nFiller 274\n\nFiller 273\n\nFiller 278\n\nFiller 277\n\nFiller 276\n\nFiller 281\n\nFiller 280\n\nFiller 279\n\nFiller 284\n\nFiller 283\n\nFiller 282\n\nFiller 287\n\nFiller 286\n\nFiller 285\n\nFiller 290\n\nFiller 289\n\nFiller 288\n\nFiller 291\n\nFiller 294\n\nFiller 293\n\nFiller 292\n\nFiller 298\n\nFiller 297\n\nFiller 296\n\nFiller 295\n\nFiller 301\n\nFiller 300\n\nFiller 299\n\nFiller 305\n\nFiller 304\n\nFiller 303\n\nFiller 302\n\nFiller 308\n\nFiller 307\n\nFiller 306\n\nFiller 312\n\nFiller 311\n\nFiller 310\n\nFiller 309\n\nFiller 315\n\nFiller 314\n\nFiller 313\n\nFiller 317\n\nFiller 316\n\nFiller 320\n\nFiller 319\n\nFiller 318\n\nFiller 323\n\nFiller 322\n\nFiller 321\n\nFiller 327\n\nFiller 326\n\nFiller 325\n\nFiller 324\n\nFiller 330\n\nFiller 329\n\nFiller 328\n\nFiller 333\n\nFiller 332\n\nFiller 331\n\nFiller 336\n\nFiller 335\n\nFiller 334\n\nFiller 339\n\nFiller 338\n\nFiller 337\n\nFiller 342\n\nFiller 341\n\nFiller 340\n\nFiller 345\n\nFiller 344\n\nFiller 343\n\nFiller 348\n\nFiller 347\n\nFiller 346\n\nFiller 351\n\nFiller 350\n\nFiller 349\n\nFiller 354\n\nFiller 353\n\nFiller 352\n\nFiller 356\n\nFiller 355\n\nFiller 359\n\nFiller 358\n\nFiller 357\n\nFiller 361\n\nFiller 360\n\nFiller 362\n\nFiller 365\n\nFiller 364\n\nFiller 363\n\nFiller 368\n\nFiller 367\n\nFiller 366\n\nFiller 371\n\nFiller 370\n\nFiller 369\n\nFiller 373\n\nFiller 372\n\nFiller 376\n\nFiller 375\n\nFiller 374\n\nFiller 378\n\nFiller 377\n\nFiller 381\n\nFiller 380\n\nFiller 379\n\nFiller 384\n\nFiller 383\n\nFiller 382\n\nFiller 386\n\nFiller 385\n\nFiller 389\n\nFiller 388\n\nFiller 387\n\nFiller 392\n\nFiller 391\n\nFiller 390\n\nFiller 393\n\nFiller 396\n\nFiller 395\n\nFiller 394\n\nFiller 398\n\nFiller 397\n\nFiller 400\n\nFiller 399\n\nFiller 402\n\nFiller 401\n\nFiller 404\n\nFiller 403\n\nFiller 406\n\nFiller 405\n\nFiller 408\n\nFiller 407\n\nFiller 410\n\nFiller 409\n\nFiller 412\n\nFiller 411\n\nFiller 415\n\nFiller 414\n\nFiller 413\n\nFiller 417\n\nFiller 416\n\nFiller 419\n\nFiller 418\n\nFiller 421\n\nFiller 420\n\nFiller 423\n\nFiller 422\n\nFiller 424\n\nFiller 425\n\nFiller 427\n\nFiller 426\n\nFiller 430\n\nFiller 429\n\nFiller 428\n\nFiller 432\n\nFiller 431\n\nFiller 434\n\nFiller 433\n\nFiller 436\n\nFiller 435\n\nFiller 439\n\nFiller 438\n\nFiller 437\n\nFiller 441\n\nFiller 440\n\nFiller 444\n\nFiller 443\n\nFiller 442\n\nFiller 446\n\nFiller 445\n\nFiller 447\n\nFiller 449\n\nFiller 448\n\nFiller 451\n\nFiller 450\n\nFiller 453\n\nFiller 452\n\nFiller 455\n\nFiller 454\n\nFiller 457\n\nFiller 456\n\nFiller 459\n\nFiller 458\n\nFiller 461\n\nFiller 460\n\nFiller 463\n\nFiller 462\n\nFiller 465\n\nFiller 464\n\nFiller 466\n\nFiller 468\n\nFiller 467\n\nFiller 470\n\nFiller 469\n\nFiller 472\n\nFiller 471\n\nFiller 474\n\nFiller 473\n\nFiller 476\n\nFiller 475\n\nFiller 477\n\nFiller 479\n\nFiller 478\n\nFiller 481\n\nFiller 480\n\nFiller 483\n\nFiller 482\n\nFiller 486\n\nFiller 485\n\nFiller 484\n\nFiller 488\n\nFiller 487\n\nFiller 490\n\nFiller 489\n\nFiller 492\n\nFiller 491\n\nFiller 494\n\nFiller 493\n\nFiller 496\n\nFiller 495\n\nFiller 499\n\nFiller 498\n\nFiller 497\n\nFiller 500\n\nFiller 502\n\nFiller 501\n\nFiller 505\n\nFiller 504\n\nFiller 503\n\nFiller 507\n\nFiller 506\n\nFiller 509\n\nFiller 508\n\n</shortTermMemory>"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:07.260Z",
+    "respondedAt": "2026-09-25T14:13:07.260Z"
+  },
+  {
+    "index": 37,
+    "label": "durable-task-start-and-dedupe",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "system",
+          "content": "<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>"
+        },
+        {
+          "role": "system",
+          "content": "[匿名小红书] APP_CONTEXT social_account acct_a / moth. Owner unknown."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Describe this post image."
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAANklEQVR4AezXsQkAAAgDsOL/P+sJjoKk0L1ka3XSl60cxwACBAgQIECAAAECBAgQIPBfYDvfAwAA//8qNtUGAAAABklEQVQDAEfKQAGr52fvAAAAAElFTkSuQmCC"
+              }
+            }
+          ]
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:07.293Z",
+    "respondedAt": "2026-09-25T14:13:08.095Z"
+  },
+  {
+    "index": 38,
+    "label": "policy-still-enforced-after-reload",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "system",
+          "content": "<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>"
+        },
+        {
+          "role": "system",
+          "content": "[匿名小红书] APP_CONTEXT social_account acct_a / moth. Owner unknown."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Describe this post image."
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAANklEQVR4AezXsQkAAAgDsOL/P+sJjoKk0L1ka3XSl60cxwACBAgQIECAAAECBAgQIPBfYDvfAwAA//8qNtUGAAAABklEQVQDAEfKQAGr52fvAAAAAElFTkSuQmCC"
+              }
+            }
+          ]
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:08.303Z",
+    "respondedAt": "2026-09-25T14:13:08.303Z"
+  },
+  {
+    "index": 39,
+    "label": "cross-tab-active-owner-and-host-restart",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "system",
+          "content": "<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>"
+        },
+        {
+          "role": "system",
+          "content": "[匿名小红书] APP_CONTEXT social_account acct_a / moth. Owner unknown."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Describe this post image."
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAANklEQVR4AezXsQkAAAgDsOL/P+sJjoKk0L1ka3XSl60cxwACBAgQIECAAAECBAgQIPBfYDvfAwAA//8qNtUGAAAABklEQVQDAEfKQAGr52fvAAAAAElFTkSuQmCC"
+              }
+            }
+          ]
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:08.350Z"
+  },
+  {
+    "index": 40,
+    "label": "cancelled-task-does-not-publish-result",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=app_phase05.probe_ea517a052bef; namespace=social]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\nREQUIRED_SOURCE_GUARD: Treat this source social_account/accountId as a persistent pseudonymous identity. Unknown owner: do not infer, speculate, hint or test identity from similarities. Explicitly disclosed knowledge is viewer-local. Do not merge separate accountIds. Apply only to this source."
+        },
+        {
+          "role": "system",
+          "content": "<charDescription>\nYou are ProbeViewer.\nVIEWER_PERSONA: patient photographer\n</charDescription>\n\n<charPersonality>\nVIEWER_PERSONALITY: precise\n</charPersonality>"
+        },
+        {
+          "role": "system",
+          "content": "[匿名小红书] APP_CONTEXT social_account acct_a / moth. Owner unknown."
+        },
+        {
+          "role": "user",
+          "content": [
+            {
+              "type": "text",
+              "text": "Describe this post image."
+            },
+            {
+              "type": "image_url",
+              "image_url": {
+                "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAANklEQVR4AezXsQkAAAgDsOL/P+sJjoKk0L1ka3XSl60cxwACBAgQIECAAAECBAgQIPBfYDvfAwAA//8qNtUGAAAABklEQVQDAEfKQAGr52fvAAAAAElFTkSuQmCC"
+              }
+            }
+          ]
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-25T14:13:08.656Z"
+  }
+]

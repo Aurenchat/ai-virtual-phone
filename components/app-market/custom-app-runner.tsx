@@ -1,4 +1,8 @@
 "use client";
+import { generateScoped, type ScopedGenerationRequest } from "@/lib/custom-app-scoped-generation";
+import { setProtectedPolicy } from "@/lib/custom-app-protected-policy";
+import { startAiTask, getAiTasks, consumeAiTask, cancelAiTask } from "@/lib/custom-app-ai-tasks";
+import { searchSourceMemory, writeSourceMemory, revokeSourceMemory } from "@/lib/custom-app-source-memory";
 
 import { useCallback, useMemo, useRef, useState, useEffect, useLayoutEffect } from "react";
 import { CheckCircle2, Circle, FileJson, Layers, LoaderCircle, MoreHorizontal, RefreshCw, Sparkles, Trash2, X } from "lucide-react";
@@ -345,6 +349,7 @@ html, body { min-height: 100%; }
     on: onEvent,
     off: offEvent,
     app: {
+      setPolicy: function(payload){ return request('app.setPolicy', payload || {}); },
       getManifest: function(){ return request('app.getManifest'); },
       getCapabilities: function(){ return request('app.getCapabilities'); },
       getLaunchContext: function(){ return Promise.resolve(launchContext); },
@@ -359,6 +364,12 @@ html, body { min-height: 100%; }
       delete: function(collection, id){ return request('db.delete', { collection: collection, id: id }); }
     },
     ai: {
+      generateScoped: function(payload){ return request('ai.generateScoped', payload || {}); },
+      startTask: function(payload){ return request('ai.startTask', payload || {}); },
+      getTask: function(payload){ return request('ai.getTask', payload || {}); },
+      listTasks: function(){ return request('ai.listTasks'); },
+      consumeTask: function(payload){ return request('ai.consumeTask', payload || {}); },
+      cancelTask: function(payload){ return request('ai.cancelTask', payload || {}); },
       generate: function(payload){ return request('ai.generate', payload || {}); },
       generateImage: function(payload){ return request('ai.generateImage', payload || {}); },
       chat: function(payload){ return request('ai.chat', payload || {}); },
@@ -514,6 +525,9 @@ html, body { min-height: 100%; }
       report: function(payload){ return request('cloud.report', payload || {}); }
     },
     memory: {
+      searchSource: function(payload){ return request('memory.searchSource', payload || {}); },
+      writeSource: function(payload){ return request('memory.writeSource', payload || {}); },
+      invalidateSource: function(payload){ return request('memory.invalidateSource', payload || {}); },
       readCore: function(payload){ return request('memory.readCore', payload || {}); },
       readLongTerm: function(payload){ return request('memory.readLongTerm', payload || {}); },
       readShortTerm: function(payload){ return request('memory.readShortTerm', payload || {}); },
@@ -1078,8 +1092,8 @@ export function CustomAppRunner({
         events: app.manifest.extensions?.events ?? app.manifest.events ?? [],
         network: app.manifest.network ?? {},
         sdk: {
-          app: ["getManifest", "getCapabilities", "getLaunchContext", "getAssetUrl", "close"],
-          ai: ["generate", "chat", "embed", "classify"],
+          app: ["getManifest", "getCapabilities", "getLaunchContext", "getAssetUrl", "close", "setPolicy"],
+          ai: ["generate", "chat", "embed", "classify", "generateScoped", "startTask", "getTask", "listTasks", "consumeTask", "cancelTask"],
           user: ["getProfile", "getPersona", "getPreferences"],
           network: ["fetch"],
           voice: ["readProfiles", "tts", "stt", "record", "stopRecord", "clone", "play", "stopPlayback", "pausePlayback", "resumePlayback"],
@@ -1088,7 +1102,7 @@ export function CustomAppRunner({
           media: ["pick", "save", "put", "get", "revoke", "delete"],
           characters: ["list", "get", "readState", "writeState", "readRelations"],
           chat: ["getCurrentSession", "readHistory", "sendMessage", "sendCard", "updateCard", "writeHistory", "requestReply", "openConversation", "setContactState"],
-          memory: ["readCore", "readLongTerm", "readShortTerm", "search", "add", "addTimeline", "deleteTimeline", "removeTimeline", "suggest"],
+          memory: ["readCore", "readLongTerm", "readShortTerm", "search", "add", "addTimeline", "deleteTimeline", "removeTimeline", "suggest", "searchSource", "writeSource", "invalidateSource"],
           notifications: ["create", "list", "markRead", "markAllRead", "getBadge", "setBadge", "incrementBadge", "clearBadge"],
           tasks: ["schedule", "list", "cancel"],
           wallet: ["get", "pay"],
@@ -1710,6 +1724,48 @@ export function CustomAppRunner({
     if (action === "ai.chat") {
       requirePermission("ai.chat");
       return runCustomAppAiChat(app, { ...launchRecord, ...record });
+    }
+    if (action === "ai.generateScoped") {
+      requirePermission("ai.generateScoped");
+      return generateScoped(app, record as unknown as ScopedGenerationRequest);
+    }
+    if (action === "app.setPolicy") {
+      requirePermission("app.policy.manage");
+      return setProtectedPolicy(app, record as Parameters<typeof setProtectedPolicy>[1]);
+    }
+    if (action === "ai.startTask") {
+      requirePermission("ai.tasks");
+      requirePermission("ai.generateScoped");
+      return startAiTask(app, record as Parameters<typeof startAiTask>[1]);
+    }
+    if (action === "ai.getTask") {
+      requirePermission("ai.tasks");
+      return (await getAiTasks(app, String(record.taskId)))[0] ?? null;
+    }
+    if (action === "ai.listTasks") {
+      requirePermission("ai.tasks");
+      return getAiTasks(app);
+    }
+    if (action === "ai.consumeTask") {
+      requirePermission("ai.tasks");
+      requirePermission("app.data.write");
+      return consumeAiTask(app, record as Parameters<typeof consumeAiTask>[1]);
+    }
+    if (action === "ai.cancelTask") {
+      requirePermission("ai.tasks");
+      return cancelAiTask(app, String(record.taskId));
+    }
+    if (action === "memory.searchSource") {
+      requirePermission("memory.source.read");
+      return searchSourceMemory(app, record as Parameters<typeof searchSourceMemory>[1]);
+    }
+    if (action === "memory.writeSource") {
+      requirePermission("memory.source.write");
+      return writeSourceMemory(app, record as Parameters<typeof writeSourceMemory>[1]);
+    }
+    if (action === "memory.invalidateSource") {
+      requirePermission("memory.source.write");
+      return revokeSourceMemory(app, record as Parameters<typeof revokeSourceMemory>[1]);
     }
     if (action === "ai.embed") {
       requirePermission("ai.embed");

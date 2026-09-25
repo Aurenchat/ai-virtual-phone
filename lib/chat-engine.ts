@@ -61,6 +61,7 @@ import { retrieveCoreMemoriesForPrompt, retrieveMemoriesForPrompt } from "./memo
 import { formatCoreMemories, formatLongTermMemories } from "./memory-injector";
 import { maybeRunSummarization } from "./memory-summarizer";
 import { prepareShortTermContext } from "./short-term-assembler";
+import { readMemoryRevisions } from "./memory-provenance";
 import { parseActionTags, dispatchActions } from "./action-parser";
 import { findEnabledToolForSchema, getEnabledTools, type EnabledTool } from "./tool-storage";
 import { formatToolsForPrompt, formatToolSchema } from "./tool-prompt";
@@ -1843,6 +1844,7 @@ export async function buildChatPromptMessages(
     const toolsEnabled = enabledTools.length > 0
         && (options?.forceEnableTools === true || presetIncludesToolsMacro(preset, resolvedAppId, effectiveAppTags));
     const usesNativeActions = Boolean(toolsEnabled && nativeToolProtocolForConfig(config));
+    await readMemoryRevisions();
     const { recentBlocks, truncatedHistory, wbActivationContext, unifiedRecentItems } = prepareShortTermContext(character.id, resolvedAppId, {
         history: historyForPrompt,
         includeDirectChatEntries: isOfflineMode,

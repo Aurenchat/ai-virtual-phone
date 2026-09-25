@@ -44,6 +44,8 @@ export type LLMMessage = {
 };
 
 export interface AssemblerInput {
+    /** Opt-in: prohibit implicit relationship/dwelling storage reads. */
+    isolatedContext?: boolean;
     character: Character;
     history: ChatMessage[];
     preset: PresetConfig | null;
@@ -412,6 +414,7 @@ function getMarkerContent(
     regexCtx?: RegexContext,
     characterRelations?: string,
     dwellingContext?: string,
+    isolatedContext = false,
 ): string | null {
     switch (identifier) {
         case "charDescription":
@@ -437,11 +440,12 @@ function getMarkerContent(
         case "memoryLongTerm":
             return longTermMemories?.trim() || null;
         case "characterRelations": {
-            const relations = characterRelations?.trim() || formatCharacterRelationsForPrompt(character.id).trim();
+            const relations = characterRelations?.trim() || (isolatedContext ? "" : formatCharacterRelationsForPrompt(character.id).trim());
             return relations || null;
         }
         case "dwellingContext": {
             if (dwellingContext?.trim()) return dwellingContext;
+            if (isolatedContext) return null;
             // Auto-load from in-memory cache if not explicitly provided
             const cached = readDwellingLayoutCache(character.id);
             return cached ? formatDwellingContext(cached.layout, cached.updatedAt) : null;
@@ -773,6 +777,7 @@ export function assemblePromptPayload(input: AssemblerInput): LLMMessage[] {
                     regexes, { macroEngine: engine, activeTags },
                     input.characterRelations,
                     input.dwellingContext,
+                    input.isolatedContext,
                 );
                 if (markerContent) {
                     // Expand macros in marker content ({{char}}/{{user}} in char descriptions etc.)

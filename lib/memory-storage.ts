@@ -5,6 +5,7 @@ import type { MemoryEntry, MemoryConfig } from "./memory-types";
 import { DEFAULT_MEMORY_CONFIG } from "./memory-types";
 import { kvGet, kvSet, registerKvMigration, registerDynamicPrefix } from "./kv-db";
 import { openIndexedDbAtLeast } from "./idb-open";
+import { readMemoryRevisions, isMemoryProvenanceValid } from "./memory-provenance";
 
 // ── Long-term memory DB (unchanged from v1) ──
 
@@ -54,9 +55,12 @@ function runRequest<T>(req: IDBRequest<T>): Promise<T> {
 
 // ── Long-term Entry CRUD ──
 
-export async function saveMemoryEntry(entry: MemoryEntry): Promise<void> {
+export async function saveMemoryEntry(entry: MemoryEntry, options?: { required?: boolean }): Promise<void> {
     const db = await openDb();
-    if (!db) return;
+    if (!db) {
+        if (options?.required) throw new Error("Memory storage unavailable");
+        return;
+    }
     try {
         const tx = db.transaction(STORE_NAME, "readwrite");
         tx.objectStore(STORE_NAME).put(entry);
@@ -69,7 +73,7 @@ export async function saveMemoryEntry(entry: MemoryEntry): Promise<void> {
     }
 }
 
-export async function loadMemoryEntries(characterId: string): Promise<MemoryEntry[]> {
+export async function loadMemoryEntries(characterId: string, options?: { includeInvalidated?: boolean }): Promise<MemoryEntry[]> {
     const db = await openDb();
     if (!db) return [];
     try {
@@ -85,7 +89,9 @@ export async function loadMemoryEntries(characterId: string): Promise<MemoryEntr
             entries = allEntries.filter(entry => entry.characterId === characterId);
         }
         entries.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-        return entries;
+        if (options?.includeInvalidated || !entries.some(e => e.provenance)) return entries;
+        const revisions = await readMemoryRevisions();
+        return entries.filter(e => isMemoryProvenanceValid(e.provenance, revisions));
     } finally {
         db.close();
     }
@@ -134,7 +140,7 @@ export async function deleteMemoryEntries(ids: string[]): Promise<void> {
 }
 
 export async function deleteCharacterMemories(characterId: string): Promise<void> {
-    const entries = await loadMemoryEntries(characterId);
+    const entries = await loadMemoryEntries(characterId, { includeInvalidated: true });
     await deleteMemoryEntries(entries.map(e => e.id));
 }
 
@@ -142,7 +148,7 @@ export async function deleteCharacterMemoriesByType(
     characterId: string,
     type: MemoryEntry["type"],
 ): Promise<void> {
-    const entries = await loadMemoryEntriesByType(characterId, type);
+    const entries = (await loadMemoryEntries(characterId, { includeInvalidated: true })).filter(e => e.type === type);
     await deleteMemoryEntries(entries.map(e => e.id));
 }
 

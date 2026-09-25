@@ -11,6 +11,7 @@ import {
 } from "./memory-storage";
 import { resolveAuxiliaryApiConfig } from "./settings-storage";
 import { simpleLLMCall } from "./api-helpers";
+import { mergeMemoryProvenance, memorySourceEnvelope, type MemoryProvenance } from "./memory-provenance";
 
 const coreBuildingSet = new Set<string>();
 
@@ -20,6 +21,7 @@ type CoreTimelineItem = {
     content: string;
     sourceApp: MemoryEntry["sourceApp"];
     sourceSessionIds: string[];
+    provenance?: MemoryProvenance;
 };
 
 function formatCoreTimelineForSummarization(
@@ -27,7 +29,7 @@ function formatCoreTimelineForSummarization(
 ): { eventsText: string; earliest: string; latest: string; count: number } | null {
     if (entries.length === 0) return null;
     return {
-        eventsText: entries.map(entry => `- ${entry.content}`).join("\n"),
+        eventsText: entries.map(entry => `- ${memorySourceEnvelope(entry.provenance)}${entry.content}`).join("\n"),
         earliest: entries[0].timestamp,
         latest: entries[entries.length - 1].timestamp,
         count: entries.length,
@@ -59,6 +61,7 @@ export async function runCoreMemoryPipeline(
             timestamp: entry.createdAt,
             content: entry.content,
             sourceApp: entry.sourceApp,
+            provenance: entry.provenance,
             sourceSessionIds: Array.isArray(entry.metadata?.sourceSessionIds)
                 ? entry.metadata.sourceSessionIds.map(String)
                 : [],
@@ -121,6 +124,7 @@ export async function runCoreMemoryPipeline(
         sourceApp: dominantSource,
         type: "core",
         content: summary,
+        provenance: mergeMemoryProvenance(entries),
         importance: 0.95,
         createdAt: now,
         updatedAt: now,

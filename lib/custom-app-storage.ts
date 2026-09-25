@@ -40,6 +40,7 @@ const MAX_TEXT_LENGTH = 1800000;
 const MAX_ASSET_BYTES = 2 * 1024 * 1024;
 
 export type CustomAppTimelineEntry = {
+  provenance?: import("./memory-provenance").MemoryProvenance;
   id: string;
   appId: string;
   appName: string;
@@ -226,6 +227,11 @@ function normalizePermission(value: unknown): CustomAppPermission | null {
     "ai.generate",
     "ai.generateImage",
     "ai.chat",
+    "ai.generateScoped",
+    "ai.tasks",
+    "app.policy.manage",
+    "memory.source.read",
+    "memory.source.write",
     "ai.embed",
     "ai.classify",
     "network.fetch",
@@ -837,6 +843,7 @@ export function setCustomAppIconStyle(appId: string, style: CustomAppIconStyle):
 
 export function uninstallCustomApp(appId: string, options: { deleteData?: boolean } = {}): void {
   const id = cleanId(appId);
+  void import("./custom-app-ai-tasks").then(m => m.cleanupAiTasks(id)).catch(error => console.error("AI task cleanup failed", error));
   saveInstalledCustomApps(loadInstalledCustomApps().filter(app => app.id !== id));
   const iconStyles = loadCustomAppIconStyles();
   if (iconStyles[id]) {
@@ -859,14 +866,19 @@ export function uninstallCustomApp(appId: string, options: { deleteData?: boolea
 export async function uninstallCustomAppAsync(appId: string, options: { deleteData?: boolean } = {}): Promise<void> {
   await hydrateKvDb();
   uninstallCustomApp(appId, options);
+  await (await import("./custom-app-ai-tasks")).cleanupAiTasks(cleanId(appId));
 }
 
 // APP 数据按集合分 key 存储。旧版把一个 APP 的全部集合塞进一个大 JSON,
 // 任何一次小写入(比如改一条计数)都要整体 parse/stringify;当某个集合里有
 // 成批的音频/图片 dataURL 时,这个内存峰值足以让 iOS 杀掉页面进程
 // (表现为 PWA 崩溃后恢复到 about:srcdoc 空白页)。
-function customAppCollectionKey(appId: string, collection: string): string {
+export function customAppCollectionKey(appId: string, collection: string): string {
   return `${CUSTOM_APP_DATA_PREFIX}${cleanId(appId)}/${collection}`;
+}
+
+export function customAppLegacyDataKey(appId: string): string {
+  return `${CUSTOM_APP_DATA_PREFIX}${cleanId(appId)}`;
 }
 
 // 首次访问时把旧版整包数据拆成按集合的 key。
@@ -946,6 +958,7 @@ function loadCustomAppTimelineForApp(appId: string): CustomAppTimelineEntry[] {
         appLabel: cleanText(record.appLabel, 80) || undefined,
         createdAt: cleanText(record.createdAt, 80) || new Date().toISOString(),
         data: cleanRecord(record.data),
+        provenance: record.provenance as CustomAppTimelineEntry["provenance"],
       } satisfies CustomAppTimelineEntry;
     }).filter(Boolean) as CustomAppTimelineEntry[];
   } catch {
@@ -971,6 +984,7 @@ export function appendCustomAppTimelineEntry(
     createdAt?: string;
     data?: Record<string, unknown>;
     appEventId?: string;
+    provenance?: CustomAppTimelineEntry["provenance"];
   },
 ): CustomAppTimelineEntry {
   const appId = cleanId(app.id);
@@ -993,6 +1007,7 @@ export function appendCustomAppTimelineEntry(
     appLabel: cleanText(input.appLabel, 80) || undefined,
     createdAt: Number.isNaN(timestamp.getTime()) ? new Date().toISOString() : timestamp.toISOString(),
     data: Object.keys(data).length > 0 ? data : undefined,
+    provenance: input.provenance,
   };
   const next = [entry, ...loadCustomAppTimelineForApp(appId)]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
