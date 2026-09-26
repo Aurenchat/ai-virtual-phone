@@ -1,0 +1,197 @@
+{
+  "revision": "6cec66372457d3f8199f0d1a49d9fba94544e084",
+  "files": [
+    {
+      "upstream": "components/xiaohongshu/xiaohongshu-app.tsx",
+      "fork": "src/fork/components/xiaohongshu/xiaohongshu-app.tsx",
+      "copiedDirectly": true,
+      "modifications": [
+        "CUSTOM-APP-ADAPTER: @/lib/chat-asset-storage -> ../../../adapters/media",
+        "CUSTOM-APP-ADAPTER: @/lib/character-storage -> ../../../adapters/characters",
+        "CUSTOM-APP-ADAPTER: @/lib/character-types -> ../../../adapters/characters",
+        "CUSTOM-APP-ADAPTER: @/lib/memory-storage -> ../../../adapters/memory",
+        "CUSTOM-APP-ADAPTER: @/lib/memory-summarizer -> ../../../adapters/memory",
+        "CUSTOM-APP-ADAPTER: @/lib/settings-storage -> ../../../adapters/settings",
+        "CUSTOM-APP-ADAPTER: @/lib/chat-share -> ../../../adapters/chat",
+        "CUSTOM-APP-ADAPTER: journal original generation handlers, resume on remount, unconditional close, Host sharing",
+        "ANON-FORK: independent user profile; participant labels local only; automatic background names and one nickname editor",
+        "CUSTOM-APP-ADAPTER: deterministic action randomness/time for repeatable continuation"
+      ]
+    },
+    {
+      "upstream": "lib/xiaohongshu-engine.ts",
+      "fork": "src/fork/lib/xiaohongshu-engine.ts",
+      "copiedDirectly": true,
+      "modifications": [
+        "CUSTOM-APP-ADAPTER: ./chat-asset-storage -> ../../adapters/media",
+        "CUSTOM-APP-ADAPTER: ./chat-engine -> ../../adapters/ai",
+        "CUSTOM-APP-ADAPTER: ./character-storage -> ../../adapters/characters",
+        "CUSTOM-APP-ADAPTER: ./character-types -> ../../adapters/characters",
+        "CUSTOM-APP-ADAPTER: ./llm-prompt-assembler -> ../../adapters/ai",
+        "CUSTOM-APP-ADAPTER: ./settings-storage -> ../../adapters/settings",
+        "CUSTOM-APP-ADAPTER: ./settings-types -> ../../adapters/ai",
+        "CUSTOM-APP-ADAPTER: consume structured multimodal error; never retry ordinary provider failures",
+        "ANON-FORK: replace only native global-context assembly and follow-implies-owner hint; all nine generators, parsers, reducers and fallback retained",
+        "CUSTOM-APP-ADAPTER: deterministic action randomness/time for repeatable continuation"
+      ]
+    },
+    {
+      "upstream": "lib/xiaohongshu-types.ts",
+      "fork": "src/fork/lib/xiaohongshu-types.ts",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "lib/xiaohongshu-storage.ts",
+      "fork": "src/fork/lib/xiaohongshu-storage.ts",
+      "copiedDirectly": true,
+      "modifications": [
+        "CUSTOM-APP-ADAPTER: ./settings-storage -> ../../adapters/settings",
+        "CUSTOM-APP-ADAPTER: ./kv-db -> ../../adapters/storage",
+        "ANON-FORK: canonicalize stable social account IDs on persistence; preserve upstream schema and normalization",
+        "CUSTOM-APP-ADAPTER: deterministic action randomness/time for repeatable continuation"
+      ]
+    },
+    {
+      "upstream": "lib/xiaohongshu-memory.ts",
+      "fork": "src/fork/lib/xiaohongshu-memory.ts",
+      "copiedDirectly": true,
+      "modifications": [
+        "CUSTOM-APP-ADAPTER: ./llm-prompt-assembler -> ../../adapters/ai",
+        "CUSTOM-APP-ADAPTER: ./kv-db -> ../../adapters/storage",
+        "ANON-FORK: remove controller ownership labels; publish stable account source evidence via adapter"
+      ]
+    },
+    {
+      "upstream": "lib/xiaohongshu-character-profile.ts",
+      "fork": "src/fork/lib/xiaohongshu-character-profile.ts",
+      "copiedDirectly": true,
+      "modifications": [
+        "CUSTOM-APP-ADAPTER: ./character-types -> ../../adapters/characters",
+        "ANON-FORK: resolve projected social nickname without native snapshot or real-name fallback"
+      ]
+    },
+    {
+      "upstream": "styles/xiaohongshu.css",
+      "fork": "src/fork/styles/xiaohongshu.css",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "styles/checkphone.css",
+      "fork": "src/fork/styles/checkphone.css",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "lib/bilingual-text.ts",
+      "fork": "src/fork/lib/bilingual-text.ts",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "lib/bilingual-prompt-defaults.ts",
+      "fork": "src/fork/lib/bilingual-prompt-defaults.ts",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "components/checkphone/checkphone-bilingual-text.tsx",
+      "fork": "src/fork/components/checkphone/checkphone-bilingual-text.tsx",
+      "copiedDirectly": true,
+      "modifications": [
+        "CUSTOM-APP-ADAPTER: @/lib/checkphone-settings -> ../../../adapters/settings"
+      ]
+    },
+    {
+      "upstream": "components/checkphone/checkphone-debug-error-card.tsx",
+      "fork": "src/fork/components/checkphone/checkphone-debug-error-card.tsx",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "components/ui/form.tsx",
+      "fork": "src/fork/components/ui/form.tsx",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "styles/tokens.css",
+      "fork": "src/fork/styles/tokens.css",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "styles/base.css",
+      "fork": "src/fork/styles/base.css",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "styles/components.css",
+      "fork": "src/fork/styles/components.css",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "styles/animations.css",
+      "fork": "src/fork/styles/animations.css",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "public/xiaohongshu/avatars/default-01.png",
+      "fork": "assets/avatars/default-01.png",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "public/xiaohongshu/avatars/default-02.png",
+      "fork": "assets/avatars/default-02.png",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "public/xiaohongshu/avatars/default-03.png",
+      "fork": "assets/avatars/default-03.png",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "public/xiaohongshu/avatars/default-04.png",
+      "fork": "assets/avatars/default-04.png",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "public/xiaohongshu/avatars/default-05.png",
+      "fork": "assets/avatars/default-05.png",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "public/xiaohongshu/avatars/default-06.png",
+      "fork": "assets/avatars/default-06.png",
+      "copiedDirectly": true,
+      "modifications": []
+    },
+    {
+      "upstream": "lib/builtin-preset.ts",
+      "fork": "src/fork/lib/xiaohongshu-prompts.ts",
+      "copiedDirectly": false,
+      "modifications": [
+        "CUSTOM-APP-ADAPTER: extract the four exact Xiaohongshu protocol blocks, not the unrelated global chat preset"
+      ]
+    }
+  ],
+  "dependencies": [
+    {
+      "package": "tailwindcss",
+      "version": "4.2.1",
+      "path": "preflight.css",
+      "sha256": "fa2d5ae43ae561061b7ce348b89636dbdc6cd71ab5992d4e1cdd046d0b4f28f9",
+      "fork": "src/fork/styles/tailwind-preflight.css",
+      "reason": "Original app/globals.css @import tailwindcss reset; copied unchanged"
+    }
+  ]
+}

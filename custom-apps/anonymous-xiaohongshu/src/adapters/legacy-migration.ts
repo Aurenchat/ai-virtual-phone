@@ -1,7 +1,8 @@
 import {host} from './host';
-import {createUserXiaohongshuNote,makeXiaohongshuComment} from '../baseline-storage';
-import type {State} from '../xiaohongshu-storage';
-import type {XiaohongshuAuthorType} from '../xiaohongshu-types';
+import {createUserXiaohongshuNote,makeXiaohongshuComment} from '../fork/lib/xiaohongshu-storage';
+import type {IdentityState} from '../identity/accounts';
+import type {XiaohongshuAuthorType,XiaohongshuState} from '../fork/lib/xiaohongshu-types';
+type State=IdentityState&{platform:XiaohongshuState;images:Record<string,string>;migrationNotice?:string};
 export async function migrateLegacy(s:State,accounts:any[]){
  if(!accounts.length)return;
  const api=host(),[bindings,posts]=await Promise.all([api.db.list('actor_bindings_private',{limit:500}),api.db.list('posts',{limit:500})]);

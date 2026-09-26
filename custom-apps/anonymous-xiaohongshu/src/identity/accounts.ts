@@ -1,5 +1,5 @@
 import type { Character } from '../adapters/host';
-import type { XiaohongshuNote } from '../xiaohongshu-types';
+import type { XiaohongshuNote } from '../fork/lib/xiaohongshu-types';
 export type SocialAccount={accountId:string;displayName:string;aliases:string[];bio?:string;avatar?:string};
 export type ActorBinding={accountId:string;ownerKind:'user'|'character';ownerId:string};
 export type Disclosure={viewerCharacterId:string;accountId:string;state:'explicitly_disclosed'|'unknown';identity?:string;revision:number};

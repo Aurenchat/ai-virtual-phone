@@ -2,6 +2,278 @@
 /******/ 	"use strict";
 /******/ 	var __webpack_modules__ = ({
 
+/***/ 29:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   iB: () => (/* binding */ resolveBilingualPrompt),
+/* harmony export */   tQ: () => (/* binding */ DEFAULT_XIAOHONGSHU_BILINGUAL_PROMPT)
+/* harmony export */ });
+/* unused harmony exports DEFAULT_CHECKPHONE_BILINGUAL_PROMPT, DEFAULT_CHAT_BILINGUAL_PROMPT, DEFAULT_GROUP_CHAT_BILINGUAL_PROMPT, DEFAULT_OFFLINE_CHAT_BILINGUAL_PROMPT, DEFAULT_GROUP_OFFLINE_CHAT_BILINGUAL_PROMPT, DEFAULT_MOMENTS_BILINGUAL_PROMPT, DEFAULT_READING_BILINGUAL_PROMPT, DEFAULT_VN_BILINGUAL_PROMPT, DEFAULT_ADVENTURE_BILINGUAL_PROMPT */
+const DEFAULT_CHECKPHONE_BILINGUAL_PROMPT = "This rule only applies to non-Chinese output; Chinese text should be output normally. For readable phone-check text, including titles, bodies, notes, comments, messages, inner thoughts, feelings, status text, Moments, posts, and feed bodies, non-Chinese content must use: complete original text|complete Simplified Chinese translation. For non-Chinese Moments/post/feed body text, keep the original and Chinese translation in the same field; do not put the Chinese translation in a separate paragraph or line without \"|\". Use \"|\" only as the whole-text bilingual separator; use colons, commas, or line breaks inside the text.";
+const DEFAULT_XIAOHONGSHU_BILINGUAL_PROMPT = [
+    "【小红书双语输出规则（仅非中文角色使用，中文角色忽略此规则）】",
+    "- 只对小红书角色生成内容生效，包括帖子标题、正文、评论、回复、图片描述、视频描述、私信正文等自然语言内容。",
+    "- 不要改动结构标签、块标题或字段名，例如 #评论1、#角色回复、[标题]、[正文]、[内容]、[图片描述]、[视频描述]。",
+    "- 如果某个字段内容使用非中文语言，字段值必须写成“完整原文|对应的简体中文译文”。",
+    "- 如果内容本来就是中文，正常输出中文，不要添加 |译文。",
+    "- 竖线 | 只作为完整原文和完整译文之间的分隔符，不要在原文或译文内部滥用。",
+].join("\n");
+const DEFAULT_CHAT_BILINGUAL_PROMPT = [
+    "【双语输出规则（仅非中文角色使用，中文角色忽略此规则)】",
+    "**双语输出作用范围**：聊天消息正文、[语音条:...]中的语音内容文字、[引用:原文片段]后面的回复内容、[内心]...[/内心]中的内心想法。当本轮回复使用非中文语言时，以上内容必须使用“原文|对应的简体中文译文”的格式输出",
+    "**格式要求**：",
+    "- 原文在前，简体中文译文在后，中间只使用一个竖线 |",
+    "- 如果内容本来就是中文，则不要添加 |译文",
+    "- 不要改动原有富媒体指令格式，只在其中的文本内容内部追加 |中文译文",
+    "- [引用:...] 中引用锚点(引用原文）保持原格式，不需要翻译；只翻译其后的回复内容",
+].join("\n");
+const DEFAULT_GROUP_CHAT_BILINGUAL_PROMPT = [
+    "【群聊双语规则（仅非中文角色使用，中文角色忽略此规则)】",
+    "不同角色这一轮可以使用不同语言，请对每个角色的每条发言分别判断。",
+    "要求：",
+    "- **中文正常输出**：如果该条发言是中文，直接正常输出，不要添加译文",
+    "- **非中文翻译格式要求**：如果该条发言使用非中文语言，则该条发言内容必须使用“原文|对应的简体中文译文”的格式输出，必须在原文和译文之间用|分割",
+    "- **不改变协议头**：只在 [角色名]: 后面的正文内部使用双语格式，不要改动 [角色名]: 前缀",
+].join("\n");
+const DEFAULT_OFFLINE_CHAT_BILINGUAL_PROMPT = [
+    "【线下双语规则（仅非中文角色对白使用，中文对白忽略此规则）】",
+    "- 只对 <content> 中角色直接说出口的对白生效。",
+    "- 旁白、动作描写、环境描写、事实陈述、心理/氛围陈述、摘要字段都不要双语，不要添加 |译文。",
+    "- 如果角色对白使用非中文语言，请把该对白单独成行，写成“完整原文|对应的简体中文译文”。",
+    "- 使用双语格式的对白必须作为独立段落输出，前后用空行与旁白隔开；不要把旁白和“原文|译文”混在同一段。",
+    "- 如果对白本来就是中文，正常输出中文，不要添加 |译文。",
+    "- 不要改动 <content>、摘要 XML 标签或其他结构标签。",
+].join("\n");
+const DEFAULT_GROUP_OFFLINE_CHAT_BILINGUAL_PROMPT = [
+    "【群聊线下双语规则（仅非中文角色对白使用，中文对白忽略此规则）】",
+    "- 只对 <content> 中群成员实际说出口的直接对白生效。",
+    "- 旁白、动作描写、环境描写、事实陈述、群体氛围陈述、摘要字段都不要双语，不要添加 |译文。",
+    "- 如果某个角色的对白使用非中文语言，请把该对白单独成行，写成“完整原文|对应的简体中文译文”。",
+    "- 使用双语格式的对白必须作为独立段落输出，前后用空行与旁白或其他动作隔开；不要把旁白和“原文|译文”混在同一段。",
+    "- 不要为了双语恢复 [角色名]: 群聊气泡格式；仍然遵守线下连续叙事和 XML 输出格式。",
+    "- 中文对白正常输出，不要添加 |译文；不要改动 XML 标签。",
+].join("\n");
+const DEFAULT_MOMENTS_BILINGUAL_PROMPT = [
+    "【朋友圈双语规则（仅非中文角色使用，中文角色忽略此规则)】",
+    "- **不改变协议头和结构标签**：只对你实际输出的正文内容使用双语格式，不要翻译或改动协议头和结构标签，不要改动 [回复 昵称]、[不回复]、[NPC点赞]、[NPC评论]、昵称、以及“昵称 回复 被回复者昵称:”这类结构。",
+    "- **中文正常输出无需译文**：如果正文是中文，直接正常输出，不要添加译文",
+    "- **非中文语言译文输出格式**：非中文语言，正文必须使用“原文|对应的简体中文译文”的格式输出，必须有|分割符号。",
+    "- **朋友圈正文双语补充**：如果朋友圈正文、评论正文或回复正文使用非中文，必须在同一段正文里写成“完整外文原文|完整简体中文译文”。",
+    "- **照片双语规则**：如果输出 [照片:使用参考图:描述] 或 [照片:不使用参考图:描述]，只允许描述部分使用双语格式，不要改动照片标签外层结构。",
+].join("\n");
+const DEFAULT_READING_BILINGUAL_PROMPT = [
+    "【阅读双语规则（仅非中文角色使用，中文角色忽略此规则)】",
+    "**作用范围**：对讨论正文（消息回复）和批注生效",
+    "**输出格式**：",
+    "- 中文正常输出无需译文：如果讨论正文/回复消息是中文，直接正常输出，不要添加译文",
+    "- 非中文情况下译文输出格式：如果讨论正文/回复消息使用非中文语言，则正文使用“原文|对应的简体中文译文”的格式输出",
+    "- 不要改变协议头，只对内容本身作用：只对内容本身输出译文，不要改变 [批注:N]...[/批注]、【新增批注 ...】、【删除批注 ...】、【修改批注 ...】这些结构",
+].join("\n");
+const DEFAULT_VN_BILINGUAL_PROMPT = [
+    "【对白双语规则（仅非中文角色使用，中文角色忽略此规则)】",
+    "- **只有对白需要双语**：只有对白需要判断是否双语，旁白、动作、环境描写一律正常输出，不要添加译文，只有角色名|\"台词\"里的台词部分允许使用双语格式",
+    "- **中文正常输出无需译文**：如果对白台词是中文，直接正常输出，不要添加译文",
+    "- **非中文译文输出规则**：如果对白台词使用非中文语言，则台词部分必须使用“原文|对应的简体中文译文”的格式输出，格式为：角色名|\"原文|对应的简体中文译文\"",
+    "- **不可改动协议头**：不要改动 <scene>、角色名|、引号、bg、sprite、<options> 等结构",
+].join("\n");
+const DEFAULT_ADVENTURE_BILINGUAL_PROMPT = [
+    "【角色双语规则（仅非中文角色使用，中文角色忽略此规则)】",
+    "- **只对speech字段生效**：只对你输出 JSON 中的 speech 字段生效。action、emotion、affinity 保持正常格式，不要翻译，不要双语",
+    "- **中文无需译文**：如果 speech 是中文，直接正常输出，不要添加译文。",
+    "- **非中文译文格式**：如果 speech 使用非中文语言，则 speech 使用“原文|对应的简体中文译文”的格式输出，必须有|分割。",
+    "- **json结构不变**：必须严格保持 JSON 结构和字段名不变",
+].join("\n");
+function resolveBilingualPrompt(enabled, customPrompt, defaultPrompt) {
+    if (!enabled)
+        return "";
+    const prompt = customPrompt?.trim();
+    return prompt || defaultPrompt;
+}
+
+
+/***/ }),
+
+/***/ 58:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+
+// EXPORTS
+__webpack_require__.d(__webpack_exports__, {
+  _A: () => (/* reexport */ PROTECTED_RULE),
+  YU: () => (/* binding */ accountByName),
+  vD: () => (/* binding */ bindingFor),
+  _l: () => (/* binding */ canonicalPlatform),
+  _m: () => (/* binding */ createAccount),
+  l2: () => (/* binding */ hasUserProfile),
+  D_: () => (/* binding */ identity),
+  zT: () => (/* binding */ initIdentity),
+  ll: () => (/* reexport */ publicAccount),
+  pV: () => (/* binding */ publicContext),
+  qt: () => (/* binding */ renameAccount),
+  Ao: () => (/* binding */ saveIdentity),
+  jZ: () => (/* binding */ setUserAvatar),
+  p: () => (/* binding */ setUserProfile),
+  YY: () => (/* binding */ subjectAccount),
+  Ny: () => (/* binding */ userAccount)
+});
+
+// UNUSED EXPORTS: ensureBackground
+
+;// ./custom-apps/anonymous-xiaohongshu/src/identity/accounts.ts
+const opaqueId = (prefix = 'acct') => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
+function publicAccount(a) { return { kind: 'social_account', accountId: a.accountId, displayName: a.displayName, previousDisplayNames: a.aliases }; }
+function validateName(s, name, characters, except) {
+    const n = name.trim(), key = n.normalize('NFKC').toLowerCase();
+    if (!n || n.length > 40 || /[\n\r<>\[\]{}|]/.test(n))
+        throw Error('昵称须为 1–40 个字符，不能含结构标记。');
+    if (['kk', 'chloe', 'user', '{{user}}', ...characters.map(c => c.name)].some(x => { const r = x.normalize('NFKC').toLowerCase(); return r && key.includes(r); }))
+        throw Error('昵称不能使用已知真实姓名或普通平台身份。');
+    if (Object.values(s.accounts).some(a => a.accountId !== except && [a.displayName, ...a.aliases].some(x => x.normalize('NFKC').toLowerCase() === key)))
+        throw Error('昵称与现有账号或历史昵称重复。');
+    return n;
+}
+function addAccount(s, displayName) { const a = { accountId: opaqueId(), displayName, aliases: [] }; s.accounts[a.accountId] = a; return a; }
+function rename(s, id, name, characters) { const a = s.accounts[id]; if (!a)
+    throw Error('账号不存在'); const next = validateName(s, name, characters, id); if (next !== a.displayName) {
+    a.aliases.push(a.displayName);
+    a.displayName = next;
+} }
+function resolveAuthor(s, name, characters) {
+    const existing = Object.values(s.accounts).find(a => a.displayName === name || a.aliases.includes(name));
+    if (existing)
+        return existing;
+    return addAccount(s, validateName(s, name, characters));
+}
+function validateGeneratedAuthors(s, names, characters, selfAccountId) {
+    for (const name of names.filter(Boolean)) {
+        const a = Object.values(s.accounts).find(a => a.displayName === name || a.aliases.includes(name));
+        if (a && s.bindings.some(b => b.accountId === a.accountId) && a.accountId !== selfAccountId)
+            throw Error('模型试图代替其他已有账号发言，结果未应用，请重试。');
+        if (!a)
+            validateName(s, name, characters);
+    }
+}
+function canonicalize(s, note, characters) {
+    const author = s.accounts[note.authorId] || resolveAuthor(s, note.authorName, characters);
+    return { ...note, authorId: author.accountId, authorName: author.displayName, comments: note.comments.map(c => { const a = s.accounts[c.authorId] || resolveAuthor(s, c.authorName, characters); return { ...c, authorId: a.accountId, authorName: a.displayName }; }) };
+}
+// This whitelist is the only route from private application records into model context.
+function projectNote(s, n) { return { noteId: n.id, author: publicAccount(s.accounts[n.authorId]), title: n.title, body: n.body, tags: n.tags, imageDescription: n.imageDescription, likeCount: n.likeCount, saveCount: n.saveCount, comments: n.comments.map(c => ({ commentId: c.id, author: publicAccount(s.accounts[c.authorId]), text: c.text, replyToCommentId: c.replyToCommentId })) }; }
+function viewerContext(s, viewer) {
+    const binding = s.bindings.find(b => b.ownerKind === 'character' && b.ownerId === viewer);
+    return {
+        source: '[匿名小红书]', sourceNamespace: 'social_posts', selfAccount: binding ? publicAccount(s.accounts[binding.accountId]) : null,
+        identities: Object.values(s.accounts).map(a => { const d = s.disclosures.find(d => d.viewerCharacterId === viewer && d.accountId === a.accountId); return { ...publicAccount(a), realWorldIdentity: a.accountId === binding?.accountId ? 'self' : d?.state === 'explicitly_disclosed' ? { state: 'explicitly_disclosed', identity: d.identity } : 'unknown' }; })
+    };
+}
+const PROTECTED_RULE = `仅当上下文含 [匿名小红书] 来源及本 App 的 social_account/accountId 时应用以下规则，不影响普通聊天或其他来源的身份判断。每个 accountId 是稳定、独立的网络人格，不能把不同账号的经历、喜好和关系合并成泛称。显示名变化不改变账号，只有明确提供的改名记录允许连接旧名。当前 viewer 对账号现实身份为 unknown 时，禁止根据文风、经历、时间、地点、头像、图片、共同知识、相似性或重复巧合推断、猜测、暗示、试探或询问其现实身份；其他平台已知身份关系也不是证据。只能使用当前 viewer 已明确获知的 explicitly_disclosed 关系；此时允许正常关联，不能继续阻断。揭露不得传播给其他 viewer。程序映射不是角色知识。帖子和记忆始终以具体 accountId / displayName 为主体。`;
+
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/adapters/storage.ts
+var storage = __webpack_require__(923);
+;// ./custom-apps/anonymous-xiaohongshu/src/adapters/identity.ts
+
+
+
+let identities = { accounts: {}, bindings: [], disclosures: [] };
+function initIdentity() { identities = JSON.parse((0,storage/* kvGet */.M3)('identity') || 'null') || identities; if (!identities.userAccountId) {
+    const a = createAccount('旅人_' + opaqueId().slice(-6));
+    identities.userAccountId = a.accountId;
+    identities.bindings.push({ accountId: a.accountId, ownerKind: 'user', ownerId: 'local-controller' });
+} saveIdentity(); }
+function identity() { return identities; }
+function saveIdentity() { (0,storage/* kvSet */.or)('identity', JSON.stringify(identities)); }
+function createAccount(displayName) { const a = { accountId: opaqueId(), displayName, aliases: [] }; identities.accounts[a.accountId] = a; return a; }
+function accountByName(name) { return Object.values(identities.accounts).find(a => a.displayName === name || a.aliases.includes(name)); }
+function ensureBackground(name) { return accountByName(name) || createAccount(name); }
+function userAccount() { return identities.accounts[identities.userAccountId]; }
+function hasUserProfile() { return (0,storage/* kvGet */.M3)('user_profile_initialized') === 'true'; }
+function setUserAvatar(dataUrl) { userAccount().avatar = dataUrl; saveIdentity(); }
+function setUserProfile(name) { const n = name.trim(); if (!n || /^(kk|chloe|user|\{\{user\}\})$/i.test(n))
+    return false; renameAccount(userAccount().accountId, n); (0,storage/* kvSet */.or)('user_profile_initialized', 'true'); return true; }
+function renameAccount(id, name) { const a = identities.accounts[id]; const n = name.trim(); if (!a || !n || n.length > 40)
+    throw Error('请输入 1–40 字的昵称'); if (Object.values(identities.accounts).some(x => x.accountId !== id && (x.displayName === n || x.aliases.includes(n))))
+    throw Error('这个网名已被使用'); if (n !== a.displayName) {
+    a.aliases = [...new Set([...a.aliases, a.displayName])];
+    a.displayName = n;
+} saveIdentity(); const raw = (0,storage/* kvGet */.M3)('ai_phone_xiaohongshu_state_v1'); if (raw)
+    (0,storage/* kvSet */.or)('ai_phone_xiaohongshu_state_v1', JSON.stringify(canonicalPlatform(JSON.parse(raw)))); }
+function bindingFor(accountId) { return identities.bindings.find(b => b.accountId === accountId); }
+function subjectAccount(id, name, type) { return type === 'user' ? userAccount() : identities.accounts[id] || ensureBackground(name); }
+function publicContext(viewer) { return viewer ? viewerContext(identities, viewer) : { source: '[匿名小红书]', accounts: Object.values(identities.accounts).map(publicAccount) }; }
+function canonicalPlatform(state) {
+    const author = subjectAccount;
+    const notes = state.notes.map(n => { const a = author(n.authorId, n.authorName, n.source); return { ...n, authorId: a.accountId, authorName: a.displayName, comments: n.comments.map(c => { const ca = author(c.authorId, c.authorName, c.authorType); return { ...c, authorId: ca.accountId, authorName: ca.displayName, replyTo: c.replyTo ? accountByName(c.replyTo)?.displayName || c.replyTo : undefined }; }), recentLikeNames: n.recentLikeNames.map(x => ensureBackground(x).displayName), recentSaveNames: n.recentSaveNames.map(x => ensureBackground(x).displayName) }; });
+    const graph = (rows) => rows.map(a => { const social = author(a.id, a.name, a.type); return { ...a, id: social.accountId, name: social.displayName }; });
+    const next = { ...state, notes, profile: { ...state.profile, nickname: userAccount().displayName }, socialGraph: { following: graph(state.socialGraph.following), followers: graph(state.socialGraph.followers) }, notifications: state.notifications.map(n => ({ ...n, actorName: ensureBackground(n.actorName).displayName, threadName: n.threadName ? ensureBackground(n.threadName).displayName : undefined })) };
+    saveIdentity();
+    return next;
+}
+
+
+/***/ }),
+
+/***/ 66:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   migrateLegacy: () => (/* binding */ migrateLegacy)
+/* harmony export */ });
+/* harmony import */ var _host__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(802);
+/* harmony import */ var _fork_lib_xiaohongshu_storage__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(575);
+
+
+async function migrateLegacy(s, accounts) {
+    if (!accounts.length)
+        return;
+    const api = (0,_host__WEBPACK_IMPORTED_MODULE_1__/* .host */ .H)(), [bindings, posts] = await Promise.all([api.db.list('actor_bindings_private', { limit: 500 }), api.db.list('posts', { limit: 500 })]);
+    if ([accounts, bindings, posts].some(rows => rows.length >= 500))
+        throw Error('原型集合达到 500 条读取上限；为避免截断旧数据，迁移已停止。原集合未改动。');
+    for (const a of accounts)
+        s.accounts[a.id] = { accountId: a.id, displayName: a.displayName, aliases: (a.aliasHistory || []).map((x) => x.displayName).filter(Boolean), bio: a.bio || '' };
+    for (const b of bindings) {
+        if (!s.accounts[b.accountId])
+            throw Error('旧绑定缺少账号，未修改旧数据');
+        if (b.ownerKind === 'human_controller') {
+            s.userAccountId = b.accountId;
+            s.bindings.push({ accountId: b.accountId, ownerKind: 'user', ownerId: 'local-controller' });
+        }
+        else if (b.ownerKind === 'character')
+            s.bindings.push({ accountId: b.accountId, ownerKind: 'character', ownerId: b.ownerId });
+    }
+    if (s.userAccountId) {
+        const a = s.accounts[s.userAccountId];
+        s.platform.profile.nickname = a.displayName;
+        s.platform.profile.signature = a.bio || '';
+        s.platform.profile.handle = a.accountId.slice(-10);
+    }
+    for (const p of posts) {
+        const a = s.accounts[p.authorAccountId];
+        if (!a)
+            throw Error('旧帖子缺少作者账号，迁移已停止');
+        const binding = s.bindings.find(b => b.accountId === a.accountId);
+        const source = binding?.ownerKind || 'npc';
+        const note = { ...(0,_fork_lib_xiaohongshu_storage__WEBPACK_IMPORTED_MODULE_0__/* .createUserXiaohongshuNote */ .Hw)({ title: p.title, body: p.body, tags: p.tags || [] }, s.platform.profile), id: p.id, source, authorId: a.accountId, authorName: a.displayName, createdAt: p.createdAt, updatedAt: p.updatedAt || p.createdAt, liked: (p.likedByAccountIds || []).includes(s.userAccountId), saved: (p.savedByAccountIds || []).includes(s.userAccountId), likeCount: p.likedByAccountIds?.length || 0, saveCount: p.savedByAccountIds?.length || 0, comments: (p.comments || []).map((c) => { const author = s.accounts[c.authorAccountId]; if (!author)
+                throw Error('旧评论缺少作者账号'); return { ...(0,_fork_lib_xiaohongshu_storage__WEBPACK_IMPORTED_MODULE_0__/* .makeXiaohongshuComment */ .nT)({ noteId: p.id, authorType: s.bindings.find(b => b.accountId === author.accountId)?.ownerKind || 'npc', authorId: author.accountId, authorName: author.displayName, text: c.text, replyToCommentId: c.replyToCommentId }), id: c.id, createdAt: c.createdAt }; }) };
+        note.commentCount = note.comments.length;
+        if (p.imageRef) {
+            const media = await api.media.get({ ref: p.imageRef });
+            if (!media?.dataUrl)
+                throw Error('旧帖子图片无法读取；迁移停止且原数据保留');
+            const id = 'legacy_' + p.id;
+            await api.db.create('post_images', { id, dataUrl: media.dataUrl });
+            note.imageAssetId = id;
+            note.imageAssetIds = [id];
+            s.images[id] = media.dataUrl;
+        }
+        s.platform.notes.push(note);
+    }
+    s.migrationNotice = `已保留 accountId 迁移 ${accounts.length} 个账号与 ${posts.length} 篇帖子；旧集合未改动。旧版推断出的身份关系不作为证据，请按角色重新确认。角色头像改用角色卡，路人不再需要管理。`;
+}
+
+
+/***/ }),
+
 /***/ 221:
 /***/ ((__unused_webpack_module, exports, __webpack_require__) => {
 
@@ -16276,6 +16548,99 @@ __webpack_unused_export__ = "19.2.4";
 
 /***/ }),
 
+/***/ 299:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   N4: () => (/* binding */ publishEventProjection),
+/* harmony export */   ZL: () => (/* binding */ maybeRunSummarization),
+/* harmony export */   aD: () => (/* binding */ incrementEventCounter),
+/* harmony export */   xZ: () => (/* binding */ removeEventProjections),
+/* harmony export */   yZ: () => (/* binding */ flushMemories)
+/* harmony export */ });
+/* harmony import */ var _host__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(802);
+/* harmony import */ var _identity__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(58);
+/* harmony import */ var _storage__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(923);
+// CUSTOM-APP-ADAPTER: native event text, explicit account subjects and durable projection outbox.
+// App history is authoritative. Deleted evidence is tombstoned and cannot be requeued.
+
+
+
+let sending;
+const read = () => JSON.parse((0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .kvGet */ .M3)('memory-ledger') || '{"rows":[],"invalidate":[]}');
+const save = (ledger) => (0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .kvSet */ .or)('memory-ledger', JSON.stringify(ledger));
+const key = (scope) => JSON.stringify([scope.viewerCharacterId, scope.sourceNamespace, scope.sourceEntityId]);
+function wake() { void flushMemories().catch(() => { }); }
+function publishEventProjection(viewerAccountId, entry) {
+    const viewer = (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .bindingFor */ .vD)(viewerAccountId);
+    if (viewer?.ownerKind !== 'character')
+        return;
+    const ledger = read();
+    for (const id of new Set(entry.subjectIds || [])) {
+        const a = (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .identity */ .D_)().accounts[id];
+        if (!a)
+            throw Error('Memory subject is not a social account');
+        const evidenceId = entry.id + '.' + id;
+        if (ledger.rows.some(e => e.viewerCharacterId === viewer.ownerId && e.evidenceId === evidenceId))
+            continue;
+        ledger.rows.push({ viewerCharacterId: viewer.ownerId, sourceNamespace: 'social_posts', sourceEntityId: id, evidenceId, noteId: entry.noteId, commentId: entry.commentId,
+            content: '[匿名小红书] ' + JSON.stringify({ subject: (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .publicAccount */ .ll)(a), participants: [...new Set(entry.subjectIds)].map(id => (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .publicAccount */ .ll)((0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .identity */ .D_)().accounts[id])), event: entry.content, noteId: entry.noteId, commentId: entry.commentId }) });
+    }
+    save(ledger);
+    wake();
+}
+function removeEventProjections(filter) {
+    const ledger = read();
+    for (const row of ledger.rows) {
+        if (row.deleted || !(filter.all || filter.noteId && row.noteId === filter.noteId || filter.commentId && row.commentId === filter.commentId))
+            continue;
+        row.deleted = true;
+        const scope = { viewerCharacterId: row.viewerCharacterId, sourceNamespace: row.sourceNamespace, sourceEntityId: row.sourceEntityId };
+        if (!ledger.invalidate.some(s => key(s) === key(scope)))
+            ledger.invalidate.push(scope);
+    }
+    save(ledger);
+    wake();
+}
+function incrementEventCounter(_id) { } // Never invoke the unsourced native RP summarizer.
+function maybeRunSummarization(_id, _name) { return flushMemories(); }
+function flushMemories() {
+    if (sending)
+        return sending;
+    sending = (async () => {
+        await (0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .flush */ .bX)();
+        for (;;) {
+            const ledger = read(), invalid = ledger.invalidate[0];
+            if (invalid) {
+                await (0,_host__WEBPACK_IMPORTED_MODULE_2__/* .host */ .H)().memory.invalidateSource(invalid);
+                const latest = read();
+                latest.invalidate = latest.invalidate.filter(s => key(s) !== key(invalid));
+                for (const row of latest.rows)
+                    if (key(row) === key(invalid))
+                        row.sent = false;
+                save(latest);
+                await (0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .flush */ .bX)();
+                continue;
+            }
+            const e = ledger.rows.find(r => !r.sent && !r.deleted);
+            if (!e)
+                break;
+            const scope = { viewerCharacterId: e.viewerCharacterId, sourceNamespace: e.sourceNamespace, sourceEntityId: e.sourceEntityId };
+            const { revision } = await (0,_host__WEBPACK_IMPORTED_MODULE_2__/* .host */ .H)().memory.searchSource(scope);
+            await (0,_host__WEBPACK_IMPORTED_MODULE_2__/* .host */ .H)().memory.writeSource({ ...scope, expectedRevision: revision, evidenceId: e.evidenceId, content: e.content, timeline: true });
+            const latest = read(), row = latest.rows.find(r => key(r) === key(e) && r.evidenceId === e.evidenceId);
+            if (row)
+                row.sent = true;
+            save(latest);
+            await (0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .flush */ .bX)();
+        }
+    })().finally(() => { sending = undefined; });
+    return sending;
+}
+
+
+/***/ }),
+
 /***/ 338:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
@@ -16657,6 +17022,30 @@ exports.unstable_wrapCallback = function (callback) {
 
 /***/ }),
 
+/***/ 502:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   Fm: () => (/* binding */ initializeMedia),
+/* harmony export */   HF: () => (/* binding */ getChatImageFromIndexedDB),
+/* harmony export */   M5: () => (/* binding */ defaultAvatars),
+/* harmony export */   VW: () => (/* binding */ saveChatImageToIndexedDB)
+/* harmony export */ });
+/* harmony import */ var _host__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(802);
+/* harmony import */ var _storage__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(923);
+// CUSTOM-APP-ADAPTER: original image compression/rendering remains in the copied UI.
+
+
+let avatarUrls = [];
+async function initializeMedia() { avatarUrls = await Promise.all(Array.from({ length: 6 }, (_, i) => (0,_host__WEBPACK_IMPORTED_MODULE_1__/* .host */ .H)().app.getAssetUrl(`assets/avatars/default-0${i + 1}.png`))); }
+function defaultAvatars() { return avatarUrls; }
+async function saveChatImageToIndexedDB(blob) { const id = 'image_' + crypto.randomUUID(); const dataUrl = await new Promise((resolve, reject) => { const r = new FileReader(); r.onload = () => resolve(String(r.result)); r.onerror = () => reject(r.error); r.readAsDataURL(blob); }); await (0,_storage__WEBPACK_IMPORTED_MODULE_0__.put)('post_images', id, { dataUrl }); return id; }
+async function getChatImageFromIndexedDB(id) { if (id.startsWith('data:'))
+    return id; return (await (0,_host__WEBPACK_IMPORTED_MODULE_1__/* .host */ .H)().db.get('post_images', id))?.dataUrl || null; }
+
+
+/***/ }),
+
 /***/ 540:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
@@ -16665,6 +17054,5445 @@ exports.unstable_wrapCallback = function (callback) {
 if (true) {
   module.exports = __webpack_require__(869);
 } else {}
+
+
+/***/ }),
+
+/***/ 575:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   A7: () => (/* binding */ addNames),
+/* harmony export */   Gx: () => (/* binding */ saveXiaohongshuState),
+/* harmony export */   Hw: () => (/* binding */ createUserXiaohongshuNote),
+/* harmony export */   LM: () => (/* binding */ makeXiaohongshuNotification),
+/* harmony export */   YS: () => (/* binding */ makeXiaohongshuNpcId),
+/* harmony export */   createDefaultXiaohongshuState: () => (/* binding */ createDefaultXiaohongshuState),
+/* harmony export */   loadXiaohongshuState: () => (/* binding */ loadXiaohongshuState),
+/* harmony export */   nT: () => (/* binding */ makeXiaohongshuComment)
+/* harmony export */ });
+/* unused harmony exports normalizeXiaohongshuProfile, normalizeXiaohongshuSettings, normalizeXiaohongshuUserInteractions, normalizeXiaohongshuSocialGraph, normalizeXiaohongshuComment, normalizeXiaohongshuNote */
+/* harmony import */ var _adapters_tasks__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(776);
+/* harmony import */ var _adapters_identity__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(58);
+/* harmony import */ var _adapters_storage__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(923);
+/* harmony import */ var _adapters_settings__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(861);
+/* harmony import */ var _xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(947);
+// CUSTOM-APP-ADAPTER: stable IDs/probability decisions when a durable action resumes.
+
+// ANON-FORK: canonical public author IDs at the local persistence boundary.
+
+
+
+
+const XHS_STATE_KEY = "ai_phone_xiaohongshu_state_v1";
+const LEGACY_DEFAULT_NICKNAME = "我";
+const LEGACY_DEFAULT_GENDER = "未设置";
+(0,_adapters_storage__WEBPACK_IMPORTED_MODULE_2__/* .registerKvMigration */ .dT)(XHS_STATE_KEY);
+function makeId(prefix) {
+    if (typeof crypto !== "undefined")
+        return `${prefix}_${(0,_adapters_tasks__WEBPACK_IMPORTED_MODULE_0__/* .actionUuid */ .MH)()}`;
+    return `${prefix}_${(0,_adapters_tasks__WEBPACK_IMPORTED_MODULE_0__/* .actionNow */ .$P)()}_${(0,_adapters_tasks__WEBPACK_IMPORTED_MODULE_0__/* .actionRandom */ .eQ)().toString(36).slice(2, 8)}`;
+}
+function cleanText(value, maxLength) {
+    return String(value ?? "")
+        .replace(/\u0000/g, "")
+        .trim()
+        .slice(0, maxLength);
+}
+function hashString(value) {
+    let hash = 0;
+    for (let index = 0; index < value.length; index += 1) {
+        hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+    }
+    return hash.toString(36);
+}
+function makeXiaohongshuNpcId(name) {
+    const normalized = cleanText(name, 60) || "小红书用户";
+    return `npc_${hashString(normalized)}`;
+}
+function cleanMultiline(value, maxLength) {
+    return cleanText(value, maxLength)
+        .replace(/\r\n?/g, "\n")
+        .replace(/\\n/g, "\n")
+        .replace(/\n{4,}/g, "\n\n\n");
+}
+function numberOr(value, fallback) {
+    if (typeof value === "number")
+        return Number.isFinite(value) ? Math.max(0, Math.round(value)) : fallback;
+    const normalized = String(value ?? "")
+        .trim()
+        .replace(/[,，\s]/g, "");
+    if (!normalized)
+        return fallback;
+    const tenThousandMatch = /^(-?\d+(?:\.\d+)?)[wW万](?:(\d+(?:\.\d+)?)(?:[kK千])?)?$/.exec(normalized);
+    if (tenThousandMatch) {
+        const main = Number(tenThousandMatch[1]);
+        const tail = tenThousandMatch[2] ? Number(tenThousandMatch[2]) : 0;
+        if (Number.isFinite(main) && Number.isFinite(tail)) {
+            return Math.max(0, Math.round(main * 10000 + tail * 1000));
+        }
+    }
+    const thousandMatch = /^(-?\d+(?:\.\d+)?)[kK千](?:(\d+(?:\.\d+)?)(?:百)?)?$/.exec(normalized);
+    if (thousandMatch) {
+        const main = Number(thousandMatch[1]);
+        const tail = thousandMatch[2] ? Number(thousandMatch[2]) : 0;
+        if (Number.isFinite(main) && Number.isFinite(tail)) {
+            return Math.max(0, Math.round(main * 1000 + tail * 100));
+        }
+    }
+    const parsed = Number(normalized.replace(/[^\d.-]/g, ""));
+    if (!Number.isFinite(parsed))
+        return fallback;
+    if (/[wW万]/.test(normalized))
+        return Math.max(0, Math.round(parsed * 10000));
+    if (/[kK千]/.test(normalized))
+        return Math.max(0, Math.round(parsed * 1000));
+    return Math.max(0, Math.round(parsed));
+}
+function optionalPositiveNumber(value) {
+    const parsed = numberOr(value, 0);
+    return parsed > 0 ? parsed : undefined;
+}
+function normalizeTags(value) {
+    const items = Array.isArray(value)
+        ? value
+        : typeof value === "string"
+            ? value.split(/[,，、#\s]+/)
+            : [];
+    return Array.from(new Set(items.map(item => cleanText(item, 18)).filter(Boolean))).slice(0, 6);
+}
+function normalizeNameList(value) {
+    const items = Array.isArray(value)
+        ? value
+        : typeof value === "string"
+            ? value.split(/[,，、\n]+/)
+            : [];
+    return Array.from(new Set(items.map(item => cleanText(item, 24)).filter(Boolean))).slice(0, 2);
+}
+function normalizeIdList(value) {
+    const items = Array.isArray(value)
+        ? value
+        : typeof value === "string"
+            ? value.split(/[,，、\n]+/)
+            : [];
+    return Array.from(new Set(items.map(item => cleanText(item, 180)).filter(Boolean)));
+}
+function parseNotificationCountFromText(text) {
+    const match = text.match(/等\s*([0-9][\d.,，]*(?:\.\d+)?\s*(?:[kKwW万千])?)\s*人/);
+    return match ? numberOr(match[1], 1) : 1;
+}
+function getDefaultXiaohongshuProfile() {
+    const identity = (0,_adapters_settings__WEBPACK_IMPORTED_MODULE_3__/* .resolveUserIdentity */ .GH)(undefined, "xiaohongshu") ?? (0,_adapters_settings__WEBPACK_IMPORTED_MODULE_3__/* .resolveUserIdentity */ .GH)();
+    return {
+        ..._xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_PROFILE */ .Kv,
+        nickname: cleanText(identity?.name, 40) || _xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_PROFILE */ .Kv.nickname,
+        gender: _xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_PROFILE */ .Kv.gender,
+    };
+}
+function normalizeXiaohongshuProfile(raw) {
+    const record = raw && typeof raw === "object" ? raw : {};
+    const defaults = getDefaultXiaohongshuProfile();
+    const nickname = cleanText(record.nickname, 40);
+    const gender = cleanText(record.gender, 20);
+    return {
+        nickname: !nickname || nickname === LEGACY_DEFAULT_NICKNAME ? defaults.nickname : nickname,
+        handle: cleanText(record.handle, 40) || defaults.handle,
+        ipLocation: cleanText(record.ipLocation ?? record.ip_location, 40) || defaults.ipLocation,
+        signature: cleanMultiline(record.signature ?? record.bio, 160) || defaults.signature,
+        gender: !gender || gender === LEGACY_DEFAULT_GENDER ? defaults.gender : gender,
+        followingCount: numberOr(record.followingCount ?? record.following_count, defaults.followingCount),
+        followerCount: numberOr(record.followerCount ?? record.follower_count, defaults.followerCount),
+        likedAndSavedCount: numberOr(record.likedAndSavedCount ?? record.liked_and_saved_count, defaults.likedAndSavedCount),
+        coverImageAssetId: cleanText(record.coverImageAssetId ?? record.cover_image_asset_id, 160) || defaults.coverImageAssetId,
+    };
+}
+function normalizeXiaohongshuSettings(raw) {
+    const record = raw && typeof raw === "object" ? raw : {};
+    const participantCharacterIds = Array.isArray(record.participantCharacterIds)
+        ? record.participantCharacterIds.map(id => cleanText(id, 120)).filter(Boolean)
+        : [];
+    const probability = numberOr(record.sendToCharacterProbability, _xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_SETTINGS */ .iK.sendToCharacterProbability);
+    const npcFeedPrompt = cleanMultiline(record.npcFeedPrompt, 8000);
+    return {
+        bilingualTranslationEnabled: record.bilingualTranslationEnabled !== false,
+        collapseBilingualTranslation: record.collapseBilingualTranslation !== false,
+        bilingualTranslationPrompt: cleanMultiline(record.bilingualTranslationPrompt, 8000) || _xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_SETTINGS */ .iK.bilingualTranslationPrompt,
+        npcIdentityGuardPrompt: cleanMultiline(record.npcIdentityGuardPrompt, 8000) || _xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_SETTINGS */ .iK.npcIdentityGuardPrompt,
+        npcFeedPrompt: npcFeedPrompt && npcFeedPrompt.includes("#附近笔记") ? npcFeedPrompt : _xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_SETTINGS */ .iK.npcFeedPrompt,
+        npcUserPostReactionPrompt: cleanMultiline(record.npcUserPostReactionPrompt, 8000) || _xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_SETTINGS */ .iK.npcUserPostReactionPrompt,
+        npcCommentReplyPrompt: cleanMultiline(record.npcCommentReplyPrompt, 8000) || _xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_SETTINGS */ .iK.npcCommentReplyPrompt,
+        npcMoreCommentsPrompt: cleanMultiline(record.npcMoreCommentsPrompt, 8000) || _xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_SETTINGS */ .iK.npcMoreCommentsPrompt,
+        npcDmReplyPrompt: cleanMultiline(record.npcDmReplyPrompt, 8000) || _xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_SETTINGS */ .iK.npcDmReplyPrompt,
+        participantCharacterIds: Array.from(new Set(participantCharacterIds)),
+        sendToCharacterProbability: Math.max(0, Math.min(100, probability)),
+    };
+}
+function normalizeXiaohongshuUserInteractions(raw) {
+    const record = raw && typeof raw === "object" ? raw : {};
+    return {
+        likedNoteIds: normalizeIdList(record.likedNoteIds ?? record.liked_note_ids),
+        savedNoteIds: normalizeIdList(record.savedNoteIds ?? record.saved_note_ids),
+        commentedNoteIds: normalizeIdList(record.commentedNoteIds ?? record.commented_note_ids),
+    };
+}
+function normalizeXiaohongshuAccount(raw) {
+    if (!raw || typeof raw !== "object")
+        return null;
+    const record = raw;
+    const type = record.type === "user" || record.type === "character" || record.type === "npc" ? record.type : "npc";
+    const name = cleanText(record.name ?? record.authorName ?? record.nickname, 60);
+    if (!name)
+        return null;
+    const id = cleanText(record.id ?? record.authorId ?? record.author_id, 120) || (type === "npc" ? makeXiaohongshuNpcId(name) : type);
+    return {
+        type,
+        id,
+        name,
+        avatar: cleanText(record.avatar, 500) || undefined,
+        followedAt: typeof record.followedAt === "string" ? record.followedAt : new Date().toISOString(),
+    };
+}
+function dedupeAccounts(accounts) {
+    const seen = new Set();
+    return accounts.filter((account) => {
+        const key = `${account.type}:${account.id}`;
+        if (seen.has(key))
+            return false;
+        seen.add(key);
+        return true;
+    });
+}
+function normalizeXiaohongshuSocialGraph(raw) {
+    const record = raw && typeof raw === "object" ? raw : {};
+    const following = Array.isArray(record.following)
+        ? record.following.map(normalizeXiaohongshuAccount).filter((account) => Boolean(account))
+        : [];
+    const followers = Array.isArray(record.followers)
+        ? record.followers.map(normalizeXiaohongshuAccount).filter((account) => Boolean(account))
+        : [];
+    return {
+        following: dedupeAccounts(following),
+        followers: dedupeAccounts(followers),
+    };
+}
+function normalizeXiaohongshuComment(raw, fallbackNoteId = "") {
+    if (!raw || typeof raw !== "object")
+        return null;
+    const record = raw;
+    const noteId = cleanText(record.noteId ?? record.note_id, 160) || fallbackNoteId;
+    const text = cleanMultiline(record.text ?? record.content ?? record.body, 600);
+    const authorName = cleanText(record.authorName ?? record.author_name, 60);
+    if (!noteId || !text || !authorName)
+        return null;
+    const id = cleanText(record.id, 180) || makeId("xhs_comment");
+    const createdAt = typeof record.createdAt === "string" ? record.createdAt : new Date().toISOString();
+    return {
+        id,
+        noteId,
+        authorType: record.authorType === "user" || record.authorType === "character" ? record.authorType : "npc",
+        authorId: cleanText(record.authorId ?? record.author_id, 120) || makeXiaohongshuNpcId(authorName),
+        authorName,
+        text,
+        replyTo: cleanText(record.replyTo ?? record.reply_to, 80) || undefined,
+        replyToCommentId: cleanText(record.replyToCommentId ?? record.reply_to_comment_id, 180) || undefined,
+        likeCount: numberOr(record.likeCount ?? record.like_count, 0),
+        dislikeCount: numberOr(record.dislikeCount ?? record.dislike_count, 0),
+        liked: record.liked === true,
+        disliked: record.disliked === true,
+        createdAt,
+        unread: record.unread === true,
+    };
+}
+function normalizeAssetIdList(value) {
+    if (!Array.isArray(value))
+        return undefined;
+    const ids = value.map(id => cleanText(id, 160)).filter(Boolean);
+    return ids.length > 0 ? ids : undefined;
+}
+function normalizeXiaohongshuNote(raw) {
+    if (!raw || typeof raw !== "object")
+        return null;
+    const record = raw;
+    const id = cleanText(record.id, 160) || makeId("xhs_note");
+    const title = cleanText(record.title, 80);
+    const body = cleanMultiline(record.body ?? record.content ?? record.text, 3000);
+    const authorName = cleanText(record.authorName ?? record.author_name, 60);
+    if (!title && !body)
+        return null;
+    const comments = Array.isArray(record.comments)
+        ? record.comments.map(comment => normalizeXiaohongshuComment(comment, id)).filter((comment) => Boolean(comment))
+        : [];
+    const createdAt = typeof record.createdAt === "string" ? record.createdAt : new Date().toISOString();
+    return {
+        id,
+        type: record.type === "video" ? "video" : "post",
+        feedScope: record.feedScope === "nearby" || record.feed_scope === "nearby" ? "nearby" : "discover",
+        source: record.source === "user" || record.source === "character" ? record.source : "npc",
+        authorId: cleanText(record.authorId ?? record.author_id, 120) || makeXiaohongshuNpcId(authorName || "小红书用户"),
+        authorName: authorName || "小红书用户",
+        title: title || body.slice(0, 18) || "未命名笔记",
+        body,
+        videoDescription: cleanMultiline(record.videoDescription ?? record.video_description, 500) || undefined,
+        coverIcon: cleanText(record.coverIcon ?? record.cover_icon, 8) || "✦",
+        tone: record.tone === "mist" || record.tone === "blush" || record.tone === "graphite" ? record.tone : "ivory",
+        tags: normalizeTags(record.tags),
+        likeCount: numberOr(record.likeCount ?? record.like_count, 0),
+        saveCount: numberOr(record.saveCount ?? record.save_count, 0),
+        commentCount: numberOr(record.commentCount ?? record.comment_count, comments.length),
+        liked: record.liked === true,
+        saved: record.saved === true,
+        recentLikeNames: normalizeNameList(record.recentLikeNames ?? record.recent_like_names),
+        recentSaveNames: normalizeNameList(record.recentSaveNames ?? record.recent_save_names),
+        comments,
+        imageAssetId: cleanText(record.imageAssetId ?? record.image_asset_id, 160) || undefined,
+        imageAssetIds: normalizeAssetIdList(record.imageAssetIds ?? record.image_asset_ids),
+        imageDescription: cleanMultiline(record.imageDescription ?? record.image_description, 500) || undefined,
+        imageWidth: optionalPositiveNumber(record.imageWidth ?? record.image_width),
+        imageHeight: optionalPositiveNumber(record.imageHeight ?? record.image_height),
+        imageCompressedAt: typeof record.imageCompressedAt === "string" ? record.imageCompressedAt : undefined,
+        imageCleanedAt: typeof record.imageCleanedAt === "string" ? record.imageCleanedAt : undefined,
+        createdAt,
+        updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : createdAt,
+    };
+}
+function normalizeNotification(raw) {
+    if (!raw || typeof raw !== "object")
+        return null;
+    const record = raw;
+    const text = cleanMultiline(record.text, 600);
+    const actorName = cleanText(record.actorName ?? record.actor_name, 60);
+    if (!text || !actorName)
+        return null;
+    const type = record.type === "save" || record.type === "comment" || record.type === "dm" || record.type === "follow"
+        ? record.type
+        : "like";
+    const createdAt = typeof record.createdAt === "string" ? record.createdAt : new Date().toISOString();
+    const parsedCount = numberOr(record.count ?? record.actorCount ?? record.actor_count, type === "like" || type === "save" ? parseNotificationCountFromText(text) : 1);
+    return {
+        id: cleanText(record.id, 160) || makeId("xhs_notice"),
+        type,
+        noteId: cleanText(record.noteId ?? record.note_id, 160) || undefined,
+        actorName,
+        text,
+        count: type === "like" || type === "save" ? Math.max(1, Math.round(parsedCount)) : undefined,
+        thumbnailText: cleanText(record.thumbnailText ?? record.thumbnail_text, 80) || undefined,
+        direction: record.direction === "outgoing" ? "outgoing" : record.direction === "incoming" ? "incoming" : undefined,
+        threadId: cleanText(record.threadId ?? record.thread_id, 180) || undefined,
+        threadName: cleanText(record.threadName ?? record.thread_name, 60) || undefined,
+        unread: record.unread !== false,
+        createdAt,
+    };
+}
+function createDefaultXiaohongshuState() {
+    return {
+        profile: getDefaultXiaohongshuProfile(),
+        settings: { ..._xiaohongshu_types__WEBPACK_IMPORTED_MODULE_4__/* .DEFAULT_XIAOHONGSHU_SETTINGS */ .iK, participantCharacterIds: [] },
+        notes: [],
+        feedHiddenNoteIds: [],
+        notifications: [],
+        userInteractions: normalizeXiaohongshuUserInteractions(null),
+        socialGraph: normalizeXiaohongshuSocialGraph(null),
+        updatedAt: new Date().toISOString(),
+    };
+}
+function loadXiaohongshuState() {
+    if (typeof window === "undefined")
+        return createDefaultXiaohongshuState();
+    try {
+        const raw = (0,_adapters_storage__WEBPACK_IMPORTED_MODULE_2__/* .kvGet */ .M3)(XHS_STATE_KEY);
+        if (!raw)
+            return createDefaultXiaohongshuState();
+        const parsed = JSON.parse(raw);
+        const notes = Array.isArray(parsed.notes)
+            ? parsed.notes.map(normalizeXiaohongshuNote).filter((note) => Boolean(note))
+            : [];
+        const noteSourceById = new Map(notes.map(note => [note.id, note.source]));
+        const notifications = Array.isArray(parsed.notifications)
+            ? parsed.notifications
+                .map(normalizeNotification)
+                .filter((notice) => Boolean(notice))
+                .filter((notice) => {
+                if (!notice.noteId)
+                    return true;
+                const source = noteSourceById.get(notice.noteId);
+                return !source || source === "user";
+            })
+            : [];
+        const rawInteractions = parsed.userInteractions ?? parsed.user_interactions;
+        const userInteractions = normalizeXiaohongshuUserInteractions(rawInteractions);
+        if (!rawInteractions) {
+            userInteractions.likedNoteIds = notes.filter(note => note.liked).map(note => note.id);
+            userInteractions.savedNoteIds = notes.filter(note => note.saved).map(note => note.id);
+            userInteractions.commentedNoteIds = notes.filter(note => note.comments.some(comment => comment.authorType === "user")).map(note => note.id);
+        }
+        return {
+            profile: normalizeXiaohongshuProfile(parsed.profile),
+            settings: normalizeXiaohongshuSettings(parsed.settings),
+            notes,
+            feedHiddenNoteIds: normalizeIdList(parsed.feedHiddenNoteIds ?? parsed.feed_hidden_note_ids),
+            notifications,
+            userInteractions,
+            socialGraph: normalizeXiaohongshuSocialGraph(parsed.socialGraph ?? parsed.social_graph),
+            updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
+        };
+    }
+    catch {
+        return createDefaultXiaohongshuState();
+    }
+}
+function saveXiaohongshuState(state) {
+    const next = (0,_adapters_identity__WEBPACK_IMPORTED_MODULE_1__/* .canonicalPlatform */ ._l)({ ...state, updatedAt: new Date().toISOString() });
+    (0,_adapters_storage__WEBPACK_IMPORTED_MODULE_2__/* .kvSet */ .or)(XHS_STATE_KEY, JSON.stringify(next));
+    return next;
+}
+function createUserXiaohongshuNote(input, profile) {
+    const now = new Date().toISOString();
+    const imageAssetIds = (input.images && input.images.length > 0)
+        ? input.images.map(img => img.assetId).filter((id) => Boolean(id))
+        : (input.image?.assetId ? [input.image.assetId] : undefined);
+    const primaryImage = input.images?.[0] || input.image;
+    return {
+        id: makeId("xhs_user_note"),
+        type: "post",
+        source: "user",
+        authorId: "user",
+        authorName: profile.nickname || "我",
+        title: cleanText(input.title, 80) || cleanMultiline(input.body, 120).slice(0, 24) || "新的笔记",
+        body: cleanMultiline(input.body, 3000),
+        coverIcon: (imageAssetIds && imageAssetIds.length > 0) || input.image?.assetId ? "▧" : "✎",
+        tone: "ivory",
+        tags: normalizeTags(input.tags),
+        likeCount: 0,
+        saveCount: 0,
+        commentCount: 0,
+        liked: false,
+        saved: false,
+        recentLikeNames: [],
+        recentSaveNames: [],
+        comments: [],
+        imageAssetId: primaryImage?.assetId,
+        imageAssetIds: imageAssetIds && imageAssetIds.length > 0 ? imageAssetIds : undefined,
+        imageDescription: cleanMultiline(primaryImage?.description, 500) || undefined,
+        imageWidth: optionalPositiveNumber(primaryImage?.width),
+        imageHeight: optionalPositiveNumber(primaryImage?.height),
+        createdAt: now,
+        updatedAt: now,
+    };
+}
+function makeXiaohongshuComment(input) {
+    return {
+        id: makeId("xhs_comment"),
+        noteId: input.noteId,
+        authorType: input.authorType,
+        authorId: input.authorId || (input.authorType === "npc" ? makeXiaohongshuNpcId(input.authorName) : input.authorType),
+        authorName: cleanText(input.authorName, 60) || "小红书用户",
+        text: cleanMultiline(input.text, 600),
+        replyTo: cleanText(input.replyTo, 80) || undefined,
+        replyToCommentId: cleanText(input.replyToCommentId, 180) || undefined,
+        likeCount: 0,
+        dislikeCount: 0,
+        liked: false,
+        disliked: false,
+        createdAt: new Date().toISOString(),
+        unread: input.unread === true,
+    };
+}
+function makeXiaohongshuNotification(input) {
+    return {
+        ...input,
+        id: makeId("xhs_notice"),
+        createdAt: new Date().toISOString(),
+    };
+}
+function addNames(existing, names) {
+    return Array.from(new Set([...names, ...existing].map(name => cleanText(name, 24)).filter(Boolean))).slice(0, 2);
+}
+
+
+/***/ }),
+
+/***/ 588:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   $5: () => (/* binding */ editNickname),
+/* harmony export */   OE: () => (/* binding */ projectProfileText),
+/* harmony export */   QT: () => (/* binding */ initializeNicknames),
+/* harmony export */   V6: () => (/* binding */ projectedPersona),
+/* harmony export */   VJ: () => (/* binding */ ownerCharacter),
+/* harmony export */   eq: () => (/* binding */ routingCharacter),
+/* harmony export */   fR: () => (/* binding */ loadCharacters),
+/* harmony export */   nw: () => (/* binding */ initializeCharacters),
+/* harmony export */   pi: () => (/* binding */ managementName),
+/* harmony export */   tX: () => (/* binding */ subscribeCharacters)
+/* harmony export */ });
+/* harmony import */ var _host__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(802);
+/* harmony import */ var _identity__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(58);
+/* harmony import */ var _storage__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(923);
+/* harmony import */ var _tasks__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(776);
+// ANON-FORK: the native product receives projected Character records, with UI-only avatars.
+
+
+
+
+let privateCharacters = [];
+const listeners = new Set();
+let naming;
+let retryTimer;
+async function initializeCharacters() { privateCharacters = await (0,_host__WEBPACK_IMPORTED_MODULE_3__/* .host */ .H)().characters.list(); for (const c of privateCharacters) {
+    if (!(0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .identity */ .D_)().bindings.some(b => b.ownerKind === 'character' && b.ownerId === c.id)) {
+        const a = (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .createAccount */ ._m)('旅人_' + crypto.randomUUID().slice(0, 8));
+        (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .identity */ .D_)().bindings.push({ accountId: a.accountId, ownerKind: 'character', ownerId: c.id });
+    }
+} (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .saveIdentity */ .Ao)(); }
+function loadCharacters() { return privateCharacters.flatMap(c => { const binding = (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .identity */ .D_)().bindings.find(b => b.ownerKind === 'character' && b.ownerId === c.id); const a = binding && (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .identity */ .D_)().accounts[binding.accountId]; return a ? [{ id: a.accountId, name: a.displayName, avatar: c.avatar }] : []; }); }
+function ownerCharacter(accountId) { const binding = (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .identity */ .D_)().bindings.find(b => b.accountId === accountId && b.ownerKind === 'character'); return privateCharacters.find(c => c.id === binding?.ownerId); }
+function routingCharacter() { return privateCharacters[0]; }
+function managementName(accountId) { return ownerCharacter(accountId)?.name || (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .identity */ .D_)().accounts[accountId]?.displayName || ''; }
+function subscribeCharacters(fn) { listeners.add(fn); return () => { listeners.delete(fn); }; }
+function emit() { listeners.forEach(fn => fn()); window.dispatchEvent(new Event('xiaohongshu-updated')); }
+function projectProfileText(value, selfId) {
+    // Static persona projection only. Legacy/mixed memories remain entirely excluded.
+    let text = value;
+    const names = [...privateCharacters.flatMap(c => [{ from: c.id, to: c.id === selfId ? '当前账号' : '一位熟人' }, { from: c.name, to: c.id === selfId ? '当前账号' : '一位熟人' }]), { from: 'Chloe', to: '一位熟人' }, { from: 'kk', to: '一位熟人' }].sort((a, b) => b.from.length - a.from.length);
+    for (const { from, to } of names) {
+        if (!from)
+            continue;
+        const escaped = from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const latin = /^[\w -]+$/.test(from);
+        text = text.replace(new RegExp(latin ? `(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])` : escaped, 'giu'), to);
+    }
+    return text.replace(/\{\{\s*(user|char)\s*\}\}/gi, (_m, key) => key.toLowerCase() === 'char' ? '当前账号' : '一位独立社交账号');
+}
+function projectedPersona(accountId) { const c = ownerCharacter(accountId); return c ? projectProfileText([c.persona, c.personality].filter(Boolean).join('\n'), c.id) : ''; }
+function uniqueName(raw, accountId) {
+    const forbidden = ['kk', 'chloe', ...privateCharacters.map(c => c.name)].map(n => n.toLocaleLowerCase());
+    let base = raw.trim().replace(/[\r\n<>\[\]{}|]/g, '').slice(0, 28);
+    if (!base || forbidden.some(n => n && base.toLowerCase().includes(n)))
+        base = '夜航_' + crypto.randomUUID().slice(0, 6);
+    let name = base, n = 2;
+    const used = (x) => Object.values((0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .identity */ .D_)().accounts).some(a => a.accountId !== accountId && [a.displayName, ...a.aliases].some(v => v.normalize('NFKC').toLowerCase() === x.normalize('NFKC').toLowerCase()));
+    while (used(name))
+        name = base + '_' + n++;
+    return name;
+}
+function editNickname(accountId, name) { const n = name.trim(); if (uniqueName(n, accountId) !== n)
+    throw Error('请输入未被占用且不含真实姓名的网名'); (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .renameAccount */ .qt)(accountId, n); const ready = JSON.parse((0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .kvGet */ .M3)('nickname-ready') || '[]'); if (!ready.includes(accountId)) {
+    ready.push(accountId);
+    (0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .kvSet */ .or)('nickname-ready', JSON.stringify(ready));
+} emit(); }
+function initializeNicknames(ids) {
+    if (naming)
+        return naming;
+    const ready = JSON.parse((0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .kvGet */ .M3)('nickname-ready') || '[]');
+    const missing = ids.filter(id => ownerCharacter(id) && !ready.includes(id));
+    if (!missing.length)
+        return Promise.resolve();
+    naming = (async () => {
+        let job = JSON.parse((0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .kvGet */ .M3)('nickname-batch') || 'null');
+        if (!job) {
+            job = { key: 'nicknames.' + crypto.randomUUID(), ids: missing, request: { characterId: routingCharacter().id, contextPolicy: {}, appContext: '[匿名小红书] 平台网名初始化工具；不扮演任何账号，不接收现实身份。', messages: [{ role: 'user', content: '为以下独立 social_account 批量生成固定网络昵称，不用真名、代号或身份。每个账号输出一个，不要共享昵称。只输出 JSON {"accounts":[{"accountId":"...","displayName":"..."}]}。\n' + JSON.stringify(missing.map(id => ({ accountId: id, profile: projectedPersona(id) }))) }] } };
+            (0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .kvSet */ .or)('nickname-batch', JSON.stringify(job));
+            await (0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .flush */ .bX)();
+        }
+        const raw = await (0,_tasks__WEBPACK_IMPORTED_MODULE_2__/* .durableRaw */ .g2)(job.request, job.key);
+        const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, ''));
+        if (!Array.isArray(parsed.accounts))
+            throw Error('nickname format');
+        const currentReady = JSON.parse((0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .kvGet */ .M3)('nickname-ready') || '[]');
+        for (const id of job.ids) {
+            if (currentReady.includes(id))
+                continue;
+            const candidate = parsed.accounts.find((a) => a.accountId === id);
+            if (!candidate?.displayName)
+                continue;
+            (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .renameAccount */ .qt)(id, uniqueName(String(candidate.displayName), id));
+            currentReady.push(id);
+        }
+        (0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .kvSet */ .or)('nickname-ready', JSON.stringify(currentReady));
+        (0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .kvSet */ .or)('nickname-batch', 'null');
+        await (0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .flush */ .bX)();
+        emit();
+        if (job.ids.some((id) => !currentReady.includes(id)))
+            throw Error('incomplete nickname batch');
+    })().catch(() => {
+        // Private retry state; never block feed, never show a task error, never use a real-name fallback.
+        (0,_storage__WEBPACK_IMPORTED_MODULE_1__/* .kvSet */ .or)('nickname-batch', 'null');
+        if (!retryTimer)
+            retryTimer = setTimeout(() => { retryTimer = undefined; void initializeNicknames(ids); }, 15000);
+    }).finally(() => { naming = undefined; });
+    return naming;
+}
+
+
+/***/ }),
+
+/***/ 622:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+
+// EXPORTS
+__webpack_require__.d(__webpack_exports__, {
+  XiaohongshuApp: () => (/* binding */ XiaohongshuApp)
+});
+
+// EXTERNAL MODULE: ./node_modules/react/jsx-runtime.js
+var jsx_runtime = __webpack_require__(848);
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/adapters/tasks.ts
+var tasks = __webpack_require__(776);
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/adapters/media.ts
+var media = __webpack_require__(502);
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/adapters/identity.ts + 1 modules
+var identity = __webpack_require__(58);
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/adapters/characters.ts
+var adapters_characters = __webpack_require__(588);
+// EXTERNAL MODULE: ./node_modules/react/index.js
+var react = __webpack_require__(540);
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/adapters/storage.ts
+var storage = __webpack_require__(923);
+;// ./custom-apps/anonymous-xiaohongshu/src/identity/nickname-settings.tsx
+
+// ANON-FORK: only additional settings section, reusing original fields and layout.
+
+
+
+function NicknameSettings({ onChange }) {
+    const [error, setError] = (0,react.useState)('');
+    const ready = JSON.parse((0,storage/* kvGet */.M3)('nickname-ready') || '[]');
+    if (!ready.length)
+        return null;
+    return (0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-field", children: [(0,jsx_runtime.jsxs)("span", { className: "xhs-profile-edit-section-title", children: ["NICKNAMES ", (0,jsx_runtime.jsx)("em", { children: "\u89D2\u8272\u7F51\u540D" })] }), (0,adapters_characters/* loadCharacters */.fR)().filter(c => ready.includes(c.id)).map(c => (0,jsx_runtime.jsxs)("label", { className: "xhs-profile-edit-field", children: [(0,jsx_runtime.jsx)("span", { children: (0,adapters_characters/* managementName */.pi)(c.id) }), (0,jsx_runtime.jsx)("input", { "aria-label": `${(0,adapters_characters/* managementName */.pi)(c.id)} 匿名网名`, className: "xhs-profile-edit-pill", defaultValue: c.name, onBlur: e => { try {
+                            (0,adapters_characters/* editNickname */.$5)(c.id, e.target.value);
+                            setError('');
+                            onChange();
+                        }
+                        catch (err) {
+                            setError(String(err.message));
+                        } } })] }, c.id)), error ? (0,jsx_runtime.jsx)("span", { role: "alert", children: error }) : null] });
+}
+
+// EXTERNAL MODULE: ./node_modules/react-dom/client.js
+var client = __webpack_require__(338);
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/adapters/host.ts
+var host = __webpack_require__(802);
+;// ./custom-apps/anonymous-xiaohongshu/src/adapters/chat.tsx
+
+// CUSTOM-APP-ADAPTER: sharing is an explicit forwarding action, not authorship.
+
+
+
+
+
+function shareCard(share) {
+    const author = (0,identity/* accountByName */.YU)(share.authorName);
+    if (!author)
+        return;
+    const node = document.createElement('div');
+    (document.querySelector('.xhs-app') || document.body).append(node);
+    const root = (0,client.createRoot)(node);
+    const close = () => { root.unmount(); node.remove(); };
+    root.render((0,jsx_runtime.jsx)("div", { className: "xhs-modal-backdrop", onClick: close, children: (0,jsx_runtime.jsxs)("section", { className: "xhs-profile-edit-sheet", onClick: e => e.stopPropagation(), children: [(0,jsx_runtime.jsxs)("header", { className: "xhs-profile-edit-header", children: [(0,jsx_runtime.jsx)("strong", { children: "\u5206\u4EAB\u5230\u804A\u5929" }), (0,jsx_runtime.jsx)("button", { "aria-label": "\u5173\u95ED", onClick: close, children: "\u00D7" })] }), (0,jsx_runtime.jsx)("div", { className: "xhs-profile-edit-body", children: (0,adapters_characters/* loadCharacters */.fR)().map(c => (0,jsx_runtime.jsx)("button", { className: "xhs-profile-edit-pill", onClick: async () => { await (0,host/* host */.H)().chat.sendCard({ characterId: (0,adapters_characters/* ownerCharacter */.VJ)(c.id).id, title: share.title, body: share.body, summary: `[匿名小红书] ${author.displayName}：${share.title}`, historyText: '当前聊天者分享了一篇[匿名小红书]帖子；分享者不等于作者。' + JSON.stringify({ author: (0,identity/* publicAccount */.ll)(author), title: share.title, body: share.body, tags: share.tags, description: share.description }) }); close(); }, children: (0,adapters_characters/* managementName */.pi)(c.id) }, c.id)) })] }) }));
+}
+
+;// ./node_modules/@phosphor-icons/react/dist/lib/context.es.js
+
+const context_es_o = (0,react.createContext)({
+  color: "currentColor",
+  size: "1em",
+  weight: "regular",
+  mirrored: !1
+});
+
+
+;// ./node_modules/@phosphor-icons/react/dist/lib/IconBase.es.js
+
+
+const p = react.forwardRef(
+  (s, a) => {
+    const {
+      alt: n,
+      color: r,
+      size: t,
+      weight: o,
+      mirrored: c,
+      children: i,
+      weights: m,
+      ...x
+    } = s, {
+      color: d = "currentColor",
+      size: l,
+      weight: f = "regular",
+      mirrored: g = !1,
+      ...w
+    } = react.useContext(context_es_o);
+    return /* @__PURE__ */ react.createElement(
+      "svg",
+      {
+        ref: a,
+        xmlns: "http://www.w3.org/2000/svg",
+        width: t != null ? t : l,
+        height: t != null ? t : l,
+        fill: r != null ? r : d,
+        viewBox: "0 0 256 256",
+        transform: c || g ? "scale(-1, 1)" : void 0,
+        ...w,
+        ...x
+      },
+      !!n && /* @__PURE__ */ react.createElement("title", null, n),
+      i,
+      m.get(o != null ? o : f)
+    );
+  }
+);
+p.displayName = "IconBase";
+
+
+;// ./node_modules/@phosphor-icons/react/dist/defs/ShareFat.es.js
+
+const a = /* @__PURE__ */ new Map([
+  [
+    "bold",
+    /* @__PURE__ */ react.createElement(react.Fragment, null, /* @__PURE__ */ react.createElement("path", { d: "M240.49,103.52l-80-80A12,12,0,0,0,140,32V68.74c-25.76,3.12-53.66,15.89-76.75,35.47-29.16,24.74-47.32,56.69-51.14,90A16,16,0,0,0,39.67,207h0c10.46-11.14,47-45.74,100.33-50.42V192a12,12,0,0,0,20.48,8.48l80-80A12,12,0,0,0,240.49,103.52ZM164,163V144a12,12,0,0,0-12-12c-49,0-86.57,21.56-109.79,40.11,7.13-18.16,19.63-35.22,36.57-49.59C101.3,103.41,128.67,92,152,92a12,12,0,0,0,12-12V61l51,51Z" }))
+  ],
+  [
+    "duotone",
+    /* @__PURE__ */ react.createElement(react.Fragment, null, /* @__PURE__ */ react.createElement(
+      "path",
+      {
+        d: "M152,192V144c-61.4,0-104.61,37.19-121.07,54.72a4,4,0,0,1-6.9-3.18C31.51,130.45,99.19,80,152,80V32l80,80Z",
+        opacity: "0.2"
+      }
+    ), /* @__PURE__ */ react.createElement("path", { d: "M237.66,106.35l-80-80A8,8,0,0,0,144,32V72.35c-25.94,2.22-54.59,14.92-78.16,34.91-28.38,24.08-46.05,55.11-49.76,87.37a12,12,0,0,0,20.68,9.58h0c11-11.71,50.14-48.74,107.24-52V192a8,8,0,0,0,13.66,5.65l80-80A8,8,0,0,0,237.66,106.35ZM160,172.69V144a8,8,0,0,0-8-8c-28.08,0-55.43,7.33-81.29,21.8a196.17,196.17,0,0,0-36.57,26.52c5.8-23.84,20.42-46.51,42.05-64.86C99.41,99.77,127.75,88,152,88a8,8,0,0,0,8-8V51.32L220.69,112Z" }))
+  ],
+  [
+    "fill",
+    /* @__PURE__ */ react.createElement(react.Fragment, null, /* @__PURE__ */ react.createElement("path", { d: "M237.66,117.66l-80,80A8,8,0,0,1,144,192V152.23c-57.1,3.24-96.25,40.27-107.24,52h0a12,12,0,0,1-20.68-9.58c3.71-32.26,21.38-63.29,49.76-87.37,23.57-20,52.22-32.69,78.16-34.91V32a8,8,0,0,1,13.66-5.66l80,80A8,8,0,0,1,237.66,117.66Z" }))
+  ],
+  [
+    "light",
+    /* @__PURE__ */ react.createElement(react.Fragment, null, /* @__PURE__ */ react.createElement("path", { d: "M236.24,107.76l-80-80A6,6,0,0,0,146,32V74.2c-54.48,3.59-120.39,55-127.93,120.66a10,10,0,0,0,17.23,8h0C46.56,190.85,87,152.6,146,150.13V192a6,6,0,0,0,10.24,4.24l80-80A6,6,0,0,0,236.24,107.76ZM158,177.52V144a6,6,0,0,0-6-6c-27.73,0-54.76,7.25-80.32,21.55a193.38,193.38,0,0,0-40.81,30.65c4.7-26.56,20.16-52,44-72.27C98.47,97.94,127.29,86,152,86a6,6,0,0,0,6-6V46.49L223.51,112Z" }))
+  ],
+  [
+    "regular",
+    /* @__PURE__ */ react.createElement(react.Fragment, null, /* @__PURE__ */ react.createElement("path", { d: "M237.66,106.35l-80-80A8,8,0,0,0,144,32V72.35c-25.94,2.22-54.59,14.92-78.16,34.91-28.38,24.08-46.05,55.11-49.76,87.37a12,12,0,0,0,20.68,9.58h0c11-11.71,50.14-48.74,107.24-52V192a8,8,0,0,0,13.66,5.65l80-80A8,8,0,0,0,237.66,106.35ZM160,172.69V144a8,8,0,0,0-8-8c-28.08,0-55.43,7.33-81.29,21.8a196.17,196.17,0,0,0-36.57,26.52c5.8-23.84,20.42-46.51,42.05-64.86C99.41,99.77,127.75,88,152,88a8,8,0,0,0,8-8V51.32L220.69,112Z" }))
+  ],
+  [
+    "thin",
+    /* @__PURE__ */ react.createElement(react.Fragment, null, /* @__PURE__ */ react.createElement("path", { d: "M234.83,109.17l-80-80A4,4,0,0,0,148,32V76.09c-54,2.44-120.43,53.55-127.94,119a7.87,7.87,0,0,0,4.58,8.16,8,8,0,0,0,3.41.77,7.9,7.9,0,0,0,5.79-2.55h0c11.53-12.27,53.29-51.73,114.16-53.4V192a4,4,0,0,0,6.83,2.83l80-80A4,4,0,0,0,234.83,109.17ZM156,182.33V144a4,4,0,0,0-4-4c-27.39,0-54.08,7.17-79.34,21.3A189.91,189.91,0,0,0,28,196l2.92,2.74L28,196c3.36-29.21,19.55-57.48,45.6-79.57C97.53,96.11,126.83,84,152,84a4,4,0,0,0,4-4V41.66L226.34,112Z" }))
+  ]
+]);
+
+
+;// ./node_modules/@phosphor-icons/react/dist/csr/ShareFat.es.js
+
+
+
+const e = react.forwardRef((o, r) => /* @__PURE__ */ react.createElement(p, { ref: r, ...o, weights: a }));
+e.displayName = "ShareFatIcon";
+const n = e;
+
+
+;// ./node_modules/lucide-react/dist/esm/shared/src/utils/mergeClasses.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+const mergeClasses = (...classes) => classes.filter((className, index, array) => {
+  return Boolean(className) && className.trim() !== "" && array.indexOf(className) === index;
+}).join(" ").trim();
+
+
+//# sourceMappingURL=mergeClasses.js.map
+
+;// ./node_modules/lucide-react/dist/esm/shared/src/utils/toKebabCase.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+const toKebabCase = (string) => string.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+
+
+//# sourceMappingURL=toKebabCase.js.map
+
+;// ./node_modules/lucide-react/dist/esm/shared/src/utils/toCamelCase.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+const toCamelCase = (string) => string.replace(
+  /^([A-Z])|[\s-_]+(\w)/g,
+  (match, p1, p2) => p2 ? p2.toUpperCase() : p1.toLowerCase()
+);
+
+
+//# sourceMappingURL=toCamelCase.js.map
+
+;// ./node_modules/lucide-react/dist/esm/shared/src/utils/toPascalCase.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const toPascalCase = (string) => {
+  const camelCase = toCamelCase(string);
+  return camelCase.charAt(0).toUpperCase() + camelCase.slice(1);
+};
+
+
+//# sourceMappingURL=toPascalCase.js.map
+
+;// ./node_modules/lucide-react/dist/esm/defaultAttributes.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+var defaultAttributes = {
+  xmlns: "http://www.w3.org/2000/svg",
+  width: 24,
+  height: 24,
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 2,
+  strokeLinecap: "round",
+  strokeLinejoin: "round"
+};
+
+
+//# sourceMappingURL=defaultAttributes.js.map
+
+;// ./node_modules/lucide-react/dist/esm/shared/src/utils/hasA11yProp.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+const hasA11yProp = (props) => {
+  for (const prop in props) {
+    if (prop.startsWith("aria-") || prop === "role" || prop === "title") {
+      return true;
+    }
+  }
+  return false;
+};
+
+
+//# sourceMappingURL=hasA11yProp.js.map
+
+;// ./node_modules/lucide-react/dist/esm/Icon.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+
+
+
+const Icon = (0,react.forwardRef)(
+  ({
+    color = "currentColor",
+    size = 24,
+    strokeWidth = 2,
+    absoluteStrokeWidth,
+    className = "",
+    children,
+    iconNode,
+    ...rest
+  }, ref) => (0,react.createElement)(
+    "svg",
+    {
+      ref,
+      ...defaultAttributes,
+      width: size,
+      height: size,
+      stroke: color,
+      strokeWidth: absoluteStrokeWidth ? Number(strokeWidth) * 24 / Number(size) : strokeWidth,
+      className: mergeClasses("lucide", className),
+      ...!children && !hasA11yProp(rest) && { "aria-hidden": "true" },
+      ...rest
+    },
+    [
+      ...iconNode.map(([tag, attrs]) => (0,react.createElement)(tag, attrs)),
+      ...Array.isArray(children) ? children : [children]
+    ]
+  )
+);
+
+
+//# sourceMappingURL=Icon.js.map
+
+;// ./node_modules/lucide-react/dist/esm/createLucideIcon.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+
+
+
+
+const createLucideIcon = (iconName, iconNode) => {
+  const Component = (0,react.forwardRef)(
+    ({ className, ...props }, ref) => (0,react.createElement)(Icon, {
+      ref,
+      iconNode,
+      className: mergeClasses(
+        `lucide-${toKebabCase(toPascalCase(iconName))}`,
+        `lucide-${iconName}`,
+        className
+      ),
+      ...props
+    })
+  );
+  Component.displayName = toPascalCase(iconName);
+  return Component;
+};
+
+
+//# sourceMappingURL=createLucideIcon.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/house.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const __iconNode = [
+  ["path", { d: "M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8", key: "5wwlr5" }],
+  [
+    "path",
+    {
+      d: "M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
+      key: "r6nss1"
+    }
+  ]
+];
+const House = createLucideIcon("house", __iconNode);
+
+
+//# sourceMappingURL=house.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/map-pin.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const map_pin_iconNode = [
+  [
+    "path",
+    {
+      d: "M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0",
+      key: "1r0f0z"
+    }
+  ],
+  ["circle", { cx: "12", cy: "10", r: "3", key: "ilqhr7" }]
+];
+const MapPin = createLucideIcon("map-pin", map_pin_iconNode);
+
+
+//# sourceMappingURL=map-pin.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/plus.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const plus_iconNode = [
+  ["path", { d: "M5 12h14", key: "1ays0h" }],
+  ["path", { d: "M12 5v14", key: "s699le" }]
+];
+const Plus = createLucideIcon("plus", plus_iconNode);
+
+
+//# sourceMappingURL=plus.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/bell.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const bell_iconNode = [
+  ["path", { d: "M10.268 21a2 2 0 0 0 3.464 0", key: "vwvbt9" }],
+  [
+    "path",
+    {
+      d: "M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326",
+      key: "11g9vi"
+    }
+  ]
+];
+const Bell = createLucideIcon("bell", bell_iconNode);
+
+
+//# sourceMappingURL=bell.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/user-round.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const user_round_iconNode = [
+  ["circle", { cx: "12", cy: "8", r: "5", key: "1hypcn" }],
+  ["path", { d: "M20 21a8 8 0 0 0-16 0", key: "rfgkzh" }]
+];
+const UserRound = createLucideIcon("user-round", user_round_iconNode);
+
+
+//# sourceMappingURL=user-round.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/heart.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const heart_iconNode = [
+  [
+    "path",
+    {
+      d: "M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5",
+      key: "mvr1a0"
+    }
+  ]
+];
+const Heart = createLucideIcon("heart", heart_iconNode);
+
+
+//# sourceMappingURL=heart.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/at-sign.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const at_sign_iconNode = [
+  ["circle", { cx: "12", cy: "12", r: "4", key: "4exip2" }],
+  ["path", { d: "M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8", key: "7n84p3" }]
+];
+const AtSign = createLucideIcon("at-sign", at_sign_iconNode);
+
+
+//# sourceMappingURL=at-sign.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/smile.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const smile_iconNode = [
+  ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
+  ["path", { d: "M8 14s1.5 2 4 2 4-2 4-2", key: "1y1vjs" }],
+  ["line", { x1: "9", x2: "9.01", y1: "9", y2: "9", key: "yxxnd0" }],
+  ["line", { x1: "15", x2: "15.01", y1: "9", y2: "9", key: "1p4y9e" }]
+];
+const Smile = createLucideIcon("smile", smile_iconNode);
+
+
+//# sourceMappingURL=smile.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/loader-circle.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const loader_circle_iconNode = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
+const LoaderCircle = createLucideIcon("loader-circle", loader_circle_iconNode);
+
+
+//# sourceMappingURL=loader-circle.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/trash-2.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const trash_2_iconNode = [
+  ["path", { d: "M10 11v6", key: "nco0om" }],
+  ["path", { d: "M14 11v6", key: "outv1u" }],
+  ["path", { d: "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", key: "miytrc" }],
+  ["path", { d: "M3 6h18", key: "d0wm0j" }],
+  ["path", { d: "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2", key: "e791ji" }]
+];
+const Trash2 = createLucideIcon("trash-2", trash_2_iconNode);
+
+
+//# sourceMappingURL=trash-2.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/chevron-left.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const chevron_left_iconNode = [["path", { d: "m15 18-6-6 6-6", key: "1wnfg3" }]];
+const ChevronLeft = createLucideIcon("chevron-left", chevron_left_iconNode);
+
+
+//# sourceMappingURL=chevron-left.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/rotate-cw.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const rotate_cw_iconNode = [
+  ["path", { d: "M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8", key: "1p45f6" }],
+  ["path", { d: "M21 3v5h-5", key: "1q7to0" }]
+];
+const RotateCw = createLucideIcon("rotate-cw", rotate_cw_iconNode);
+
+
+//# sourceMappingURL=rotate-cw.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/ellipsis.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const ellipsis_iconNode = [
+  ["circle", { cx: "12", cy: "12", r: "1", key: "41hilf" }],
+  ["circle", { cx: "19", cy: "12", r: "1", key: "1wjl8i" }],
+  ["circle", { cx: "5", cy: "12", r: "1", key: "1pcz8c" }]
+];
+const Ellipsis = createLucideIcon("ellipsis", ellipsis_iconNode);
+
+
+//# sourceMappingURL=ellipsis.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/sparkles.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const sparkles_iconNode = [
+  [
+    "path",
+    {
+      d: "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z",
+      key: "1s2grr"
+    }
+  ],
+  ["path", { d: "M20 2v4", key: "1rf3ol" }],
+  ["path", { d: "M22 4h-4", key: "gwowj6" }],
+  ["circle", { cx: "4", cy: "20", r: "2", key: "6kqj1y" }]
+];
+const Sparkles = createLucideIcon("sparkles", sparkles_iconNode);
+
+
+//# sourceMappingURL=sparkles.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/send.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const send_iconNode = [
+  [
+    "path",
+    {
+      d: "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z",
+      key: "1ffxy3"
+    }
+  ],
+  ["path", { d: "m21.854 2.147-10.94 10.939", key: "12cjpa" }]
+];
+const Send = createLucideIcon("send", send_iconNode);
+
+
+//# sourceMappingURL=send.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/search.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const search_iconNode = [
+  ["path", { d: "m21 21-4.34-4.34", key: "14j7rj" }],
+  ["circle", { cx: "11", cy: "11", r: "8", key: "4ej97u" }]
+];
+const Search = createLucideIcon("search", search_iconNode);
+
+
+//# sourceMappingURL=search.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/bookmark.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const bookmark_iconNode = [
+  [
+    "path",
+    {
+      d: "M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z",
+      key: "oz39mx"
+    }
+  ]
+];
+const Bookmark = createLucideIcon("bookmark", bookmark_iconNode);
+
+
+//# sourceMappingURL=bookmark.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/message-circle.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const message_circle_iconNode = [
+  [
+    "path",
+    {
+      d: "M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719",
+      key: "1sd12s"
+    }
+  ]
+];
+const MessageCircle = createLucideIcon("message-circle", message_circle_iconNode);
+
+
+//# sourceMappingURL=message-circle.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/chevron-down.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const chevron_down_iconNode = [["path", { d: "m6 9 6 6 6-6", key: "qrunsl" }]];
+const ChevronDown = createLucideIcon("chevron-down", chevron_down_iconNode);
+
+
+//# sourceMappingURL=chevron-down.js.map
+
+;// ./node_modules/lucide-react/dist/esm/icons/image-plus.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const image_plus_iconNode = [
+  ["path", { d: "M16 5h6", key: "1vod17" }],
+  ["path", { d: "M19 2v6", key: "4bpg5p" }],
+  ["path", { d: "M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5", key: "1ue2ih" }],
+  ["path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21", key: "1xmnt7" }],
+  ["circle", { cx: "9", cy: "9", r: "2", key: "af1f0g" }]
+];
+const ImagePlus = createLucideIcon("image-plus", image_plus_iconNode);
+
+
+//# sourceMappingURL=image-plus.js.map
+
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/adapters/memory.ts
+var memory = __webpack_require__(299);
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/adapters/settings.ts
+var settings = __webpack_require__(861);
+;// ./custom-apps/anonymous-xiaohongshu/src/fork/components/ui/form.tsx
+"use client";
+
+function Input({ className, ...rest }) {
+    return _jsx("input", { className: `ui-input ${className ?? ""}`, ...rest });
+}
+function Textarea({ className, ...rest }) {
+    return _jsx("textarea", { className: `ui-textarea ${className ?? ""}`, ...rest });
+}
+function Select({ className, children, ...rest }) {
+    return (_jsx("select", { className: `ui-select ${className ?? ""}`, ...rest, children: children }));
+}
+/* ── Toggle ── */
+function Toggle({ checked, onChange, className, disabled, }) {
+    return ((0,jsx_runtime.jsx)("button", { type: "button", role: "switch", "aria-checked": checked, className: `ui-toggle ${className ?? ""}`, "data-ui": "toggle", "data-checked": checked ? "" : undefined, disabled: disabled, onClick: () => onChange(!checked), children: (0,jsx_runtime.jsx)("span", { className: "ui-toggle-knob" }) }));
+}
+/* ── Slider (param row with label + value display) ── */
+function Slider({ label, value, displayValue, hint, className, ...rest }) {
+    return (_jsxs("div", { className: `ui-slider-row ${className ?? ""}`, children: [_jsx("span", { className: "ui-slider-label", children: label }), _jsx("input", { type: "range", className: "ui-slider", "data-ui": "slider", value: value, ...rest }), displayValue !== undefined && _jsx("span", { className: "ui-slider-value", children: displayValue }), hint && _jsx("span", { className: "ui-slider-hint", children: hint })] }));
+}
+/* ── Avatar Upload ── */
+function AvatarUpload({ src, onClick, className, }) {
+    return (_jsxs("button", { type: "button", className: `ui-avatar-upload ${className ?? ""}`, onClick: onClick, children: [src ? (_jsx("img", { src: src, alt: "avatar", style: { width: "100%", height: "100%", objectFit: "cover", borderRadius: "inherit" } })) : (_jsx("span", { className: "ui-avatar-upload-placeholder", children: "+" })), _jsx("span", { className: "ui-avatar-upload-overlay", children: "\u66F4\u6362" })] }));
+}
+/* ── Color Input ── */
+function ColorInput({ value, onChange, label, className, }) {
+    return (_jsxs("label", { className: `ui-color-input ${className ?? ""}`, children: [_jsx("input", { type: "color", value: value, onChange: (e) => onChange(e.target.value) }), label && _jsx("span", { children: label })] }));
+}
+
+;// ./custom-apps/anonymous-xiaohongshu/src/fork/lib/bilingual-text.ts
+function containsChinese(text) {
+    return /[\u3400-\u9fff]/.test(text);
+}
+function normalizeBilingualTextInput(text) {
+    return text.replace(/\\r\\n|\\n|\\r/g, "\n");
+}
+function splitSegmentedBilingualLine(line) {
+    const parts = line.split("|").map(part => part.trim());
+    if (parts.length < 2 || parts.some(part => !part))
+        return null;
+    if (parts.length === 3) {
+        const [originalLabel, mixedLabelAndOriginal, translatedValue] = parts;
+        const colonIndex = mixedLabelAndOriginal.search(/[:：]/);
+        if (colonIndex > 0 && containsChinese(translatedValue) && !containsChinese(originalLabel)) {
+            const translatedLabel = mixedLabelAndOriginal.slice(0, colonIndex + 1).trim();
+            const originalValue = mixedLabelAndOriginal.slice(colonIndex + 1).trim();
+            if (translatedLabel && originalValue && containsChinese(translatedLabel)) {
+                return {
+                    original: `${originalLabel}: ${originalValue}`,
+                    translated: `${translatedLabel} ${translatedValue}`,
+                };
+            }
+        }
+    }
+    if (parts.length % 2 !== 0)
+        return null;
+    const originalParts = [];
+    const translatedParts = [];
+    let hasNonChineseOriginal = false;
+    for (let index = 0; index < parts.length; index += 2) {
+        const original = parts[index];
+        const translated = parts[index + 1];
+        if (!translated || !containsChinese(translated))
+            return null;
+        if (!containsChinese(original))
+            hasNonChineseOriginal = true;
+        originalParts.push(original);
+        translatedParts.push(translated);
+    }
+    if (!hasNonChineseOriginal)
+        return null;
+    return {
+        original: originalParts.join(" | "),
+        translated: translatedParts.join(" | "),
+    };
+}
+function splitBilingualText(text) {
+    const trimmed = normalizeBilingualTextInput(text).trim();
+    if (!trimmed || trimmed.includes("```") || /<script\b|<style\b/i.test(trimmed))
+        return null;
+    const firstPipe = trimmed.indexOf("|");
+    if (firstPipe <= 0)
+        return null;
+    if (firstPipe === trimmed.lastIndexOf("|")) {
+        const original = trimmed.slice(0, firstPipe).trim();
+        const translated = trimmed.slice(firstPipe + 1).trim();
+        if (!original || !translated)
+            return null;
+        if (!containsChinese(translated))
+            return null;
+        return { original, translated };
+    }
+    if (trimmed.includes("\n")) {
+        const originalLines = [];
+        const translatedLines = [];
+        let bilingualLineCount = 0;
+        for (const rawLine of trimmed.split("\n")) {
+            const line = rawLine.trim();
+            if (!line) {
+                originalLines.push("");
+                translatedLines.push("");
+                continue;
+            }
+            const linePipe = line.indexOf("|");
+            if (linePipe > 0 && linePipe === line.lastIndexOf("|")) {
+                const lineOriginal = line.slice(0, linePipe).trim();
+                const lineTranslated = line.slice(linePipe + 1).trim();
+                if (!lineOriginal || !lineTranslated || !containsChinese(lineTranslated))
+                    return null;
+                originalLines.push(lineOriginal);
+                translatedLines.push(lineTranslated);
+                bilingualLineCount += 1;
+                continue;
+            }
+            if (line.includes("|")) {
+                const segmented = splitSegmentedBilingualLine(line);
+                if (!segmented)
+                    return null;
+                originalLines.push(segmented.original);
+                translatedLines.push(segmented.translated);
+                bilingualLineCount += 1;
+                continue;
+            }
+            originalLines.push(line);
+            translatedLines.push(line);
+        }
+        if (bilingualLineCount === 0)
+            return null;
+        const original = originalLines.join("\n").trim();
+        const translated = translatedLines.join("\n").trim();
+        if (!original || !translated || !containsChinese(translated))
+            return null;
+        return { original, translated };
+    }
+    const segmented = splitSegmentedBilingualLine(trimmed);
+    if (segmented)
+        return segmented;
+    return null;
+}
+
+;// ./custom-apps/anonymous-xiaohongshu/src/fork/components/checkphone/checkphone-bilingual-text.tsx
+"use client";
+
+
+
+
+function normalizeCheckPhoneText(value) {
+    return normalizeBilingualTextInput(value);
+}
+function CheckPhoneBilingualText({ text, className = "", tone = "default", variant = "block", collapseBilingualTranslation: collapseBilingualTranslationOverride, }) {
+    const normalized = normalizeCheckPhoneText(text);
+    const bilingual = splitBilingualText(normalized);
+    const [settingsCollapseBilingualTranslation, setSettingsCollapseBilingualTranslation] = (0,react.useState)(true);
+    const [expanded, setExpanded] = (0,react.useState)(false);
+    const collapseBilingualTranslation = collapseBilingualTranslationOverride ?? settingsCollapseBilingualTranslation;
+    (0,react.useEffect)(() => {
+        if (collapseBilingualTranslationOverride !== undefined)
+            return;
+        const sync = (settings) => {
+            setSettingsCollapseBilingualTranslation(settings.collapseBilingualTranslation);
+        };
+        sync((0,settings/* loadCheckPhoneSettings */.g5)());
+        const handleSettingsChange = (event) => {
+            sync(event.detail);
+        };
+        window.addEventListener(settings/* CHECKPHONE_SETTINGS_CHANGED_EVENT */.JF, handleSettingsChange);
+        return () => window.removeEventListener(settings/* CHECKPHONE_SETTINGS_CHANGED_EVENT */.JF, handleSettingsChange);
+    }, [collapseBilingualTranslationOverride]);
+    (0,react.useEffect)(() => {
+        setExpanded(!collapseBilingualTranslation);
+    }, [normalized, collapseBilingualTranslation]);
+    if (!bilingual) {
+        return (0,jsx_runtime.jsx)("span", { className: className, children: normalized });
+    }
+    function toggle(event) {
+        event.stopPropagation();
+        setExpanded((current) => !current);
+    }
+    function handleKeyDown(event) {
+        if (event.key !== "Enter" && event.key !== " ")
+            return;
+        event.preventDefault();
+        toggle(event);
+    }
+    return ((0,jsx_runtime.jsxs)("span", { className: `cp-bilingual cp-bilingual--${tone} cp-bilingual--${variant} ${className}`.trim(), children: [(0,jsx_runtime.jsx)("span", { className: "cp-bilingual-original", children: bilingual.original }), (0,jsx_runtime.jsx)("span", { className: "cp-bilingual-toggle", role: "button", tabIndex: 0, onClick: toggle, onKeyDown: handleKeyDown, "aria-expanded": expanded, children: expanded ? "收起中文" : "中文" }), expanded && variant === "inline" ? ((0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("span", { className: "cp-bilingual-inline-separator", "aria-hidden": "true", children: " " }), (0,jsx_runtime.jsx)("span", { className: "cp-bilingual-translation", children: bilingual.translated })] })) : null, expanded && variant === "block" ? ((0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("span", { className: "cp-bilingual-divider", "aria-hidden": "true" }), (0,jsx_runtime.jsx)("span", { className: "cp-bilingual-translation", children: bilingual.translated })] })) : null] }));
+}
+
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/fork/lib/bilingual-prompt-defaults.ts
+var bilingual_prompt_defaults = __webpack_require__(29);
+;// ./custom-apps/anonymous-xiaohongshu/src/fork/lib/xiaohongshu-prompts.ts
+// CUSTOM-APP-ADAPTER: exact Xiaohongshu protocol blocks from pinned builtin-preset.ts.
+const NATIVE_CHARACTER_PROMPTS = {
+    "activity": "<xiaohongshu_character_activity_instruction>\n你正在以{{char}}的身份浏览小红书，并根据当前看到的公共内容进行自然互动。\n以下是小红书候选笔记、已有评论和点赞/收藏数量：\n{{xiaohongshuFeedContext}}\n\n内容要求：\n- 以碎片化、去精致化的日常分享为主，使用口语、网络黑话、表情等加强日常不经意感，*不煽情、不装逼。*\n- 可采用日常经历吐槽、疑问、分享技巧与心得等多种形式，标题和内容都应该口语化（除非是正式的技巧和心得的分享）。\n- 角色与评论区的互动，禁止世界以{{char}}为中心夸夸和吹捧，评论区可体现出不一样的观点，NPC不脸谱化，多种性格同时存在（比如尖锐的、温和的、挑事的、看戏的、蹲后续等等）\n- *绝对禁止在小红书讲大道理、爹味说教*，*绝对禁止强行把日常生活上升高度*，小红书必须是轻松、幽默、张力十足的，绝对禁止分享一些假大空道理，帖子与评论必须落于实际。\n- *绝对禁止评论的时候引用帖子/评论原文”，例如“XXXXX”这句太真实了——这种格式绝对禁止\n- 必须和{{char}}的性格相符，结合{{char}}的记忆和经历内容进行适度延展，从日常事件中提取主题，如有日程可联系日程。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 从候选笔记中选择 3 条进行评论；如果确实没有适合评论的内容，可以少于 3 条\n- 每条评论必须使用候选中的 [笔记ID]\n- 同时输出 1 条{{char}}自己发布的小红书内容；每次由{{char}}自行选择普通笔记或视频笔记，只输出其中一种\n- {{char}}自己发布的内容需要输出点赞数、收藏数、评论数和前两个点赞/收藏昵称，并附带 3 到 8 条评论；评论主要来自小红书路人，但可以有 1~2 条由{{char}}自己作为笔记作者出现来回应路人\n- 如果选择普通笔记，[类型]填 笔记，可以输出[图片描述]；如果选择视频笔记，[类型]填 视频，必须输出[视频描述]\n- Xiaohongshu comments must come from strangers. In most cases, these users have no way to know {{char}}'s private life unless {{char}} is a public figure; do not use acquaintances from Moments, group chats, or private chats.\n- [评论数] 是该笔记显示的总评论数，可以远高于实际输出的评论条数；输出的评论只是评论区样例，不代表全部评论\n- 发帖下的评论可以包含楼中楼；如需楼中楼，使用 [评论N回复对象]评论M，其中 M 必须是前面已经出现过的评论编号\n- 当{{char}}本人作为发帖下的评论作者出现时，[评论N作者] 直接填 {{char}}，并用 [评论N回复对象] 指向你回应的路人评论编号\n- 点赞、收藏由{{char}}自己判断，填 是 或 否\n- 评论要符合{{char}}的人设、性格、记忆、最近状态和与{{user}}的关系；不要像客服或机器总结\n- 如果回复已有评论，可以在评论正文里自然接话，但这里不需要输出楼中楼关系\n\n在每条 #评论N 下面，可以可选地输出 3~6 条「延伸互动」，模拟这条评论下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 {{char}} 自己接话（[延伸M作者] 直接填 {{char}}）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 楼中楼关系用 [延伸M回复对象] 表示，值为：主评论 或 延伸K（K 是同一条 #评论N 下前面已经出现过的延伸编号）\n- 如果你判断该评论不适合延伸，可以完全省略该评论的延伸段\n\n输出格式：\n#评论1\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n[延伸1作者]路人昵称 或 {{char}}\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 {{char}}\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n\n#评论2\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n\n#评论3\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n\n#发帖1\n[类型]笔记或视频\n[标题]笔记标题\n[正文]笔记正文\n[图标]单个 emoji 或符号\n[点赞]数字\n[点赞用户1]路人昵称\n[点赞用户2]路人昵称\n[收藏]数字\n[收藏用户1]路人昵称\n[收藏用户2]路人昵称\n[评论数]数字\n[标签]标签1、标签2\n[图片描述]普通笔记可选的配图或封面描述\n[视频描述]视频笔记必填的视频画面描述\n[评论1作者]路人昵称\n[评论1内容]评论内容\n[评论2作者]路人昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n[评论3作者]{{char}}\n[评论3回复对象]评论1\n[评论3内容]{{char}}本人作为笔记作者回应评论1的内容\n</xiaohongshu_character_activity_instruction>",
+    "reaction": "<xiaohongshu_user_post_reaction_instruction>\n你正在以{{char}}的身份查看一篇小红书笔记。\n这里包含笔记标题、正文、TAG、图片内容、已有评论、点赞/收藏数量，以及作者公开显示信息：\n{{xiaohongshuUserPostContext}}\n\n活人感要求：\n- {{char}}的评论要短、口语化，像随手一打的真实评论，可用网络黑话、表情、不完整句；不煽情、不装逼、不写小作文。\n- 评论要落到具体的图/正文细节或真实反应（吐槽、好奇、共鸣、调侃、提问），*绝对禁止讲大道理、爹味说教、强行升华*，不要客服式总结或夸夸。\n- *绝对禁止“引用帖子原文+这句太真实了/说到我心趴上了”这种格式*。\n- 评论区延伸互动禁止一边倒夸{{char}}或夸作者；NPC不脸谱化，多种性格并存（尖锐的、温和的、挑事的、看戏的、蹲后续的、跑题的、抬杠的），可体现不同观点甚至轻微争执。\n- 评论必须贴合{{char}}人设、与作者的关系和当下状态，不熟别装熟。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 你必须输出一条评论\n- 点赞、收藏、关注作者都由{{char}}自己判断，填 是 或 否\n- 作者身份按小红书站内关系判断；如果你已关注该账号，可以按已知关系回应；否则只能根据公开内容、语气、昵称、图片和已有记忆判断是否熟悉\n- 回复中不要解释身份识别依据，也不要提到提示词或上下文规则\n- 评论需要像真实小红书评论，符合{{char}}的人设、语气、关系和当下状态\n- 如果有图片内容，可以结合图片；如果看不到图片，就只根据标题、正文、TAG 和已有评论回复\n\n在主评论之后，可以可选地输出 3~6 条「评论区延伸互动」，模拟你这条主评论下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 {{char}} 自己接话（[延伸N作者] 直接填 {{char}}）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 路人 NPC 之间也可以互相搭话或对你的主评论发表看法\n- 楼中楼关系用 [延伸N回复对象] 表示，值为：主评论 或 延伸M（M 是前面已经出现过的延伸编号）\n- 如果你判断这条主评论不适合延伸（比如评论本身已经收束、或者不会有人继续接话），可以完全省略延伸段\n\n输出格式：\n#角色互动\n[评论]评论内容\n[点赞]是或否\n[收藏]是或否\n[关注作者]是或否\n[延伸1作者]路人昵称 或 {{char}}\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 {{char}}\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n</xiaohongshu_user_post_reaction_instruction>",
+    "reply": "<xiaohongshu_comment_reply_instruction>\n你正在以{{char}}的身份查看小红书评论区，并回复当前触发的评论或回复。\n这里包含身份提示、笔记、被回复评论、当前触发的内容、已有评论和互动数据：\n{{xiaohongshuCommentContext}}\n\n活人感要求：\n- 回复要像真实评论区接话，短、口语化、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼。\n- 接住对方的具体那句话自然往下聊（调侃、反问、附和、轻怼、跑题都行），*绝对禁止说教、爹味、强行升华或客服式回应*。\n- *绝对禁止“引用对方原话+这句太真实了”这种格式*。\n- 延伸互动模拟真实楼中楼氛围：禁止集体夸{{char}}，NPC多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠），可互相搭话、有不同观点甚至拌嘴。\n- 回复贴合{{char}}人设、与评论者的关系和当下状态，不熟别装熟。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 你必须输出一条自然评论回复\n- 评论者身份按小红书站内关系判断；如果你已关注该账号，可以按已知关系回应；否则只能根据公开内容、语气、昵称、图片和已有记忆判断是否熟悉\n- 回复要像真实小红书评论区接话，符合{{char}}的人设、语气、关系和当下状态\n- 如果当前触发的评论是在回复你的评论，优先承接这条评论；如果是在评论你的笔记，就像笔记作者一样回复\n- 点赞和收藏由{{char}}自己判断，填 是 或 否\n\n在主回复之后，可以可选地输出 3~6 条「评论区延伸互动」，模拟你这条回复下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 {{char}} 自己接话（[延伸N作者] 直接填 {{char}}）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 路人 NPC 之间也可以互相搭话或对你的主回复发表看法\n- 楼中楼关系用 [延伸N回复对象] 表示，值为：主评论 或 延伸M（M 是前面已经出现过的延伸编号）\n- 如果你判断这条回复不适合延伸（比如内容已经收束、或者不会有人继续接话），可以完全省略延伸段\n\n输出格式：\n#角色回复\n[内容]回复内容\n[点赞]是或否\n[收藏]是或否\n[延伸1作者]路人昵称 或 {{char}}\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 {{char}}\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n</xiaohongshu_comment_reply_instruction>",
+    "mention": "<xiaohongshu_mention_reply_instruction>\n有人在小红书评论区 @ 了 {{char}}。\n这里包含身份提示、当前笔记、当前触发的 @ 评论、被回复对象和已有评论：\n{{xiaohongshuMentionContext}}\n\n活人感要求：\n- 回复要像真实评论区接话，短、口语化、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼。\n- 被@可能是来逗你、喊你来看热闹、点名要你表态，按具体语境接住对方那句话自然往下聊（调侃、反问、附和、轻怼、跑题都行），*绝对禁止说教、爹味、强行升华或客服式回应*。\n- *绝对禁止“引用对方原话+这句太真实了”这种格式*。\n- 延伸互动模拟真实楼中楼氛围：禁止集体夸{{char}}，NPC多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠），可互相搭话、有不同观点甚至拌嘴。\n- 回复贴合{{char}}人设、与@评论者的关系和当下状态，不熟别装熟。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 必须以 {{char}} 身份自然回复这条 @ 评论\n- 只生成回复评论内容，不要输出点赞、收藏或关注字段\n- @ 评论者身份按小红书站内关系判断；如果你已关注该账号，可以按已知关系回应；否则只能根据公开内容、语气、昵称、图片和已有记忆判断是否熟悉\n- 回复要像真实小红书评论区接话，符合{{char}}的人设、语气、关系和当下状态\n\n在主回复之后，可以可选地输出 3~6 条「评论区延伸互动」，模拟你这条 @ 回复下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 {{char}} 自己接话（[延伸N作者] 直接填 {{char}}）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 路人 NPC 之间也可以互相搭话或对你的主回复发表看法\n- 楼中楼关系用 [延伸N回复对象] 表示，值为：主评论 或 延伸M（M 是前面已经出现过的延伸编号）\n- 如果你判断这条 @ 回复不适合延伸，可以完全省略延伸段\n\n输出格式：\n#角色回复\n[内容]回复内容\n[延伸1作者]路人昵称 或 {{char}}\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 {{char}}\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n</xiaohongshu_mention_reply_instruction>"
+};
+
+;// ./custom-apps/anonymous-xiaohongshu/src/identity/prompt-projection.ts
+// ANON-FORK: rewrite only identity semantics at the model boundary, not native block protocols.
+// User-editable native prompt templates are stored unchanged by the original settings panel.
+function projectPromptIdentity(text, triggerName) {
+    return text
+        .replace(/\{\{\s*user\s*\}\}/gi, triggerName)
+        .replaceAll('以下名字属于真实角色或用户', '以下名字属于已存在的独立 social_account')
+        .replaceAll("the user's nickname, Xiaohongshu ID, profile name, configured persona name", 'the named social account or its recorded display-name aliases')
+        .replaceAll('[用户昵称]', '[发言账号]')
+        .replaceAll('用户资料上下文：', '当前 social_account 的公开资料：')
+        .replaceAll('用户当前关注的小红书账号：', triggerName + ' 当前关注的小红书账号：')
+        .replaceAll('[用户IP属地]', '[公开IP属地]')
+        .replaceAll('[被@角色]', '[被@账号]');
+}
+
+;// ./custom-apps/anonymous-xiaohongshu/src/adapters/ai.ts
+
+
+
+
+
+class ai_ChatEngineError extends Error {
+}
+function ai_assemblePromptPayload(input) {
+    const kind = input.appTags.includes('activity') ? 'activity' : input.appTags.includes('mention') ? 'mention' : input.appTags.includes('comment') ? 'reply' : 'reaction';
+    const context = input.feedContext || input.userPostContext || input.commentContext || input.mentionContext || '';
+    const prompt = NATIVE_CHARACTER_PROMPTS[kind].split('\n').filter(line => !line.includes('否则只能根据公开内容') && !line.includes('与{{user}}的关系')).join('\n')
+        .replaceAll('{{char}}', input.character.name).replaceAll('{{user}}', (0,identity/* userAccount */.Ny)().displayName)
+        .replace(/\{\{xiaohongshu(?:Feed|UserPost|Comment|Mention)Context\}\}/g, context);
+    return [{ role: 'system', content: input.xiaohongshuBilingualInstruction }, { role: 'user', content: prompt }];
+}
+function ai_previewMessagesForApi(_api, _preset, messages) { return messages; }
+function formatChatTimestamp(timestamp) { return new Date(timestamp).toLocaleString('zh-CN', { hour12: false }); }
+async function sendLLMRequest(api, _preset, messages, _regexes, _meta, options) {
+    const owner = (0,adapters_characters/* ownerCharacter */.VJ)(api.id);
+    const route = owner || (0,adapters_characters/* routingCharacter */.eq)();
+    const current = (0,identity/* identity */.D_)();
+    const memoryScopes = owner ? Object.keys(current.accounts).slice(-100).map(sourceEntityId => ({ sourceNamespace: 'social_posts', sourceEntityId })) : [];
+    const knowledge = JSON.stringify(current.disclosures.filter(d => d.viewerCharacterId === owner?.id));
+    const project = (text) => (0,adapters_characters/* projectProfileText */.OE)(projectPromptIdentity(text, (0,identity/* userAccount */.Ny)().displayName), owner?.id);
+    const projected = messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? project(m.content) : m.content.map(p => p.type === 'text' ? { type: 'text', text: project(p.text) } : p) }));
+    const request = { ...(route ? { characterId: route.id } : {}), contextPolicy: { characterProfile: false, boundPreset: false, worldbook: false, regex: false, generationRules: !!owner, userProfile: false, coreMemory: 'deny', longTermMemory: owner && memoryScopes.length ? 'own_source' : 'deny', ...(memoryScopes.length ? { memorySources: memoryScopes } : {}) }, appContext: JSON.stringify({ platform: (0,identity/* publicContext */.pV)(owner?.id), ...(owner ? { selfPersona: (0,adapters_characters/* projectedPersona */.V6)(api.id) } : {}) }), messages: projected, maxTokens: 10000 };
+    const raw = await (0,tasks/* durableRaw */.g2)(request, undefined, knowledge);
+    if (knowledge !== JSON.stringify((0,identity/* identity */.D_)().disclosures.filter(d => d.viewerCharacterId === owner?.id)))
+        throw new ai_ChatEngineError('身份知识已更新，请重新生成。');
+    return raw;
+}
+
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/fork/lib/xiaohongshu-storage.ts
+var xiaohongshu_storage = __webpack_require__(575);
+// EXTERNAL MODULE: ./custom-apps/anonymous-xiaohongshu/src/fork/lib/xiaohongshu-types.ts
+var xiaohongshu_types = __webpack_require__(947);
+;// ./custom-apps/anonymous-xiaohongshu/src/fork/lib/xiaohongshu-character-profile.ts
+// ANON-FORK: Character is already a public account projection; never read the native phone snapshot.
+function resolveCharacterXiaohongshuDisplayName(character) { return character.name; }
+
+;// ./custom-apps/anonymous-xiaohongshu/src/fork/lib/xiaohongshu-engine.ts
+// CUSTOM-APP-ADAPTER: stable IDs/probability decisions when a durable action resumes.
+
+// ANON-FORK: append stable public account references in DM input, never owner metadata.
+
+
+
+
+
+
+
+
+
+
+function buildXiaohongshuBilingualInstruction(settings) {
+    const prompt = (0,bilingual_prompt_defaults/* resolveBilingualPrompt */.iB)(settings?.bilingualTranslationEnabled !== false, settings?.bilingualTranslationPrompt, bilingual_prompt_defaults/* DEFAULT_XIAOHONGSHU_BILINGUAL_PROMPT */.tQ);
+    if (!prompt)
+        return "";
+    return [
+        "<xiaohongshu_bilingual_text_instruction>",
+        prompt,
+        "</xiaohongshu_bilingual_text_instruction>",
+    ].join("\n");
+}
+function cleanReservedName(value) {
+    return String(value ?? "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 80);
+}
+function collectXiaohongshuReservedNames(context = {}) {
+    const names = [];
+    const add = (value) => {
+        const name = cleanReservedName(value);
+        if (name && !names.includes(name))
+            names.push(name);
+    };
+    (0,adapters_characters/* loadCharacters */.fR)().forEach((character) => {
+        add(character.name);
+        add(resolveCharacterXiaohongshuDisplayName(character));
+    });
+    add((0,settings/* resolveUserIdentity */.GH)()?.name);
+    add((0,settings/* resolveUserIdentity */.GH)(undefined, "xiaohongshu")?.name);
+    add(context.userName);
+    add(context.userXiaohongshuName);
+    context.extraReservedNames?.forEach(add);
+    return names;
+}
+function formatXiaohongshuReservedNames(context = {}) {
+    const names = collectXiaohongshuReservedNames(context);
+    return names.length > 0 ? names.map(name => `- ${name}`).join("\n") : "- 暂无";
+}
+function buildDefaultXiaohongshuNpcIdentityGuard(context = {}) {
+    return xiaohongshu_types/* DEFAULT_XIAOHONGSHU_NPC_IDENTITY_GUARD_PROMPT */.m6.replace(/\{\{\s*xiaohongshuReservedNames\s*\}\}/g, formatXiaohongshuReservedNames(context));
+}
+function expandXiaohongshuNpcMacros(text, context = {}) {
+    return text
+        .replace(/\{\{\s*xiaohongshuReservedNames\s*\}\}/g, formatXiaohongshuReservedNames(context))
+        .replace(/\{\{\s*xiaohongshuNpcIdentityGuard\s*\}\}/g, buildDefaultXiaohongshuNpcIdentityGuard(context));
+}
+function buildXiaohongshuNpcPrompt(settings, prompt, context = {}) {
+    const guardTemplate = (settings.npcIdentityGuardPrompt ?? "").trim() || xiaohongshu_types/* DEFAULT_XIAOHONGSHU_NPC_IDENTITY_GUARD_PROMPT */.m6;
+    const guard = expandXiaohongshuNpcMacros(guardTemplate, context).trim();
+    const body = expandXiaohongshuNpcMacros(prompt, context).trim();
+    return [guard, body].filter(Boolean).join("\n\n");
+}
+// 解析层剪枝：保留名单守卫只是提示词约束，模型不听话时仍会产出冒用
+// 用户名的"路人"评论（实报）。朋友圈引擎早有同类剪枝，这里对齐口径：
+// 命中用户名的生成评论整条丢弃，挂在它下面的楼中楼一并丢弃。
+function normalizeXiaohongshuAuthorName(value) {
+    return cleanReservedName(value).toLowerCase();
+}
+function buildXiaohongshuUserNameSet(extraNames = []) {
+    const names = [
+        (0,settings/* resolveUserIdentity */.GH)()?.name,
+        (0,settings/* resolveUserIdentity */.GH)(undefined, "xiaohongshu")?.name,
+        ...extraNames,
+    ].map(normalizeXiaohongshuAuthorName).filter(Boolean);
+    return new Set(names);
+}
+function isXiaohongshuUserAuthorName(authorName, userNames) {
+    const normalized = normalizeXiaohongshuAuthorName(authorName);
+    return normalized !== "" && userNames.has(normalized);
+}
+function getUserXiaohongshuNamesFromNote(note) {
+    const names = [
+        note.source === "user" ? note.authorName : "",
+        ...note.comments
+            .filter(comment => comment.authorType === "user")
+            .map(comment => comment.authorName),
+    ].map(cleanReservedName).filter(Boolean);
+    return Array.from(new Set(names));
+}
+function getUserXiaohongshuNamesFromNotes(notes) {
+    const names = notes.flatMap(note => getUserXiaohongshuNamesFromNote(note));
+    return Array.from(new Set(names));
+}
+class XiaohongshuGenerationError extends Error {
+    rawOutput;
+    parseError;
+    constructor(message, rawOutput = "", parseError) {
+        super(message);
+        this.name = "XiaohongshuGenerationError";
+        this.rawOutput = rawOutput;
+        this.parseError = parseError;
+    }
+}
+function parseWithDebug(raw, parser, fallbackMessage) {
+    try {
+        return parser(raw);
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : fallbackMessage;
+        throw new XiaohongshuGenerationError(fallbackMessage, raw, message);
+    }
+}
+function makeId(prefix) {
+    if (typeof crypto !== "undefined")
+        return `${prefix}_${(0,tasks/* actionUuid */.MH)()}`;
+    return `${prefix}_${(0,tasks/* actionNow */.$P)()}_${(0,tasks/* actionRandom */.eQ)().toString(36).slice(2, 8)}`;
+}
+function cleanText(value, maxLength) {
+    return String(value ?? "")
+        .replace(/\u0000/g, "")
+        .trim()
+        .slice(0, maxLength);
+}
+function cleanMultiline(value, maxLength) {
+    return cleanText(value, maxLength)
+        .replace(/\r\n?/g, "\n")
+        .replace(/\\n/g, "\n")
+        .replace(/\n{4,}/g, "\n\n\n");
+}
+function parseMetric(value) {
+    if (typeof value === "number")
+        return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+    const text = String(value ?? "")
+        .trim()
+        .replace(/[,，\s]/g, "");
+    if (!text)
+        return 0;
+    const tenThousandMatch = /^(-?\d+(?:\.\d+)?)[wW万](?:(\d+(?:\.\d+)?)(?:[kK千])?)?$/.exec(text);
+    if (tenThousandMatch) {
+        const main = Number(tenThousandMatch[1]);
+        const tail = tenThousandMatch[2] ? Number(tenThousandMatch[2]) : 0;
+        if (Number.isFinite(main) && Number.isFinite(tail)) {
+            return Math.max(0, Math.round(main * 10000 + tail * 1000));
+        }
+    }
+    const thousandMatch = /^(-?\d+(?:\.\d+)?)[kK千](?:(\d+(?:\.\d+)?)(?:百)?)?$/.exec(text);
+    if (thousandMatch) {
+        const main = Number(thousandMatch[1]);
+        const tail = thousandMatch[2] ? Number(thousandMatch[2]) : 0;
+        if (Number.isFinite(main) && Number.isFinite(tail)) {
+            return Math.max(0, Math.round(main * 1000 + tail * 100));
+        }
+    }
+    const numeric = Number(text.replace(/[^\d.-]/g, ""));
+    if (!Number.isFinite(numeric))
+        return 0;
+    if (/[wW万]/.test(text))
+        return Math.max(0, Math.round(numeric * 10000));
+    if (/[kK千]/.test(text))
+        return Math.max(0, Math.round(numeric * 1000));
+    return Math.max(0, Math.round(numeric));
+}
+function metricField(fields, names) {
+    if (!fields)
+        return undefined;
+    for (const name of names) {
+        if (fields[name] !== undefined)
+            return fields[name];
+    }
+    return undefined;
+}
+function parseMetricField(fields, names, fallback = 0) {
+    const value = metricField(fields, names);
+    return value === undefined || String(value).trim() === "" ? fallback : parseMetric(value);
+}
+function parseBoolean(value) {
+    const text = String(value ?? "").trim().toLowerCase();
+    return ["是", "yes", "true", "1", "y", "喜欢", "收藏"].includes(text);
+}
+function parseTags(value) {
+    return Array.from(new Set(String(value ?? "")
+        .split(/[,，、#\s]+/)
+        .map(tag => cleanText(tag, 18))
+        .filter(Boolean))).slice(0, 6);
+}
+function stripFences(text) {
+    return text
+        .replace(/^```(?:text|json|markdown)?\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+}
+function parseBlocks(text) {
+    const blocks = [];
+    let current = null;
+    const lines = stripFences(text).split(/\r?\n/);
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line)
+            continue;
+        const blockMatch = /^#\s*([^\d#\[]+?)(\d+)?\s*$/.exec(line);
+        if (blockMatch) {
+            if (current)
+                blocks.push(current);
+            current = {
+                title: blockMatch[1].trim(),
+                number: Number(blockMatch[2] || "1"),
+                fields: {},
+            };
+            continue;
+        }
+        if (!current) {
+            current = { title: "全局", number: 1, fields: {} };
+        }
+        const fieldMatch = /^\[([^\]]+)]\s*(.*)$/.exec(line);
+        if (fieldMatch) {
+            current.fields[fieldMatch[1].trim()] = fieldMatch[2].trim();
+        }
+    }
+    if (current)
+        blocks.push(current);
+    return blocks;
+}
+function parseBlockComments(fields, noteId, source = "npc") {
+    const numbers = Object.keys(fields)
+        .map(key => /^评论(\d+)作者$/.exec(key)?.[1])
+        .filter((value) => Boolean(value))
+        .map(Number)
+        .sort((a, b) => a - b);
+    const userNames = buildXiaohongshuUserNameSet();
+    const prunedNumbers = new Set();
+    const comments = [];
+    for (const number of numbers) {
+        const authorName = cleanText(fields[`评论${number}作者`], 60) || "小红书用户";
+        const replyTarget = cleanText(fields[`评论${number}回复对象`], 40);
+        const replyNumber = /^评论(\d+)$/.exec(replyTarget)?.[1];
+        if (isXiaohongshuUserAuthorName(authorName, userNames)) {
+            console.warn(`[Xiaohongshu] 剪掉冒用用户名的生成评论: "${authorName}"`);
+            prunedNumbers.add(number);
+            continue;
+        }
+        if (replyNumber && prunedNumbers.has(Number(replyNumber))) {
+            prunedNumbers.add(number);
+            continue;
+        }
+        const text = cleanMultiline(fields[`评论${number}内容`], 600);
+        if (!text)
+            continue;
+        comments.push((0,xiaohongshu_storage/* makeXiaohongshuComment */.nT)({
+            noteId,
+            authorType: source,
+            authorId: source === "npc" ? (0,xiaohongshu_storage/* makeXiaohongshuNpcId */.YS)(authorName) : source,
+            authorName,
+            text,
+            replyTo: replyNumber ? undefined : replyTarget || undefined,
+            replyToCommentId: replyNumber ? `${noteId}_comment_${replyNumber}` : undefined,
+            unread: source === "npc",
+        }));
+    }
+    return comments;
+}
+/**
+ * 解析 [延伸N作者/回复对象/内容] 字段族为角色侧 thread 数组。
+ * - 字段名兼容 "延伸N作者"/"延伸N回复对象"/"延伸N内容"
+ * - 没有任何延伸字段时返回空数组（apply 端据此回退到"只保留主评论"）
+ */
+function parseCharacterThreadFields(fields) {
+    const numbers = Object.keys(fields)
+        .map(key => /^延伸(\d+)作者$/.exec(key)?.[1])
+        .filter((value) => Boolean(value))
+        .map(Number)
+        .sort((a, b) => a - b);
+    return numbers.map((number) => {
+        const authorName = cleanText(fields[`延伸${number}作者`], 60);
+        const replyTo = cleanText(fields[`延伸${number}回复对象`], 60);
+        return {
+            number,
+            authorName,
+            text: cleanMultiline(fields[`延伸${number}内容`], 600),
+            replyTo: replyTo || undefined,
+        };
+    }).filter(item => item.text && item.authorName).slice(0, 8);
+}
+function isCharacterXiaohongshuAuthor(authorName, characterDisplayName, characterName) {
+    const normalized = authorName.trim();
+    if (!normalized)
+        return false;
+    return [characterDisplayName.trim(), characterName.trim()].filter(Boolean).includes(normalized);
+}
+/**
+ * 把角色侧 thread 评论按顺序追加到 note 上：
+ * - "主评论" 或缺省 → replyToCommentId = mainCommentId
+ * - "延伸N" → replyToCommentId 指向前面已生成的 thread comment
+ * - 作者名匹配 character.name 或小红书显示名 → authorType="character"，否则 "npc"
+ */
+function appendCharacterThreadToNote(args) {
+    const { note, characterDisplayName, characterName, characterId, thread, mainCommentId, shouldNotifyUser } = args;
+    const appended = [];
+    const numberToId = new Map();
+    const userNames = buildXiaohongshuUserNameSet(getUserXiaohongshuNamesFromNote(note));
+    const prunedNumbers = new Set();
+    thread.forEach((item) => {
+        const isCharacter = isCharacterXiaohongshuAuthor(item.authorName, characterDisplayName, characterName);
+        const replyTarget = (item.replyTo || "").trim();
+        const referenceMatch = /^延伸(\d+)$/.exec(replyTarget);
+        if (!isCharacter && isXiaohongshuUserAuthorName(item.authorName, userNames)) {
+            console.warn(`[Xiaohongshu] 剪掉冒用用户名的楼中楼评论: "${item.authorName}"`);
+            prunedNumbers.add(item.number);
+            return;
+        }
+        if (referenceMatch && prunedNumbers.has(Number(referenceMatch[1]))) {
+            prunedNumbers.add(item.number);
+            return;
+        }
+        const isMainReply = !replyTarget || /^主评论$/.test(replyTarget);
+        const replyToCommentId = isMainReply
+            ? mainCommentId
+            : referenceMatch
+                ? numberToId.get(Number(referenceMatch[1])) || mainCommentId
+                : mainCommentId;
+        const comment = (0,xiaohongshu_storage/* makeXiaohongshuComment */.nT)({
+            noteId: note.id,
+            authorType: isCharacter ? "character" : "npc",
+            authorId: isCharacter ? characterId : (0,xiaohongshu_storage/* makeXiaohongshuNpcId */.YS)(item.authorName),
+            authorName: isCharacter ? characterDisplayName : item.authorName,
+            text: item.text,
+            replyToCommentId,
+            unread: shouldNotifyUser,
+        });
+        appended.push(comment);
+        numberToId.set(item.number, comment.id);
+    });
+    const notifications = shouldNotifyUser
+        ? appended
+            .filter(comment => comment.authorType === "npc")
+            .map(comment => (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "comment",
+            noteId: note.id,
+            actorName: comment.authorName,
+            text: comment.text,
+            thumbnailText: note.title,
+            unread: true,
+        }))
+        : [];
+    return {
+        note: {
+            ...note,
+            comments: [...note.comments, ...appended],
+            commentCount: note.commentCount + appended.length,
+            updatedAt: appended.length > 0 ? new Date().toISOString() : note.updatedAt,
+        },
+        appended,
+        notifications,
+    };
+}
+function parseNoteBlock(block, type, index, source = "npc", authorId = "npc", feedScope = "discover") {
+    const noteId = makeId(type === "video" ? "xhs_video" : "xhs_note");
+    const body = cleanMultiline(block.fields["正文"] ?? block.fields["内容"], 3000);
+    const title = cleanText(block.fields["标题"], 80) || body.slice(0, 24);
+    if (!title && !body)
+        return null;
+    const comments = parseBlockComments(block.fields, noteId, source);
+    const authorName = cleanText(block.fields["作者"] ?? block.fields["落款"], 60) || "小红书用户";
+    return {
+        id: noteId,
+        type,
+        feedScope,
+        source,
+        authorId: source === "npc" && authorId === "npc" ? (0,xiaohongshu_storage/* makeXiaohongshuNpcId */.YS)(authorName) : authorId,
+        authorName,
+        title: title || "未命名笔记",
+        body,
+        videoDescription: cleanMultiline(block.fields["视频描述"] ?? block.fields["画面描述"], 500) || undefined,
+        coverIcon: cleanText(block.fields["图标"], 8) || (type === "video" ? "▶" : "✦"),
+        tone: index % 4 === 1 ? "mist" : index % 4 === 2 ? "blush" : index % 4 === 3 ? "graphite" : "ivory",
+        tags: parseTags(block.fields["标签"] ?? block.fields["TAG"]),
+        likeCount: parseMetricField(block.fields, ["点赞", "点赞数", "赞"]),
+        saveCount: parseMetricField(block.fields, ["收藏", "收藏数"]),
+        commentCount: parseMetricField(block.fields, ["评论数", "评论量", "评论"], comments.length),
+        liked: parseBoolean(block.fields["已赞"]),
+        saved: parseBoolean(block.fields["已收藏"]),
+        recentLikeNames: [block.fields["点赞用户1"], block.fields["点赞用户2"]].map(name => cleanText(name, 24)).filter(Boolean),
+        recentSaveNames: [block.fields["收藏用户1"], block.fields["收藏用户2"]].map(name => cleanText(name, 24)).filter(Boolean),
+        comments: comments.map((comment, idx) => ({ ...comment, id: `${noteId}_comment_${idx + 1}` })),
+        imageDescription: cleanMultiline(block.fields["图片描述"] ?? block.fields["配图"], 500) || undefined,
+        createdAt: new Date((0,tasks/* actionNow */.$P)() - index * 1000 * 60 * 5).toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+}
+function parseXiaohongshuNpcFeed(raw) {
+    const blocks = parseBlocks(raw);
+    const nearbyNotes = blocks
+        .filter(block => /附近笔记|同城笔记|附近/.test(block.title) && !/视频/.test(block.title))
+        .slice(0, 4)
+        .map((block, index) => parseNoteBlock(block, "post", index + 12, "npc", "npc", "nearby"))
+        .filter((note) => Boolean(note));
+    const homeNotes = blocks
+        .filter(block => /首页笔记|图文笔记|笔记/.test(block.title) && !/视频|附近|同城/.test(block.title))
+        .slice(0, 6)
+        .map((block, index) => parseNoteBlock(block, "post", index, "npc"))
+        .filter((note) => Boolean(note));
+    const videoNotes = blocks
+        .filter(block => /视频/.test(block.title))
+        .slice(0, 6)
+        .map((block, index) => parseNoteBlock(block, "video", index + homeNotes.length, "npc"))
+        .filter((note) => Boolean(note));
+    return { homeNotes, videoNotes, nearbyNotes };
+}
+function parseXiaohongshuNpcReaction(raw, noteId) {
+    const blocks = parseBlocks(raw);
+    const interaction = blocks.find(block => /用户笔记互动|互动/.test(block.title)) ?? blocks[0];
+    const commentFields = blocks.reduce((acc, block) => ({ ...acc, ...block.fields }), {});
+    const comments = parseBlockComments(commentFields, noteId, "npc").map((comment) => ({
+        authorName: comment.authorName,
+        text: comment.text,
+        replyTo: comment.replyTo,
+        replyToCommentId: comment.replyToCommentId,
+    }));
+    const directMessages = blocks
+        .filter(block => /私信|消息/.test(block.title))
+        .map(block => ({
+        name: cleanText(block.fields["名称"] ?? block.fields["作者"], 60) || "小红书用户",
+        text: cleanMultiline(block.fields["正文"] ?? block.fields["内容"], 600),
+    }))
+        .filter(item => item.text)
+        .slice(0, 6);
+    const followerCount = parseMetric(metricField(interaction?.fields, ["新增关注", "关注", "粉丝"]));
+    const followerNames = Array.from(new Set([
+        interaction?.fields["关注用户1"],
+        interaction?.fields["关注用户2"],
+        interaction?.fields["关注用户3"],
+        ...Array.from({ length: Math.min(12, followerCount) }, (_, index) => interaction?.fields[`关注用户${index + 1}`]),
+    ].map(name => cleanText(name, 60)).filter(Boolean))).slice(0, Math.max(2, followerCount || 0));
+    return {
+        likeCount: parseMetric(metricField(interaction?.fields, ["点赞", "点赞数", "赞"])),
+        saveCount: parseMetric(metricField(interaction?.fields, ["收藏", "收藏数"])),
+        recentLikeNames: [interaction?.fields["点赞用户1"], interaction?.fields["点赞用户2"]].map(name => cleanText(name, 24)).filter(Boolean),
+        recentSaveNames: [interaction?.fields["收藏用户1"], interaction?.fields["收藏用户2"]].map(name => cleanText(name, 24)).filter(Boolean),
+        comments,
+        directMessages,
+        followerNames,
+    };
+}
+function parseXiaohongshuNpcCommentReply(raw, noteId, fallbackReplyToCommentId) {
+    const blocks = parseBlocks(raw);
+    const fields = blocks.reduce((acc, block) => ({ ...acc, ...block.fields }), {});
+    const numbers = Object.keys(fields)
+        .map(key => /^评论(\d+)作者$/.exec(key)?.[1])
+        .filter((value) => Boolean(value))
+        .map(Number)
+        .sort((a, b) => a - b);
+    const userNames = buildXiaohongshuUserNameSet();
+    const prunedNumbers = new Set();
+    const comments = [];
+    for (const number of numbers) {
+        if (comments.length >= 4)
+            break;
+        const authorName = cleanText(fields[`评论${number}作者`], 60) || "小红书用户";
+        const replyValue = cleanText(fields[`评论${number}回复评论ID`] ?? fields[`评论${number}回复对象`], 180);
+        const replyNumber = /^评论(\d+)$/.exec(replyValue)?.[1];
+        if (isXiaohongshuUserAuthorName(authorName, userNames)) {
+            console.warn(`[Xiaohongshu] 剪掉冒用用户名的生成评论: "${authorName}"`);
+            prunedNumbers.add(number);
+            continue;
+        }
+        if (replyNumber && prunedNumbers.has(Number(replyNumber))) {
+            prunedNumbers.add(number);
+            continue;
+        }
+        const isEmptyReply = !replyValue || /^(无|none|null|-)$/.test(replyValue.toLowerCase()) || /被回复|候选|评论id/i.test(replyValue);
+        const replyToCommentId = replyNumber
+            ? `${noteId}_comment_${replyNumber}`
+            : !isEmptyReply
+                ? replyValue
+                : fallbackReplyToCommentId;
+        const text = cleanMultiline(fields[`评论${number}内容`], 600);
+        if (!text)
+            continue;
+        comments.push({ authorName, text, replyToCommentId });
+    }
+    return { comments };
+}
+function parseXiaohongshuNpcMoreComments(raw) {
+    const blocks = parseBlocks(raw);
+    const fields = blocks.reduce((acc, block) => ({ ...acc, ...block.fields }), {});
+    const numbers = Object.keys(fields)
+        .map(key => /^评论(\d+)作者$/.exec(key)?.[1])
+        .filter((value) => Boolean(value))
+        .map(Number)
+        .sort((a, b) => a - b);
+    const userNames = buildXiaohongshuUserNameSet();
+    const prunedNumbers = new Set();
+    const comments = [];
+    for (const number of numbers) {
+        if (comments.length >= 8)
+            break;
+        const authorName = cleanText(fields[`评论${number}作者`], 60) || "小红书用户";
+        const replyId = cleanText(fields[`评论${number}回复评论ID`], 180);
+        const replyTarget = cleanText(fields[`评论${number}回复对象`], 80);
+        const replyNumber = /^评论(\d+)$/.exec(replyTarget)?.[1];
+        if (isXiaohongshuUserAuthorName(authorName, userNames)) {
+            console.warn(`[Xiaohongshu] 剪掉冒用用户名的生成评论: "${authorName}"`);
+            prunedNumbers.add(number);
+            continue;
+        }
+        if (replyNumber && prunedNumbers.has(Number(replyNumber))) {
+            prunedNumbers.add(number);
+            continue;
+        }
+        const isEmptyReplyId = !replyId || /^(无|none|null|-)$/.test(replyId.toLowerCase()) || /从上下文|真实评论id|被回复|候选|评论id/i.test(replyId);
+        const text = cleanMultiline(fields[`评论${number}内容`], 600);
+        if (!text)
+            continue;
+        comments.push({
+            authorName,
+            text,
+            replyTo: !replyNumber && replyTarget ? replyTarget : undefined,
+            replyToCommentId: !isEmptyReplyId
+                ? replyId
+                : replyNumber
+                    ? `__generated_comment_${replyNumber}`
+                    : undefined,
+        });
+    }
+    return { comments };
+}
+function parseXiaohongshuNpcDmReply(raw) {
+    const blocks = parseBlocks(raw).filter(block => /私信|回复|消息/.test(block.title));
+    const messages = blocks
+        .map(block => cleanMultiline(block.fields["正文"] ?? block.fields["内容"] ?? block.fields["回复"], 600))
+        .filter(Boolean)
+        .slice(0, 4);
+    if (messages.length > 0)
+        return { messages };
+    const fallback = cleanMultiline(raw.replace(/^#.*$/gm, "").replace(/^\[[^\]]+]\s*/gm, ""), 600);
+    return { messages: fallback ? [fallback] : [] };
+}
+function parseXiaohongshuCharacterActivity(raw, allowedNoteIds) {
+    const blocks = parseBlocks(raw);
+    const comments = blocks
+        .filter(block => /评论/.test(block.title))
+        .map(block => {
+        const thread = parseCharacterThreadFields(block.fields);
+        return {
+            noteId: cleanText(block.fields["笔记ID"] ?? block.fields["noteId"], 180),
+            text: cleanMultiline(block.fields["内容"] ?? block.fields["评论"], 600),
+            liked: parseBoolean(block.fields["点赞"]),
+            saved: parseBoolean(block.fields["收藏"]),
+            thread: thread.length > 0 ? thread : undefined,
+        };
+    })
+        .filter(item => item.noteId && item.text && allowedNoteIds.includes(item.noteId))
+        .slice(0, 3);
+    const postBlock = blocks.find(block => /发帖|笔记|视频/.test(block.title) && !/评论/.test(block.title));
+    const rawPostType = cleanText(postBlock?.fields["类型"] ?? postBlock?.fields["格式"] ?? postBlock?.title, 40).toLowerCase();
+    const postType = /视频|video/.test(rawPostType) ? "video" : "post";
+    const post = postBlock
+        ? {
+            type: postType,
+            title: cleanText(postBlock.fields["标题"], 80),
+            body: cleanMultiline(postBlock.fields["正文"] ?? postBlock.fields["内容"], 3000),
+            coverIcon: cleanText(postBlock.fields["图标"], 8) || (postType === "video" ? "▶" : "✦"),
+            tags: parseTags(postBlock.fields["标签"] ?? postBlock.fields["TAG"]),
+            likeCount: parseMetricField(postBlock.fields, ["点赞", "点赞数", "赞"]),
+            saveCount: parseMetricField(postBlock.fields, ["收藏", "收藏数"]),
+            commentCount: parseMetricField(postBlock.fields, ["评论数", "评论量", "评论"], parseBlockComments(postBlock.fields, "__character_post__", "npc").length),
+            recentLikeNames: [postBlock.fields["点赞用户1"], postBlock.fields["点赞用户2"]].map(name => cleanText(name, 24)).filter(Boolean),
+            recentSaveNames: [postBlock.fields["收藏用户1"], postBlock.fields["收藏用户2"]].map(name => cleanText(name, 24)).filter(Boolean),
+            imageDescription: postType === "post" ? cleanMultiline(postBlock.fields["图片描述"] ?? postBlock.fields["配图"], 500) || undefined : undefined,
+            videoDescription: postType === "video"
+                ? cleanMultiline(postBlock.fields["视频描述"] ?? postBlock.fields["视频画面"] ?? postBlock.fields["图片描述"] ?? postBlock.fields["配图"], 500) || undefined
+                : undefined,
+            comments: parseBlockComments(postBlock.fields, "__character_post__", "npc")
+                .map((comment) => ({
+                authorName: comment.authorName,
+                text: comment.text,
+                replyTo: comment.replyTo,
+                replyToCommentId: comment.replyToCommentId,
+            }))
+                .slice(0, 8),
+        }
+        : undefined;
+    return { comments, post: post && (post.title || post.body) ? post : undefined };
+}
+function parseXiaohongshuCharacterReaction(raw) {
+    const blocks = parseBlocks(raw);
+    const block = blocks.find(item => /角色互动|互动|评论|回复/.test(item.title)) ?? blocks[0];
+    const thread = block ? parseCharacterThreadFields(block.fields) : [];
+    return {
+        comment: cleanMultiline(block?.fields["评论"] ?? block?.fields["内容"], 600),
+        liked: parseBoolean(block?.fields["点赞"]),
+        saved: parseBoolean(block?.fields["收藏"]),
+        followedAuthor: parseBoolean(block?.fields["关注作者"] ?? block?.fields["关注"]),
+        thread: thread.length > 0 ? thread : undefined,
+    };
+}
+function parseXiaohongshuCharacterMentionReply(raw) {
+    const blocks = parseBlocks(raw);
+    const block = blocks.find(item => /角色回复|回复|评论/.test(item.title)) ?? blocks[0];
+    const thread = block ? parseCharacterThreadFields(block.fields) : [];
+    return {
+        comment: cleanMultiline(block?.fields["内容"] ?? block?.fields["评论"], 600),
+        thread: thread.length > 0 ? thread : undefined,
+    };
+}
+function formatFollowedAccountsForPrompt(accounts = []) {
+    const names = accounts
+        .filter(account => account.type !== "user")
+        .map(account => account.name)
+        .filter(Boolean)
+        .slice(0, 12);
+    if (names.length === 0)
+        return "";
+    return [
+        "用户当前关注的小红书账号：",
+        ...names.map(name => `- ${name}`),
+        "生成内容流时，可以适当提高这些账号再次出现的概率，但不要强行全部出现。",
+    ].join("\n");
+}
+function formatNpcFeedUserContext(userIpLocation) {
+    const ipLocation = cleanText(userIpLocation, 60) || "未知";
+    return [
+        "用户资料上下文：",
+        `[用户IP属地]${ipLocation}`,
+    ].join("\n");
+}
+function collectCleanNames(values) {
+    const names = [];
+    for (const value of values) {
+        const name = cleanText(value, 80);
+        if (name && !names.includes(name))
+            names.push(name);
+    }
+    return names;
+}
+function getXiaohongshuUserProfileName() {
+    const state = loadXiaohongshuState();
+    return cleanText(state.profile.nickname, 80)
+        || cleanText(resolveUserIdentity(undefined, "xiaohongshu")?.name, 80)
+        || cleanText(resolveUserIdentity()?.name, 80)
+        || "小红书用户";
+}
+function hasCharacterFollowedUser(characterId) {
+    if (!characterId)
+        return false;
+    return loadXiaohongshuState().socialGraph.followers.some(account => account.type === "character" && account.id === characterId);
+}
+// ANON-FORK: following an account never establishes its real-world owner.
+function buildXiaohongshuUserIdentityHint(_input) { return "[匿名小红书] 所有发言者为独立 social_account。身份以当前 viewer 的明确揭露为准，关注关系不构成身份揭露。"; }
+function prependXiaohongshuUserIdentityHint(context, hint) {
+    return [hint.trim(), context.trim()].filter(Boolean).join("\n\n");
+}
+function resolveGlobalApiConfig() {
+    const configs = (0,settings/* loadApiConfigs */.yx)();
+    const binding = (0,settings/* loadBindingConfig */.__)();
+    if (binding.globalDefaults.apiConfigId) {
+        return configs.find(config => config.id === binding.globalDefaults.apiConfigId) ?? null;
+    }
+    return configs[0] ?? null;
+}
+function hasVisionParts(messages) {
+    return messages.some(message => Array.isArray(message.content) && message.content.some(part => part.type === "image_url"));
+}
+function stripVisionParts(messages) {
+    return messages.map((message) => {
+        if (!Array.isArray(message.content))
+            return message;
+        const text = message.content
+            .filter((part) => part.type === "text")
+            .map(part => part.text)
+            .filter(Boolean)
+            .join("\n\n");
+        return { ...message, content: text || "[图片已省略：当前模型不支持多模态输入]" };
+    });
+}
+function isVisionUnsupportedError(error) {
+    // CUSTOM-APP-ADAPTER: Host preserves provider semantics; only this stable code permits the native text-only retry.
+    const code = error && typeof error === "object" ? String(error.code ?? "") : "";
+    if (code === "MULTIMODAL_UNSUPPORTED")
+        return true;
+    if (code)
+        return false;
+    const message = error instanceof Error ? error.message : String(error ?? "");
+    const lower = message.toLowerCase();
+    const statusLooksRelevant = /api error\s+(400|413|415|422)/i.test(message)
+        || /invalid_request|invalid request|invalid_argument|invalid parameters|invalid format|request_too_large|unsupported/i.test(lower)
+        || /参数|格式|不支持|请求体/.test(message);
+    if (!statusLooksRelevant)
+        return false;
+    return [
+        "image_url",
+        "input_image",
+        "image input",
+        "image content",
+        "image block",
+        "image source",
+        "inline_data",
+        "inlinedata",
+        "file_data",
+        "mime_type",
+        "media_type",
+        "unsupported media",
+        "unsupported content",
+        "unsupported content type",
+        "invalid content type",
+        "content must be a string",
+        "content should be a string",
+        "content must be string",
+        "expected string",
+        "expected a string",
+        "expected object",
+        "expected array",
+        "multimodal",
+        "multi-modal",
+        "vision",
+        "does not support images",
+        "doesn't support images",
+        "model does not support",
+        "not support image",
+        "only supports text",
+        "text only",
+        "request_too_large",
+        "图片",
+        "图像",
+        "视觉",
+        "多模态",
+        "不支持图片",
+        "不支持图像",
+        "不支持多模态",
+        "参数非法",
+        "参数有误",
+        "请求体格式错误",
+        "当前模型不支持",
+    ].some(keyword => lower.includes(keyword.toLowerCase()) || message.includes(keyword));
+}
+async function sendWithOptionalVisionFallback(apiConfig, preset, messages, regexes, meta, options) {
+    const attemptedVision = hasVisionParts(messages);
+    try {
+        return await sendLLMRequest(apiConfig, preset, messages, regexes, meta, options);
+    }
+    catch (error) {
+        if (!attemptedVision || !isVisionUnsupportedError(error))
+            throw error;
+        console.warn("[Xiaohongshu] Vision request failed, retrying without images:", error);
+        return sendLLMRequest(apiConfig, preset, stripVisionParts(messages), regexes, meta, options);
+    }
+}
+function makeVisionMessage(text, imageDataUrl) {
+    if (!imageDataUrl)
+        return { role: "user", content: text, _debugMeta: { marker: "xiaohongshu_context" } };
+    return {
+        role: "user",
+        content: [
+            { type: "text", text },
+            { type: "image_url", image_url: { url: imageDataUrl, detail: "low" } },
+        ],
+        _debugMeta: { marker: "xiaohongshu_context" },
+    };
+}
+async function resolveNoteImageDataUrl(note) {
+    if (!note.imageAssetId)
+        return null;
+    try {
+        return await (0,media/* getChatImageFromIndexedDB */.HF)(note.imageAssetId);
+    }
+    catch {
+        return null;
+    }
+}
+function formatXiaohongshuFeedContext(notes) {
+    if (notes.length === 0)
+        return "暂无小红书笔记。";
+    return notes
+        .slice(0, 30)
+        .map((note) => {
+        const comments = note.comments.slice(0, 8).map((comment, index) => {
+            const reply = comment.replyToCommentId
+                ? ` 回复${comment.replyToCommentId.replace(/^.*_comment_/, "评论")}`
+                : comment.replyTo
+                    ? ` 回复${comment.replyTo}`
+                    : "";
+            return `  [评论${index + 1}] ${comment.authorName} [accountId]${comment.authorId}${reply}：${comment.text}`;
+        });
+        return [
+            `#笔记`,
+            `[笔记ID]${note.id}`,
+            `[类型]${note.type === "video" ? "视频" : "图文"}`,
+            `[作者]${note.authorName} [accountId]${note.authorId}`,
+            `[标题]${note.title}`,
+            `[正文]${note.body}`,
+            note.imageDescription ? `[图片内容]${note.imageDescription}` : note.imageAssetId ? "[图片内容]有真实图片" : "",
+            `[TAG]${note.tags.join("、") || "无"}`,
+            `[点赞]${note.likeCount}`,
+            `[收藏]${note.saveCount}`,
+            `[评论数]${note.commentCount}`,
+            "已有评论：",
+            comments.length ? comments.join("\n") : "  暂无评论",
+        ].filter(Boolean).join("\n");
+    })
+        .join("\n\n");
+}
+function formatXiaohongshuUserPostContext(note) {
+    return formatXiaohongshuFeedContext([note]);
+}
+function formatCommentLine(comment, comments) {
+    const targetName = comment.replyToCommentId
+        ? comments.find(item => item.id === comment.replyToCommentId)?.authorName
+        : comment.replyTo;
+    const reply = targetName ? ` 回复${targetName}` : "";
+    return `[评论ID]${comment.id} [作者]${comment.authorName} [accountId]${comment.authorId}${reply}：[内容]${comment.text}`;
+}
+function formatXiaohongshuCommentContext(note, userComment, targetComment) {
+    const recentComments = note.comments
+        .slice(-16)
+        .map(comment => formatCommentLine(comment, note.comments));
+    return [
+        "#笔记",
+        `[笔记ID]${note.id}`,
+        `[类型]${note.type === "video" ? "视频" : "图文"}`,
+        `[作者]${note.authorName} [accountId]${note.authorId}`,
+        `[标题]${note.title}`,
+        `[正文]${note.body}`,
+        note.imageDescription ? `[图片内容]${note.imageDescription}` : note.imageAssetId ? "[图片内容]有真实图片" : "",
+        `[TAG]${note.tags.join("、") || "无"}`,
+        `[点赞]${note.likeCount}`,
+        `[收藏]${note.saveCount}`,
+        `[评论数]${note.commentCount}`,
+        "",
+        targetComment ? "#被回复评论" : "",
+        targetComment ? formatCommentLine(targetComment, note.comments) : "",
+        "",
+        "#当前触发的评论",
+        formatCommentLine(userComment, note.comments),
+        "",
+        "#已有评论",
+        recentComments.length ? recentComments.join("\n") : "暂无评论",
+    ].filter(Boolean).join("\n");
+}
+function formatXiaohongshuMentionContext(note, userComment, mentionedCharacter, targetComment) {
+    return [
+        `[被@角色]${resolveCharacterXiaohongshuDisplayName(mentionedCharacter)}`,
+        "",
+        formatXiaohongshuCommentContext(note, userComment, targetComment),
+    ].filter(Boolean).join("\n");
+}
+function formatXiaohongshuNoteCommentContext(note) {
+    const comments = note.comments
+        .slice(-30)
+        .map(comment => formatCommentLine(comment, note.comments));
+    return [
+        "#笔记",
+        `[笔记ID]${note.id}`,
+        `[类型]${note.type === "video" ? "视频" : "图文"}`,
+        "[来源][匿名小红书] social_account",
+        `[作者]${note.authorName} [accountId]${note.authorId}`,
+        `[标题]${note.title}`,
+        `[正文]${note.body}`,
+        note.videoDescription ? `[视频内容]${note.videoDescription}` : "",
+        note.imageDescription ? `[图片内容]${note.imageDescription}` : note.imageAssetId ? "[图片内容]有真实图片" : "",
+        `[TAG]${note.tags.join("、") || "无"}`,
+        `[点赞]${note.likeCount}`,
+        `[收藏]${note.saveCount}`,
+        `[评论数]${note.commentCount}`,
+        "",
+        "#已有评论",
+        comments.length ? comments.join("\n") : "暂无评论",
+    ].filter(Boolean).join("\n");
+}
+function formatXiaohongshuDmContext(input) {
+    const history = input.messages
+        .slice(-20)
+        .map((message) => {
+        const speaker = message.direction === "outgoing" ? input.userName : input.threadName;
+        return `[${speaker}] [accountId]${(0,identity/* accountByName */.YU)(speaker)?.accountId || "unknown"} ${message.text}`;
+    });
+    return [
+        `[对话对象]${input.threadName} [accountId]${(0,identity/* accountByName */.YU)(input.threadName)?.accountId || "unknown"}`,
+        `[用户昵称]${input.userName}`,
+        "",
+        "#用户刚发送的私信",
+        input.latestUserText,
+        "",
+        "#历史私信",
+        history.length ? history.join("\n") : "暂无历史私信",
+    ].join("\n");
+}
+// CUSTOM-APP-ADAPTER: source-scoped character configuration; no native RP memory assembly.
+async function resolveCharacterAssemblerInput(characterId, appTags, context, settings) {
+    const character = (0,adapters_characters/* loadCharacters */.fR)().find(c => c.id === characterId);
+    if (!character)
+        return null;
+    const input = { character, appTags, ...context, xiaohongshuBilingualInstruction: buildXiaohongshuBilingualInstruction(settings) };
+    return { character, apiConfig: { id: character.id, enableImageRecognition: true, defaultModel: "" }, preset: null, regexes: [], input };
+}
+async function generateXiaohongshuNpcFeed(settings, followedAccounts = [], userIpLocation = "", userXiaohongshuName = "") {
+    const apiConfig = resolveGlobalApiConfig();
+    if (!apiConfig)
+        throw new ai_ChatEngineError("未配置全局默认 API。");
+    const prompt = [
+        buildXiaohongshuNpcPrompt(settings, settings.npcFeedPrompt.trim() || xiaohongshu_types/* DEFAULT_XIAOHONGSHU_NPC_FEED_PROMPT */.MP, { userXiaohongshuName }),
+        formatNpcFeedUserContext(userIpLocation),
+        formatFollowedAccountsForPrompt(followedAccounts),
+    ].filter(Boolean).join("\n\n");
+    const raw = await sendLLMRequest(apiConfig, null, [{ role: "user", content: prompt, _debugMeta: { marker: "xiaohongshu_npc_feed" } }], [], { characterName: "小红书NPC内容流" }, { appId: "xiaohongshu", appTags: ["xiaohongshu", "npc_feed"], skipOutputRegex: true });
+    const parsed = parseWithDebug(raw, parseXiaohongshuNpcFeed, "无法解析小红书内容");
+    const notes = [...parsed.homeNotes, ...parsed.videoNotes, ...parsed.nearbyNotes];
+    if (notes.length === 0)
+        throw new XiaohongshuGenerationError("没有解析到小红书笔记。", raw);
+    return notes;
+}
+async function generateXiaohongshuNpcReactionForUserPost(note, settings) {
+    const apiConfig = resolveGlobalApiConfig();
+    if (!apiConfig)
+        throw new ai_ChatEngineError("未配置全局默认 API。");
+    const userNames = getUserXiaohongshuNamesFromNote(note);
+    const context = [
+        buildXiaohongshuNpcPrompt(settings, settings.npcUserPostReactionPrompt.trim() || xiaohongshu_types/* DEFAULT_XIAOHONGSHU_NPC_USER_POST_REACTION_PROMPT */.kt, { userXiaohongshuName: userNames[0], extraReservedNames: userNames }),
+        "",
+        "<user_xiaohongshu_post>",
+        formatXiaohongshuUserPostContext(note),
+        "</user_xiaohongshu_post>",
+        note.imageAssetId && !note.imageDescription ? "该笔记有真实图片；如果你无法看到图片，请只根据标题、正文、TAG 与已有评论生成互动。" : "",
+    ].filter(Boolean).join("\n");
+    const imageDataUrl = apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
+    const raw = await sendWithOptionalVisionFallback(apiConfig, null, [makeVisionMessage(context, imageDataUrl)], [], { characterName: "小红书NPC互动" }, { appId: "xiaohongshu", appTags: ["xiaohongshu", "npc_user_post"], skipOutputRegex: true });
+    return parseWithDebug(raw, output => parseXiaohongshuNpcReaction(output, note.id), "无法解析小红书互动内容");
+}
+async function generateXiaohongshuCharacterActivity(characterId, notes, settings) {
+    const userNames = getUserXiaohongshuNamesFromNotes(notes);
+    const context = userNames.length > 0
+        ? prependXiaohongshuUserIdentityHint(formatXiaohongshuFeedContext(notes), buildXiaohongshuUserIdentityHint({ characterId, xiaohongshuNames: userNames }))
+        : formatXiaohongshuFeedContext(notes);
+    const resolved = await resolveCharacterAssemblerInput(characterId, ["xiaohongshu", "activity"], {
+        feedContext: context,
+    }, settings);
+    if (!resolved?.apiConfig)
+        return null;
+    const messages = ai_assemblePromptPayload(resolved.input);
+    const raw = await sendLLMRequest(resolved.apiConfig, resolved.preset, messages, resolved.regexes, { characterName: `小红书:${resolved.character.name}`, userName: resolved.input.userIdentity?.name }, { appId: "xiaohongshu", appTags: ["xiaohongshu", "activity"] });
+    return parseWithDebug(raw, output => parseXiaohongshuCharacterActivity(output, notes.map(note => note.id)), "无法解析小红书角色互动内容");
+}
+async function generateXiaohongshuCharacterReactionToUserPost(characterId, note, settings) {
+    const context = prependXiaohongshuUserIdentityHint(formatXiaohongshuUserPostContext(note), buildXiaohongshuUserIdentityHint({ characterId, xiaohongshuNames: getUserXiaohongshuNamesFromNote(note) }));
+    const resolved = await resolveCharacterAssemblerInput(characterId, ["xiaohongshu", "reaction"], {
+        userPostContext: context,
+    }, settings);
+    if (!resolved?.apiConfig)
+        return null;
+    const messages = ai_assemblePromptPayload(resolved.input);
+    const imageDataUrl = resolved.apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
+    if (imageDataUrl) {
+        messages.push(makeVisionMessage("这是当前小红书笔记配图。请结合预设中的 {{xiaohongshuUserPostContext}} 判断如何评论。", imageDataUrl));
+    }
+    const raw = await sendWithOptionalVisionFallback(resolved.apiConfig, resolved.preset, messages, resolved.regexes, { characterName: `小红书:${resolved.character.name}`, userName: resolved.input.userIdentity?.name }, { appId: "xiaohongshu", appTags: ["xiaohongshu", "reaction"] });
+    return parseWithDebug(raw, parseXiaohongshuCharacterReaction, "无法解析小红书角色互动内容");
+}
+async function generateXiaohongshuNpcReplyToUserComment(note, userComment, settings, targetComment) {
+    const apiConfig = resolveGlobalApiConfig();
+    if (!apiConfig)
+        throw new ai_ChatEngineError("未配置全局默认 API。");
+    const commentContext = formatXiaohongshuCommentContext(note, userComment, targetComment);
+    const userNames = Array.from(new Set([
+        ...getUserXiaohongshuNamesFromNote(note),
+        userComment.authorType === "user" ? userComment.authorName : "",
+        targetComment?.authorType === "user" ? targetComment.authorName : "",
+    ].map(cleanReservedName).filter(Boolean)));
+    const prompt = [
+        buildXiaohongshuNpcPrompt(settings, settings.npcCommentReplyPrompt.trim() || xiaohongshu_types/* DEFAULT_XIAOHONGSHU_NPC_COMMENT_REPLY_PROMPT */.E9, { userXiaohongshuName: userNames[0], extraReservedNames: userNames }),
+        "",
+        "<xiaohongshu_comment_context>",
+        commentContext,
+        "</xiaohongshu_comment_context>",
+        note.imageAssetId && !note.imageDescription ? "该笔记有真实图片；如果你无法看到图片，请只根据标题、正文、TAG 与评论区上下文生成回复。" : "",
+    ].filter(Boolean).join("\n");
+    const imageDataUrl = apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
+    const raw = await sendWithOptionalVisionFallback(apiConfig, null, [makeVisionMessage(prompt, imageDataUrl)], [], { characterName: "小红书NPC评论回复" }, { appId: "xiaohongshu", appTags: ["xiaohongshu", "npc_comment_reply"], skipOutputRegex: true });
+    return parseWithDebug(raw, output => parseXiaohongshuNpcCommentReply(output, note.id, userComment.id), "无法解析小红书评论回复");
+}
+async function generateXiaohongshuNpcMoreComments(note, settings) {
+    const apiConfig = resolveGlobalApiConfig();
+    if (!apiConfig)
+        throw new ai_ChatEngineError("未配置全局默认 API。");
+    const commentContext = formatXiaohongshuNoteCommentContext(note);
+    const userNames = getUserXiaohongshuNamesFromNote(note);
+    const prompt = [
+        buildXiaohongshuNpcPrompt(settings, (settings.npcMoreCommentsPrompt ?? "").trim() || xiaohongshu_types/* DEFAULT_XIAOHONGSHU_NPC_MORE_COMMENTS_PROMPT */.sG, { userXiaohongshuName: userNames[0], extraReservedNames: userNames }),
+        "",
+        "<xiaohongshu_note_comment_context>",
+        commentContext,
+        "</xiaohongshu_note_comment_context>",
+        note.imageAssetId && !note.imageDescription ? "该笔记有真实图片；如果你无法看到图片，请只根据标题、正文、TAG 与评论区上下文生成更多评论。" : "",
+    ].filter(Boolean).join("\n");
+    const imageDataUrl = apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
+    const raw = await sendWithOptionalVisionFallback(apiConfig, null, [makeVisionMessage(prompt, imageDataUrl)], [], { characterName: "小红书NPC更多评论" }, { appId: "xiaohongshu", appTags: ["xiaohongshu", "npc_more_comments"], skipOutputRegex: true });
+    return parseWithDebug(raw, parseXiaohongshuNpcMoreComments, "无法解析小红书评论内容");
+}
+async function generateXiaohongshuNpcDmReply(input) {
+    const apiConfig = resolveGlobalApiConfig();
+    if (!apiConfig)
+        throw new ai_ChatEngineError("未配置全局默认 API。");
+    const prompt = [
+        buildXiaohongshuNpcPrompt(input.settings, (input.settings.npcDmReplyPrompt ?? "").trim() || xiaohongshu_types/* DEFAULT_XIAOHONGSHU_NPC_DM_REPLY_PROMPT */.oZ, { userXiaohongshuName: input.userName }),
+        "",
+        "<xiaohongshu_dm_context>",
+        formatXiaohongshuDmContext(input),
+        "</xiaohongshu_dm_context>",
+    ].join("\n");
+    const raw = await sendLLMRequest(apiConfig, null, [{ role: "user", content: prompt, _debugMeta: { marker: "xiaohongshu_npc_dm_reply" } }], [], { characterName: "小红书NPC私信回复", userName: input.userName }, { appId: "xiaohongshu", appTags: ["xiaohongshu", "npc_dm_reply"], skipOutputRegex: true });
+    return parseWithDebug(raw, parseXiaohongshuNpcDmReply, "无法解析小红书私信回复");
+}
+async function generateXiaohongshuCharacterReplyToUserComment(characterId, note, userComment, targetComment, settings) {
+    const userNames = collectCleanNames([
+        ...getUserXiaohongshuNamesFromNote(note),
+        userComment.authorType === "user" ? userComment.authorName : "",
+        targetComment?.authorType === "user" ? targetComment.authorName : "",
+    ]);
+    const commentContext = prependXiaohongshuUserIdentityHint(formatXiaohongshuCommentContext(note, userComment, targetComment), buildXiaohongshuUserIdentityHint({ characterId, xiaohongshuNames: userNames }));
+    const resolved = await resolveCharacterAssemblerInput(characterId, ["xiaohongshu", "comment"], {
+        commentContext,
+    }, settings);
+    if (!resolved?.apiConfig)
+        return null;
+    const messages = ai_assemblePromptPayload(resolved.input);
+    const imageDataUrl = resolved.apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
+    if (imageDataUrl) {
+        messages.push(makeVisionMessage("这是当前小红书笔记的配图。请结合预设中的 {{xiaohongshuCommentContext}} 回复用户评论。", imageDataUrl));
+    }
+    const raw = await sendWithOptionalVisionFallback(resolved.apiConfig, resolved.preset, messages, resolved.regexes, { characterName: `小红书:${resolved.character.name}`, userName: resolved.input.userIdentity?.name }, { appId: "xiaohongshu", appTags: ["xiaohongshu", "comment"] });
+    return parseWithDebug(raw, parseXiaohongshuCharacterReaction, "无法解析小红书角色回复");
+}
+async function generateXiaohongshuCharacterMentionReply(characterId, note, userComment, targetComment, settings) {
+    const character = (0,adapters_characters/* loadCharacters */.fR)().find(item => item.id === characterId);
+    if (!character)
+        return null;
+    const userNames = collectCleanNames([
+        ...getUserXiaohongshuNamesFromNote(note),
+        userComment.authorType === "user" ? userComment.authorName : "",
+        targetComment?.authorType === "user" ? targetComment.authorName : "",
+    ]);
+    const mentionContext = prependXiaohongshuUserIdentityHint(formatXiaohongshuMentionContext(note, userComment, character, targetComment), buildXiaohongshuUserIdentityHint({ characterId, xiaohongshuNames: userNames }));
+    const resolved = await resolveCharacterAssemblerInput(characterId, ["xiaohongshu", "mention"], {
+        mentionContext,
+    }, settings);
+    if (!resolved?.apiConfig)
+        return null;
+    const messages = ai_assemblePromptPayload(resolved.input);
+    const imageDataUrl = resolved.apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
+    if (imageDataUrl) {
+        messages.push(makeVisionMessage("这是当前小红书笔记的配图。请结合预设中的 {{xiaohongshuMentionContext}} 回复 @ 评论。", imageDataUrl));
+    }
+    const raw = await sendWithOptionalVisionFallback(resolved.apiConfig, resolved.preset, messages, resolved.regexes, { characterName: `小红书:${resolved.character.name}`, userName: resolved.input.userIdentity?.name }, { appId: "xiaohongshu", appTags: ["xiaohongshu", "mention"] });
+    return parseWithDebug(raw, parseXiaohongshuCharacterMentionReply, "无法解析小红书@回复");
+}
+async function previewXiaohongshuPromptPayload(characterId, mode, notes, settings) {
+    const firstNote = notes[0];
+    const latestComment = firstNote?.comments.slice(-1)[0];
+    const character = loadCharacters().find(item => item.id === characterId);
+    const withIdentityHint = (context, names) => prependXiaohongshuUserIdentityHint(context, buildXiaohongshuUserIdentityHint({ characterId, xiaohongshuNames: names }));
+    const context = mode === "activity"
+        ? {
+            feedContext: getUserXiaohongshuNamesFromNotes(notes).length > 0
+                ? withIdentityHint(formatXiaohongshuFeedContext(notes), getUserXiaohongshuNamesFromNotes(notes))
+                : formatXiaohongshuFeedContext(notes),
+        }
+        : mode === "reaction"
+            ? { userPostContext: firstNote ? withIdentityHint(formatXiaohongshuUserPostContext(firstNote), getUserXiaohongshuNamesFromNote(firstNote)) : "暂无小红书笔记。" }
+            : mode === "mention"
+                ? {
+                    mentionContext: firstNote && latestComment && character
+                        ? withIdentityHint(formatXiaohongshuMentionContext(firstNote, latestComment, character), collectCleanNames([
+                            ...getUserXiaohongshuNamesFromNote(firstNote),
+                            latestComment.authorType === "user" ? latestComment.authorName : "",
+                        ]))
+                        : "暂无可回复的 @ 评论。",
+                }
+                : {
+                    commentContext: firstNote && latestComment
+                        ? withIdentityHint(formatXiaohongshuCommentContext(firstNote, latestComment), collectCleanNames([
+                            ...getUserXiaohongshuNamesFromNote(firstNote),
+                            latestComment.authorType === "user" ? latestComment.authorName : "",
+                        ]))
+                        : "暂无可回复的小红书评论。",
+                };
+    const resolved = await resolveCharacterAssemblerInput(characterId, ["xiaohongshu", mode], context, settings);
+    if (!resolved?.apiConfig)
+        throw new ChatEngineError("未配置小红书 API。");
+    const messages = assemblePromptPayload(resolved.input);
+    if (firstNote && mode !== "activity") {
+        const imageDataUrl = resolved.apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(firstNote) : null;
+        if (imageDataUrl) {
+            messages.push(makeVisionMessage("这是当前小红书笔记配图。请结合预设中的小红书上下文判断如何回应。", imageDataUrl));
+        }
+    }
+    return {
+        messages: previewMessagesForApi(resolved.apiConfig, resolved.preset, messages),
+        characterName: `小红书:${resolved.character.name}`,
+        model: resolved.apiConfig.defaultModel ?? "",
+        presetName: resolved.preset?.name ?? "默认预设",
+    };
+}
+function applyNpcReaction(note, reaction) {
+    const shouldNotifyUser = note.source === "user";
+    const baseCommentIndex = note.comments.length;
+    const comments = reaction.comments
+        .filter(comment => comment.text)
+        .map((comment, index) => {
+        const parsedReplyIndex = /^.*_comment_(\d+)$/.exec(comment.replyToCommentId || "")?.[1];
+        const replyToCommentId = parsedReplyIndex
+            ? `${note.id}_comment_${baseCommentIndex + Number(parsedReplyIndex)}`
+            : comment.replyToCommentId;
+        return {
+            ...(0,xiaohongshu_storage/* makeXiaohongshuComment */.nT)({
+                noteId: note.id,
+                authorType: "npc",
+                authorId: "npc",
+                authorName: comment.authorName,
+                text: comment.text,
+                replyTo: comment.replyTo,
+                replyToCommentId,
+                unread: true,
+            }),
+            id: `${note.id}_comment_${baseCommentIndex + index + 1}`,
+        };
+    });
+    const updated = {
+        ...note,
+        likeCount: note.likeCount + reaction.likeCount,
+        saveCount: note.saveCount + reaction.saveCount,
+        recentLikeNames: (0,xiaohongshu_storage/* addNames */.A7)(note.recentLikeNames, reaction.recentLikeNames),
+        recentSaveNames: (0,xiaohongshu_storage/* addNames */.A7)(note.recentSaveNames, reaction.recentSaveNames),
+        comments: [...note.comments, ...comments],
+        commentCount: note.commentCount + comments.length,
+        updatedAt: new Date().toISOString(),
+    };
+    const notifications = shouldNotifyUser ? [
+        reaction.likeCount > 0 ? (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "like",
+            noteId: note.id,
+            actorName: reaction.recentLikeNames[0] || "小红书用户",
+            text: `${reaction.recentLikeNames.join("、") || "有人"}等${reaction.likeCount}人赞了你的笔记`,
+            count: reaction.likeCount,
+            thumbnailText: note.title,
+            unread: true,
+        }) : null,
+        reaction.saveCount > 0 ? (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "save",
+            noteId: note.id,
+            actorName: reaction.recentSaveNames[0] || "小红书用户",
+            text: `${reaction.recentSaveNames.join("、") || "有人"}等${reaction.saveCount}人收藏了你的笔记`,
+            count: reaction.saveCount,
+            thumbnailText: note.title,
+            unread: true,
+        }) : null,
+        ...comments.map(comment => (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "comment",
+            noteId: note.id,
+            actorName: comment.authorName,
+            text: comment.text,
+            thumbnailText: note.title,
+            unread: true,
+        })),
+        ...reaction.directMessages.map(message => (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "dm",
+            noteId: note.id,
+            actorName: message.name,
+            text: message.text,
+            thumbnailText: note.title,
+            direction: "incoming",
+            threadId: `dm:${message.name}`,
+            threadName: message.name,
+            unread: true,
+        })),
+    ].filter((item) => Boolean(item)) : [];
+    return { note: updated, notifications };
+}
+function applyCharacterReaction(note, character, reaction) {
+    const shouldNotifyUser = note.source === "user";
+    const displayName = resolveCharacterXiaohongshuDisplayName(character);
+    const comment = (0,xiaohongshu_storage/* makeXiaohongshuComment */.nT)({
+        noteId: note.id,
+        authorType: "character",
+        authorId: character.id,
+        authorName: displayName,
+        text: reaction.comment,
+        unread: shouldNotifyUser,
+    });
+    const likeIncrement = reaction.liked && !note.recentLikeNames.includes(displayName) ? 1 : 0;
+    const saveIncrement = reaction.saved && !note.recentSaveNames.includes(displayName) ? 1 : 0;
+    let updated = {
+        ...note,
+        likeCount: note.likeCount + likeIncrement,
+        saveCount: note.saveCount + saveIncrement,
+        recentLikeNames: reaction.liked ? (0,xiaohongshu_storage/* addNames */.A7)(note.recentLikeNames, [displayName]) : note.recentLikeNames,
+        recentSaveNames: reaction.saved ? (0,xiaohongshu_storage/* addNames */.A7)(note.recentSaveNames, [displayName]) : note.recentSaveNames,
+        comments: comment.text ? [...note.comments, comment] : note.comments,
+        commentCount: note.commentCount + (comment.text ? 1 : 0),
+        updatedAt: new Date().toISOString(),
+    };
+    let threadNotifications = [];
+    let threadComments = [];
+    if (comment.text && reaction.thread && reaction.thread.length > 0) {
+        const result = appendCharacterThreadToNote({
+            note: updated,
+            characterDisplayName: displayName,
+            characterName: character.name,
+            characterId: character.id,
+            thread: reaction.thread,
+            mainCommentId: comment.id,
+            shouldNotifyUser,
+        });
+        updated = result.note;
+        threadNotifications = result.notifications;
+        threadComments = result.appended;
+    }
+    const notifications = shouldNotifyUser ? [
+        reaction.liked ? (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "like",
+            noteId: note.id,
+            actorName: displayName,
+            text: `${displayName} 赞了你的笔记`,
+            count: 1,
+            thumbnailText: note.title,
+            unread: true,
+        }) : null,
+        reaction.saved ? (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "save",
+            noteId: note.id,
+            actorName: displayName,
+            text: `${displayName} 收藏了你的笔记`,
+            count: 1,
+            thumbnailText: note.title,
+            unread: true,
+        }) : null,
+        comment.text ? (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "comment",
+            noteId: note.id,
+            actorName: displayName,
+            text: comment.text,
+            thumbnailText: note.title,
+            unread: true,
+        }) : null,
+    ].filter((item) => Boolean(item)) : [];
+    return { note: updated, notifications: [...notifications, ...threadNotifications], mainComment: comment, threadComments };
+}
+function applyNpcCommentReply(note, reaction, fallbackReplyToCommentId) {
+    const shouldNotifyUser = note.source === "user";
+    const comments = reaction.comments
+        .filter(comment => comment.text)
+        .map(comment => (0,xiaohongshu_storage/* makeXiaohongshuComment */.nT)({
+        noteId: note.id,
+        authorType: "npc",
+        authorId: "npc",
+        authorName: comment.authorName,
+        text: comment.text,
+        replyTo: comment.replyTo,
+        replyToCommentId: comment.replyToCommentId || fallbackReplyToCommentId,
+        unread: true,
+    }));
+    const updated = {
+        ...note,
+        comments: [...note.comments, ...comments],
+        commentCount: note.commentCount + comments.length,
+        updatedAt: new Date().toISOString(),
+    };
+    const notifications = shouldNotifyUser ? comments.map(comment => (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+        type: "comment",
+        noteId: note.id,
+        actorName: comment.authorName,
+        text: comment.text,
+        thumbnailText: note.title,
+        unread: true,
+    })) : [];
+    return { note: updated, notifications };
+}
+function applyNpcMoreComments(note, reaction) {
+    const baseCommentIndex = note.comments.length;
+    const comments = reaction.comments
+        .filter(comment => comment.text)
+        .map((comment, index) => {
+        const generatedReplyIndex = /^__generated_comment_(\d+)$/.exec(comment.replyToCommentId || "")?.[1];
+        return {
+            ...(0,xiaohongshu_storage/* makeXiaohongshuComment */.nT)({
+                noteId: note.id,
+                authorType: "npc",
+                authorId: (0,xiaohongshu_storage/* makeXiaohongshuNpcId */.YS)(comment.authorName),
+                authorName: comment.authorName,
+                text: comment.text,
+                replyTo: comment.replyTo,
+                replyToCommentId: generatedReplyIndex
+                    ? `${note.id}_comment_${baseCommentIndex + Number(generatedReplyIndex)}`
+                    : comment.replyToCommentId,
+            }),
+            id: `${note.id}_comment_${baseCommentIndex + index + 1}`,
+        };
+    });
+    return {
+        ...note,
+        comments: [...note.comments, ...comments],
+        commentCount: note.commentCount + comments.length,
+        updatedAt: new Date().toISOString(),
+    };
+}
+function applyCharacterCommentReply(note, character, reaction, replyToCommentId) {
+    const shouldNotifyUser = note.source === "user";
+    const displayName = resolveCharacterXiaohongshuDisplayName(character);
+    const comment = (0,xiaohongshu_storage/* makeXiaohongshuComment */.nT)({
+        noteId: note.id,
+        authorType: "character",
+        authorId: character.id,
+        authorName: displayName,
+        text: reaction.comment,
+        replyToCommentId,
+        unread: shouldNotifyUser,
+    });
+    const likeIncrement = reaction.liked && !note.recentLikeNames.includes(displayName) ? 1 : 0;
+    const saveIncrement = reaction.saved && !note.recentSaveNames.includes(displayName) ? 1 : 0;
+    let updated = {
+        ...note,
+        likeCount: note.likeCount + likeIncrement,
+        saveCount: note.saveCount + saveIncrement,
+        recentLikeNames: reaction.liked ? (0,xiaohongshu_storage/* addNames */.A7)(note.recentLikeNames, [displayName]) : note.recentLikeNames,
+        recentSaveNames: reaction.saved ? (0,xiaohongshu_storage/* addNames */.A7)(note.recentSaveNames, [displayName]) : note.recentSaveNames,
+        comments: comment.text ? [...note.comments, comment] : note.comments,
+        commentCount: note.commentCount + (comment.text ? 1 : 0),
+        updatedAt: new Date().toISOString(),
+    };
+    let threadNotifications = [];
+    let threadComments = [];
+    if (comment.text && reaction.thread && reaction.thread.length > 0) {
+        const result = appendCharacterThreadToNote({
+            note: updated,
+            characterDisplayName: displayName,
+            characterName: character.name,
+            characterId: character.id,
+            thread: reaction.thread,
+            mainCommentId: comment.id,
+            shouldNotifyUser,
+        });
+        updated = result.note;
+        threadNotifications = result.notifications;
+        threadComments = result.appended;
+    }
+    const notifications = shouldNotifyUser ? [
+        reaction.liked ? (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "like",
+            noteId: note.id,
+            actorName: displayName,
+            text: `${displayName} 赞了这篇笔记`,
+            count: 1,
+            thumbnailText: note.title,
+            unread: true,
+        }) : null,
+        reaction.saved ? (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "save",
+            noteId: note.id,
+            actorName: displayName,
+            text: `${displayName} 收藏了这篇笔记`,
+            count: 1,
+            thumbnailText: note.title,
+            unread: true,
+        }) : null,
+        comment.text ? (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "comment",
+            noteId: note.id,
+            actorName: displayName,
+            text: comment.text,
+            thumbnailText: note.title,
+            unread: true,
+        }) : null,
+    ].filter((item) => Boolean(item)) : [];
+    return { note: updated, notifications: [...notifications, ...threadNotifications], mainComment: comment, threadComments };
+}
+/**
+ * 应用 Activity 里"角色评论别人帖子"的单条评论 + 可选延伸 thread。
+ * - 主评论永远是角色本人评论
+ * - 如果 thread 存在，把延伸评论按楼中楼关系挂在主评论下
+ * - 返回新增的所有评论（主评论 + thread 评论）供调用方记录记忆/通知
+ */
+function applyCharacterActivityComment(args) {
+    const { note, character, text, liked, saved, thread } = args;
+    const displayName = resolveCharacterXiaohongshuDisplayName(character);
+    const shouldNotifyUser = note.source === "user";
+    const mainComment = (0,xiaohongshu_storage/* makeXiaohongshuComment */.nT)({
+        noteId: note.id,
+        authorType: "character",
+        authorId: character.id,
+        authorName: displayName,
+        text,
+        unread: shouldNotifyUser,
+    });
+    let updated = {
+        ...note,
+        likeCount: note.likeCount + (liked && !note.recentLikeNames.includes(displayName) ? 1 : 0),
+        saveCount: note.saveCount + (saved && !note.recentSaveNames.includes(displayName) ? 1 : 0),
+        recentLikeNames: liked ? (0,xiaohongshu_storage/* addNames */.A7)(note.recentLikeNames, [displayName]) : note.recentLikeNames,
+        recentSaveNames: saved ? (0,xiaohongshu_storage/* addNames */.A7)(note.recentSaveNames, [displayName]) : note.recentSaveNames,
+        comments: [...note.comments, mainComment],
+        commentCount: note.commentCount + 1,
+        updatedAt: new Date().toISOString(),
+    };
+    let threadComments = [];
+    let threadNotifications = [];
+    if (thread && thread.length > 0) {
+        const result = appendCharacterThreadToNote({
+            note: updated,
+            characterDisplayName: displayName,
+            characterName: character.name,
+            characterId: character.id,
+            thread,
+            mainCommentId: mainComment.id,
+            shouldNotifyUser,
+        });
+        updated = result.note;
+        threadComments = result.appended;
+        threadNotifications = result.notifications;
+    }
+    const mainNotifications = shouldNotifyUser ? [
+        liked && !note.recentLikeNames.includes(displayName) ? (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "like",
+            noteId: note.id,
+            actorName: displayName,
+            text: `${displayName} 赞了你的笔记`,
+            count: 1,
+            thumbnailText: note.title,
+            unread: true,
+        }) : null,
+        saved && !note.recentSaveNames.includes(displayName) ? (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "save",
+            noteId: note.id,
+            actorName: displayName,
+            text: `${displayName} 收藏了你的笔记`,
+            count: 1,
+            thumbnailText: note.title,
+            unread: true,
+        }) : null,
+        (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "comment",
+            noteId: note.id,
+            actorName: displayName,
+            text,
+            thumbnailText: note.title,
+            unread: true,
+        }),
+    ].filter((item) => Boolean(item)) : [];
+    return {
+        note: updated,
+        mainComment,
+        threadComments,
+        notifications: [...mainNotifications, ...threadNotifications],
+    };
+}
+function applyCharacterMentionReply(note, character, reaction, replyToCommentId) {
+    const shouldNotifyUser = note.source === "user";
+    const displayName = resolveCharacterXiaohongshuDisplayName(character);
+    const comment = (0,xiaohongshu_storage/* makeXiaohongshuComment */.nT)({
+        noteId: note.id,
+        authorType: "character",
+        authorId: character.id,
+        authorName: displayName,
+        text: reaction.comment,
+        replyToCommentId,
+        unread: shouldNotifyUser,
+    });
+    let updated = {
+        ...note,
+        comments: comment.text ? [...note.comments, comment] : note.comments,
+        commentCount: note.commentCount + (comment.text ? 1 : 0),
+        updatedAt: new Date().toISOString(),
+    };
+    let threadNotifications = [];
+    let threadComments = [];
+    if (comment.text && reaction.thread && reaction.thread.length > 0) {
+        const result = appendCharacterThreadToNote({
+            note: updated,
+            characterDisplayName: displayName,
+            characterName: character.name,
+            characterId: character.id,
+            thread: reaction.thread,
+            mainCommentId: comment.id,
+            shouldNotifyUser,
+        });
+        updated = result.note;
+        threadNotifications = result.notifications;
+        threadComments = result.appended;
+    }
+    const notifications = shouldNotifyUser ? [
+        comment.text ? (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "comment",
+            noteId: note.id,
+            actorName: displayName,
+            text: comment.text,
+            thumbnailText: note.title,
+            unread: true,
+        }) : null,
+    ].filter((item) => Boolean(item)) : [];
+    return { note: updated, notifications: [...notifications, ...threadNotifications], mainComment: comment, threadComments };
+}
+
+;// ./custom-apps/anonymous-xiaohongshu/src/fork/lib/xiaohongshu-memory.ts
+// CUSTOM-APP-ADAPTER: preserve native event builders; explicit subjects and source invalidation.
+
+
+
+
+const XIAOHONGSHU_EVENT_PREFIX = "ai_phone_xiaohongshu_events_";
+const MAX_EVENTS_PER_CHARACTER = 120;
+(0,storage/* registerDynamicPrefix */.vp)(XIAOHONGSHU_EVENT_PREFIX);
+function storageKey(characterId) {
+    return `${XIAOHONGSHU_EVENT_PREFIX}${characterId}`;
+}
+function cleanEventText(value, maxLength) {
+    const text = String(value ?? "")
+        .replace(/\r\n?/g, "\n")
+        .replace(/\s+/g, " ")
+        .trim();
+    return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+function formatAuthorLabel(authorType, value, fallback) {
+    const name = cleanEventText(value, 80) || fallback;
+    return `“${name}”`;
+}
+function loadEventsByKey(key) {
+    if (typeof window === "undefined")
+        return [];
+    try {
+        const raw = (0,storage/* kvGet */.M3)(key);
+        if (!raw)
+            return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed))
+            return [];
+        return parsed
+            .filter((entry) => entry
+            && typeof entry.id === "string"
+            && typeof entry.timestamp === "string"
+            && typeof entry.content === "string")
+            .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    }
+    catch {
+        return [];
+    }
+}
+function loadEvents(characterId) {
+    return loadEventsByKey(storageKey(characterId));
+}
+function saveEventsByKey(key, events) {
+    if (typeof window === "undefined")
+        return;
+    const compacted = [...events]
+        .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+        .slice(-MAX_EVENTS_PER_CHARACTER);
+    (0,storage/* kvSet */.or)(key, JSON.stringify(compacted));
+}
+function saveEvents(characterId, events) {
+    saveEventsByKey(storageKey(characterId), events);
+}
+function upsertEvent(characterId, entry) {
+    const events = loadEvents(characterId);
+    const next = events.filter(item => item.id !== entry.id);
+    next.push(entry);
+    saveEvents(characterId, next);
+    (0,memory/* publishEventProjection */.N4)(characterId, entry);
+}
+function noteTitle(note) {
+    return cleanEventText(note.title || note.body.slice(0, 24) || "未命名笔记", 80);
+}
+function imageText(note) {
+    if (note.imageDescription?.trim())
+        return cleanEventText(note.imageDescription, 160);
+    if (note.imageAssetId)
+        return "真实图片";
+    if (note.videoDescription?.trim())
+        return cleanEventText(note.videoDescription, 160);
+    return "无";
+}
+function belongsToNote(entry, noteId) {
+    return entry.noteId === noteId
+        || entry.id === `xiaohongshu_post_${noteId}`
+        || entry.content.includes(`noteId：${noteId}`)
+        || entry.content.includes(`noteId:${noteId}`);
+}
+function recordXiaohongshuPostEvent(input) {
+    const timestamp = input.note.createdAt || new Date().toISOString();
+    const time = formatChatTimestamp(timestamp);
+    const characterName = cleanEventText(input.characterName, 80) || "角色";
+    const title = noteTitle(input.note);
+    const body = cleanEventText(input.note.body, 500);
+    const image = imageText(input.note);
+    upsertEvent(input.characterId, {
+        subjectIds: [input.characterId, (0,identity/* subjectAccount */.YY)(input.note.authorId, input.note.authorName, input.note.source).accountId],
+        id: `xiaohongshu_post_${input.note.id}`,
+        noteId: input.note.id,
+        timestamp,
+        content: `[匿名小红书 ${time}] ${characterName}在小红书发布了一篇笔记，标题：“${title}”。正文：“${body}”。图片：“${image}”。`,
+    });
+}
+function recordXiaohongshuCommentEvent(input) {
+    if (!input.comment.text.trim())
+        return;
+    const timestamp = input.comment.createdAt || new Date().toISOString();
+    const time = formatChatTimestamp(timestamp);
+    const characterName = cleanEventText(input.characterName, 80) || "角色";
+    const authorLabel = formatAuthorLabel(input.note.source, input.note.authorName, "小红书用户");
+    const title = noteTitle(input.note);
+    const body = cleanEventText(input.comment.text, 360);
+    upsertEvent(input.characterId, {
+        subjectIds: [input.characterId, (0,identity/* subjectAccount */.YY)(input.note.authorId, input.note.authorName, input.note.source).accountId],
+        id: `xiaohongshu_comment_${input.comment.id}`,
+        noteId: input.note.id,
+        commentId: input.comment.id,
+        timestamp,
+        content: `[匿名小红书 ${time}] ${characterName}在小红书评论了${authorLabel}的笔记《${title}》，评论：“${body}”。点赞：${input.liked ? "是" : "否"}，收藏：${input.saved ? "是" : "否"}。`,
+    });
+}
+function recordXiaohongshuReplyEvent(input) {
+    if (!input.comment.text.trim())
+        return;
+    const timestamp = input.comment.createdAt || new Date().toISOString();
+    const time = formatChatTimestamp(timestamp);
+    const characterName = cleanEventText(input.characterName, 80) || "角色";
+    const targetLabel = input.targetComment
+        ? formatAuthorLabel(input.targetComment.authorType, input.targetComment.authorName, "某人")
+        : formatAuthorLabel(undefined, input.comment.replyTo, "某人");
+    const title = noteTitle(input.note);
+    const targetBody = cleanEventText(input.targetComment?.text, 360);
+    const body = cleanEventText(input.comment.text, 360);
+    upsertEvent(input.characterId, {
+        subjectIds: [input.characterId, ...(input.targetComment ? [(0,identity/* subjectAccount */.YY)(input.targetComment.authorId, input.targetComment.authorName, input.targetComment.authorType).accountId] : [])],
+        id: `xiaohongshu_reply_${input.comment.id}`,
+        noteId: input.note.id,
+        commentId: input.comment.id,
+        timestamp,
+        content: `[匿名小红书 ${time}] ${characterName}在小红书回复了${targetLabel}在笔记《${title}》下的评论${targetBody ? `，${targetLabel}评论：“${targetBody}”` : ""}，回复：“${body}”。`,
+    });
+}
+function recordXiaohongshuFollowUserEvent(input) {
+    const timestamp = input.timestamp || new Date().toISOString();
+    const time = formatChatTimestamp(timestamp);
+    const characterName = cleanEventText(input.characterName, 80) || "角色";
+    const userDisplayName = cleanEventText(input.userDisplayName, 80) || "小红书用户";
+    upsertEvent(input.characterId, {
+        subjectIds: [input.characterId, (0,identity/* subjectAccount */.YY)("", input.userDisplayName, "user").accountId],
+        id: "xiaohongshu_follow_user",
+        timestamp,
+        content: `[匿名小红书 ${time}] ${characterName}关注了“${userDisplayName}”。`,
+    });
+}
+function deleteXiaohongshuProjectionEventsForNote(noteId) {
+    if (!noteId || typeof window === "undefined")
+        return;
+    (0,memory/* removeEventProjections */.xZ)({ noteId }); // CUSTOM-APP-ADAPTER: also invalidate Host evidence.
+    for (const key of (0,storage/* kvKeysWithPrefix */.oD)(XIAOHONGSHU_EVENT_PREFIX)) {
+        const events = loadEventsByKey(key);
+        const next = events.filter(entry => !belongsToNote(entry, noteId));
+        if (next.length !== events.length) {
+            saveEventsByKey(key, next);
+        }
+    }
+}
+function deleteXiaohongshuProjectionEventForComment(commentId) {
+    if (!commentId || typeof window === "undefined")
+        return;
+    (0,memory/* removeEventProjections */.xZ)({ commentId });
+    for (const key of (0,storage/* kvKeysWithPrefix */.oD)(XIAOHONGSHU_EVENT_PREFIX)) {
+        const events = loadEventsByKey(key);
+        const next = events.filter(entry => entry.commentId !== commentId
+            && entry.id !== `xiaohongshu_comment_${commentId}`
+            && entry.id !== `xiaohongshu_reply_${commentId}`);
+        if (next.length !== events.length) {
+            saveEventsByKey(key, next);
+        }
+    }
+}
+function clearXiaohongshuProjectionEvents() {
+    removeEventProjections({ all: true });
+    if (typeof window === "undefined")
+        return;
+    for (const key of kvKeysWithPrefix(XIAOHONGSHU_EVENT_PREFIX)) {
+        kvRemove(key);
+    }
+}
+function loadXiaohongshuProjectionEntries(characterId, options) {
+    const events = loadEvents(characterId);
+    if (!options?.afterTimestamp)
+        return events;
+    return events.filter(entry => entry.timestamp > options.afterTimestamp);
+}
+
+// EXTERNAL MODULE: ./node_modules/react-dom/index.js
+var react_dom = __webpack_require__(961);
+;// ./node_modules/lucide-react/dist/esm/icons/x.js
+/**
+ * @license lucide-react v0.575.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
+
+
+const x_iconNode = [
+  ["path", { d: "M18 6 6 18", key: "1bl5f8" }],
+  ["path", { d: "m6 6 12 12", key: "d8bk6v" }]
+];
+const X = createLucideIcon("x", x_iconNode);
+
+
+//# sourceMappingURL=x.js.map
+
+;// ./custom-apps/anonymous-xiaohongshu/src/fork/components/checkphone/checkphone-debug-error-card.tsx
+"use client";
+
+
+
+
+function CheckPhoneDebugErrorCard({ title, error, debugParseError, debugNormalizeError, debugRawOutput, debugSanitizedOutput, }) {
+    const [open, setOpen] = (0,react.useState)(true);
+    const [showReason, setShowReason] = (0,react.useState)(false);
+    const [copied, setCopied] = (0,react.useState)(false);
+    const markerRef = (0,react.useRef)(null);
+    const [portalTarget, setPortalTarget] = (0,react.useState)(null);
+    const reasonText = (0,react.useMemo)(() => {
+        const rawOutput = debugRawOutput?.trim() || debugSanitizedOutput?.trim() || "";
+        const normalizedError = error.replace(/\r\n/g, "\n").trim();
+        const detailParts = [debugParseError, debugNormalizeError]
+            .map((item) => item?.replace(/\r\n/g, "\n").trim() ?? "")
+            .filter((item, index, items) => item && item !== normalizedError && items.indexOf(item) === index);
+        const detail = detailParts.join("\n");
+        const errorText = detail ? `${normalizedError}\n${detail}` : normalizedError;
+        return `错误信息：${errorText}\nAI原始输出：${rawOutput}`;
+    }, [debugNormalizeError, debugParseError, debugRawOutput, debugSanitizedOutput, error]);
+    (0,react.useEffect)(() => {
+        setOpen(true);
+        setShowReason(false);
+        setCopied(false);
+    }, [error, reasonText]);
+    (0,react.useEffect)(() => {
+        const target = markerRef.current?.closest('[class*="-module"]') ??
+            markerRef.current?.closest(".phone-shell") ??
+            document.body;
+        setPortalTarget(target);
+    }, []);
+    async function handleCopy() {
+        try {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(reasonText);
+            }
+            else {
+                const textarea = document.createElement("textarea");
+                textarea.value = reasonText;
+                textarea.setAttribute("readonly", "true");
+                textarea.style.position = "fixed";
+                textarea.style.opacity = "0";
+                textarea.style.pointerEvents = "none";
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+                const copiedFallback = document.execCommand("copy");
+                document.body.removeChild(textarea);
+                if (!copiedFallback)
+                    throw new Error("copy_failed");
+            }
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1600);
+        }
+        catch {
+            setCopied(false);
+        }
+    }
+    const dialog = open ? ((0,jsx_runtime.jsx)("div", { className: "modal-overlay", "data-ui": "modal", onClick: () => setOpen(false), children: (0,jsx_runtime.jsxs)("div", { className: "modal-dialog cp-sync-error-dialog", "data-ui": "modal-dialog", onClick: (event) => event.stopPropagation(), children: [(0,jsx_runtime.jsx)("button", { type: "button", className: "modal-header-btn modal-header-btn-muted cp-sync-error-close", onClick: () => setOpen(false), "aria-label": "\u5173\u95ED", children: (0,jsx_runtime.jsx)(X, { size: 17 }) }), (0,jsx_runtime.jsx)("div", { className: "modal-header cp-sync-error-header", "data-ui": "modal-header", children: (0,jsx_runtime.jsx)("h3", { className: "modal-title", children: title || "哎呀，抱歉~同步数据失败了呢~" }) }), (0,jsx_runtime.jsx)("div", { className: "modal-body cp-sync-error-body", "data-ui": "modal-body", children: !showReason ? ((0,jsx_runtime.jsx)("button", { type: "button", className: "ui-btn ui-btn-primary", onClick: () => setShowReason(true), children: "\u67E5\u770B\u539F\u56E0" })) : ((0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("div", { className: "cp-sync-error-raw", role: "region", "aria-label": "AI \u539F\u59CB\u8F93\u51FA", children: (0,jsx_runtime.jsx)("pre", { children: reasonText }) }), (0,jsx_runtime.jsx)("button", { type: "button", className: "ui-btn ui-btn-outline cp-sync-error-copy", onClick: handleCopy, children: copied ? "已复制" : "复制" })] })) })] }) })) : null;
+    return ((0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("span", { ref: markerRef, hidden: true }), portalTarget && dialog ? (0,react_dom.createPortal)(dialog, portalTarget) : null] }));
+}
+
+;// ./custom-apps/anonymous-xiaohongshu/src/fork/components/xiaohongshu/xiaohongshu-app.tsx
+
+// CUSTOM-APP-ADAPTER: stable IDs/probability decisions when a durable action resumes.
+
+
+"use client";
+// CUSTOM-APP-ADAPTER: lifecycle and identity additions; all native page JSX remains.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const TABS = [
+    { id: "home", label: "首页", icon: House },
+    { id: "video", label: "附近", icon: MapPin },
+    { id: "publish", label: "发布", icon: Plus },
+    { id: "messages", label: "消息", icon: Bell },
+    { id: "profile", label: "我的", icon: UserRound },
+];
+const PROFILE_TABS = [
+    { id: "notes", label: "笔记" },
+    { id: "comments", label: "评论" },
+    { id: "saved", label: "收藏" },
+    { id: "liked", label: "赞过" },
+];
+const HOME_FEED_TABS = [
+    { id: "follow", label: "关注" },
+    { id: "discover", label: "发现" },
+    { id: "video", label: "视频" },
+];
+// CUSTOM-APP-ADAPTER: package asset URLs are hydrated before mount.
+const DEFAULT_XHS_AVATARS = (0,media/* defaultAvatars */.M5)();
+const XHS_DM_EMOJIS = ["😊", "😂", "🥺", "😭", "😳", "👍", "❤️", "✨", "🌸", "🍵", "🥰", "🤔", "😎", "🙌", "💌", "🫶"];
+const XHS_MAX_IMAGE_HEIGHT_RATIO = 4 / 3;
+const XHS_TEXT_IMAGE_HEIGHT_RATIO = 1.18;
+const XHS_VIDEO_IMAGE_HEIGHT_RATIO = XHS_TEXT_IMAGE_HEIGHT_RATIO;
+const DEFAULT_XHS_IMAGE_FRAME_STYLE = { aspectRatio: `1 / ${XHS_MAX_IMAGE_HEIGHT_RATIO}` };
+const TEXT_XHS_IMAGE_FRAME_STYLE = { aspectRatio: `1 / ${XHS_TEXT_IMAGE_HEIGHT_RATIO}` };
+const VIDEO_XHS_IMAGE_FRAME_STYLE = { aspectRatio: `1 / ${XHS_VIDEO_IMAGE_HEIGHT_RATIO}` };
+const ICON_XHS_IMAGE_FRAME_STYLES = {
+    compact: { aspectRatio: "1 / 0.9" },
+    regular: { aspectRatio: `1 / ${XHS_TEXT_IMAGE_HEIGHT_RATIO}` },
+    tall: { aspectRatio: `1 / ${XHS_MAX_IMAGE_HEIGHT_RATIO}` },
+};
+function formatCount(value) {
+    if (value >= 10000)
+        return `${(value / 10000).toFixed(value >= 100000 ? 0 : 1)}万`;
+    if (value >= 1000)
+        return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`;
+    return String(Math.max(0, Math.round(value)));
+}
+function formatBadgeCount(value) {
+    if (value > 99)
+        return "99+";
+    return String(Math.max(0, Math.round(value)));
+}
+function parseCompactCountLabel(value) {
+    const normalized = value.trim().replace(/[,，\s]/g, "");
+    const match = /^(\d+(?:\.\d+)?)([kKwW万千])?$/.exec(normalized);
+    if (!match)
+        return 1;
+    const amount = Number(match[1]);
+    if (!Number.isFinite(amount))
+        return 1;
+    const unit = match[2];
+    if (unit === "w" || unit === "W" || unit === "万")
+        return Math.max(1, Math.round(amount * 10000));
+    if (unit === "k" || unit === "K" || unit === "千")
+        return Math.max(1, Math.round(amount * 1000));
+    return Math.max(1, Math.round(amount));
+}
+function parseNotificationCountFromText(text) {
+    const match = text.match(/等\s*([0-9][\d.,，]*(?:\.\d+)?\s*(?:[kKwW万千])?)\s*人/);
+    return match ? parseCompactCountLabel(match[1]) : 1;
+}
+function formatTime(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime()))
+        return "";
+    const diffMinutes = Math.max(1, Math.round(((0,tasks/* actionNow */.$P)() - date.getTime()) / 60000));
+    if (diffMinutes < 60)
+        return `${diffMinutes}分钟前`;
+    if (diffMinutes < 1440)
+        return `${Math.round(diffMinutes / 60)}小时前`;
+    return `${Math.round(diffMinutes / 1440)}天前`;
+}
+function splitColumns(items) {
+    const left = [];
+    const right = [];
+    items.forEach((item, index) => {
+        if (index % 2 === 0)
+            left.push(item);
+        else
+            right.push(item);
+    });
+    return [left, right];
+}
+function addId(list, id) {
+    return list.includes(id) ? list : [id, ...list];
+}
+function removeId(list, id) {
+    return list.filter(item => item !== id);
+}
+function accountKey(account) {
+    return `${account.type}:${account.id}`;
+}
+function noteAuthorKey(note) {
+    if (note.source === "user")
+        return "";
+    const id = note.authorId || (note.source === "npc" ? (0,xiaohongshu_storage/* makeXiaohongshuNpcId */.YS)(note.authorName) : note.source);
+    return accountKey({ type: note.source, id });
+}
+function dedupeAccounts(accounts) {
+    const seen = new Set();
+    return accounts.filter((account) => {
+        const key = accountKey(account);
+        if (seen.has(key))
+            return false;
+        seen.add(key);
+        return true;
+    });
+}
+function makeNpcAccount(name) {
+    return {
+        type: "npc",
+        id: (0,xiaohongshu_storage/* makeXiaohongshuNpcId */.YS)(name),
+        name,
+        followedAt: new Date().toISOString(),
+    };
+}
+function hashString(value) {
+    let hash = 0;
+    for (let index = 0; index < value.length; index += 1) {
+        hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+    }
+    return hash;
+}
+function pickDefaultAvatar(seed) {
+    return DEFAULT_XHS_AVATARS[hashString(seed || "npc") % DEFAULT_XHS_AVATARS.length];
+}
+function XhsAvatar({ className, src, name }) {
+    const isDefaultAvatar = Boolean(src?.startsWith("/xiaohongshu/avatars/"));
+    return ((0,jsx_runtime.jsx)("div", { className: `${className}${isDefaultAvatar ? " xhs-default-avatar" : ""}`, children: src ? (0,jsx_runtime.jsx)("img", { src: src, alt: "" }) : (0,jsx_runtime.jsx)("span", { children: (name || "?").slice(0, 1) }) }));
+}
+function XhsDislikeIcon() {
+    return ((0,jsx_runtime.jsxs)("svg", { className: "xhs-comment-dislike-icon", width: "20", height: "20", viewBox: "0 0 24 24", "aria-hidden": "true", children: [(0,jsx_runtime.jsx)("circle", { cx: "12", cy: "12", r: "9.2" }), (0,jsx_runtime.jsx)("path", { d: "M8.3 9.7h1.9" }), (0,jsx_runtime.jsx)("path", { d: "M13.8 9.7h1.9" }), (0,jsx_runtime.jsx)("path", { d: "M8.9 15.5c1.7-.85 4.5-.85 6.2 0" })] }));
+}
+function getImageFrameStyle(width, height) {
+    if (!width || !height || width <= 0 || height <= 0)
+        return DEFAULT_XHS_IMAGE_FRAME_STYLE;
+    const heightRatio = Math.min(height / width, XHS_MAX_IMAGE_HEIGHT_RATIO);
+    return { aspectRatio: `1 / ${heightRatio.toFixed(4)}` };
+}
+function getXhsPlainText(text) {
+    const normalized = normalizeBilingualTextInput(text);
+    return splitBilingualText(normalized)?.original ?? normalized;
+}
+function getNoteCardVariant(note) {
+    const textLength = getXhsPlainText(note.body).length + getXhsPlainText(note.title).length;
+    if (textLength > 95)
+        return "tall";
+    if (textLength > 54)
+        return "regular";
+    return "compact";
+}
+function getIconImageFrameStyle(note) {
+    return ICON_XHS_IMAGE_FRAME_STYLES[getNoteCardVariant(note)];
+}
+function noteHasUserComment(note) {
+    return note.comments.some(comment => comment.authorType === "user");
+}
+function findAddedCharacterComment(before, after, character) {
+    const beforeIds = new Set(before.comments.map(comment => comment.id));
+    return after.comments.find(comment => !beforeIds.has(comment.id)
+        && comment.authorType === "character"
+        && comment.authorId === character.id) ?? null;
+}
+function XiaohongshuOverviewGlyph({ type }) {
+    if (type === "heart") {
+        return ((0,jsx_runtime.jsx)("svg", { className: "cp-xhs-overview-glyph", viewBox: "0 0 24 24", "aria-hidden": "true", children: (0,jsx_runtime.jsx)("path", { d: "M12 21.2c-.35 0-.7-.13-.98-.39C4.88 15.28 2 12.67 2 8.72 2 5.58 4.47 3.1 7.58 3.1c1.75 0 3.43.82 4.42 2.11.99-1.29 2.67-2.11 4.42-2.11C19.53 3.1 22 5.58 22 8.72c0 3.95-2.88 6.56-9.02 12.09-.28.26-.63.39-.98.39Z" }) }));
+    }
+    if (type === "bookmark") {
+        return ((0,jsx_runtime.jsx)("svg", { className: "cp-xhs-overview-glyph", viewBox: "0 0 24 24", "aria-hidden": "true", children: (0,jsx_runtime.jsx)("path", { d: "M6.35 4.55c0-1.1.9-2 2-2h7.3c1.1 0 2 .9 2 2v16.1c0 .7-.8 1.1-1.36.68L12 18.1l-4.29 3.23a.82.82 0 0 1-1.36-.68V4.55Z" }) }));
+    }
+    if (type === "user") {
+        return ((0,jsx_runtime.jsx)("svg", { className: "cp-xhs-overview-glyph", viewBox: "0 0 24 24", "aria-hidden": "true", children: (0,jsx_runtime.jsx)("path", { d: "M12 11.2a4.55 4.55 0 1 0 0-9.1 4.55 4.55 0 0 0 0 9.1ZM4.15 21.06c0-4.13 3.52-7.48 7.85-7.48s7.85 3.35 7.85 7.48c0 .54-.39.99-.92 1.07-2.12.31-4.43.47-6.93.47s-4.81-.16-6.93-.47a1.08 1.08 0 0 1-.92-1.07Z" }) }));
+    }
+    return ((0,jsx_runtime.jsxs)("svg", { className: "cp-xhs-overview-glyph", viewBox: "0 0 24 24", "aria-hidden": "true", children: [(0,jsx_runtime.jsx)("path", { d: "M12 3.15c5.54 0 10 3.82 10 8.55s-4.46 8.55-10 8.55c-1.11 0-2.18-.15-3.18-.44l-3.54 1.56a.75.75 0 0 1-1.02-.88l.9-3.3C3.22 15.69 2 13.56 2 11.7c0-4.73 4.46-8.55 10-8.55Z" }), (0,jsx_runtime.jsx)("circle", { cx: "8.8", cy: "11.45", r: "1.18", fill: "white" }), (0,jsx_runtime.jsx)("circle", { cx: "15.2", cy: "11.45", r: "1.18", fill: "white" })] }));
+}
+function getGenderClassName(value) {
+    const normalized = value.trim().toLowerCase();
+    if (!normalized)
+        return "xhs-profile-gender xhs-profile-gender--female";
+    if (normalized.includes("女") || normalized.includes("♀") || normalized.includes("female")) {
+        return "xhs-profile-gender xhs-profile-gender--female";
+    }
+    if (normalized.includes("男") || normalized.includes("♂") || normalized.includes("male")) {
+        return "xhs-profile-gender xhs-profile-gender--male";
+    }
+    return "xhs-profile-gender";
+}
+function xiaohongshu_app_isCharacterXiaohongshuAuthor(authorName, character, displayName) {
+    const normalized = authorName.trim();
+    if (!normalized)
+        return false;
+    return [displayName.trim(), character.name.trim()].filter(Boolean).includes(normalized);
+}
+function createCharacterPost(character, activity) {
+    if (!activity.post)
+        return null;
+    const now = new Date().toISOString();
+    const displayName = resolveCharacterXiaohongshuDisplayName(character);
+    const noteId = `xhs_char_note_${character.id}_${(0,tasks/* actionNow */.$P)()}_${(0,tasks/* actionRandom */.eQ)().toString(36).slice(2, 7)}`;
+    const comments = activity.post.comments
+        .filter(comment => comment.text)
+        .map((comment, index) => {
+        const parsedReplyIndex = /^.*_comment_(\d+)$/.exec(comment.replyToCommentId || "")?.[1];
+        const isCharacterAuthor = xiaohongshu_app_isCharacterXiaohongshuAuthor(comment.authorName, character, displayName);
+        return {
+            ...(0,xiaohongshu_storage/* makeXiaohongshuComment */.nT)({
+                noteId,
+                authorType: isCharacterAuthor ? "character" : "npc",
+                authorId: isCharacterAuthor ? character.id : (0,xiaohongshu_storage/* makeXiaohongshuNpcId */.YS)(comment.authorName),
+                authorName: isCharacterAuthor ? displayName : comment.authorName,
+                text: comment.text,
+                replyTo: comment.replyTo,
+                replyToCommentId: parsedReplyIndex ? `${noteId}_comment_${Number(parsedReplyIndex)}` : comment.replyToCommentId,
+            }),
+            id: `${noteId}_comment_${index + 1}`,
+        };
+    });
+    return {
+        id: noteId,
+        type: activity.post.type,
+        source: "character",
+        authorId: character.id,
+        authorName: displayName,
+        title: activity.post.title || activity.post.body.slice(0, 24) || "新的笔记",
+        body: activity.post.body,
+        videoDescription: activity.post.videoDescription,
+        coverIcon: activity.post.coverIcon || (activity.post.type === "video" ? "▶" : "✦"),
+        tone: "blush",
+        tags: activity.post.tags,
+        likeCount: activity.post.likeCount,
+        saveCount: activity.post.saveCount,
+        commentCount: activity.post.commentCount,
+        liked: false,
+        saved: false,
+        recentLikeNames: activity.post.recentLikeNames,
+        recentSaveNames: activity.post.recentSaveNames,
+        comments,
+        imageDescription: activity.post.type === "post" ? activity.post.imageDescription : undefined,
+        createdAt: now,
+        updatedAt: now,
+    };
+}
+function NoteDetailSlider({ note, imageIds, imageMap, }) {
+    const [activeSlide, setActiveSlide] = (0,react.useState)(0);
+    return ((0,jsx_runtime.jsxs)("div", { className: "xhs-note-slider-container", style: getImageFrameStyle(note.imageWidth, note.imageHeight), children: [(0,jsx_runtime.jsx)("div", { className: "xhs-note-slider-track", onScroll: (e) => {
+                    const el = e.currentTarget;
+                    const index = Math.round(el.scrollLeft / (el.clientWidth || 1));
+                    setActiveSlide(index);
+                }, children: imageIds.map((id, idx) => ((0,jsx_runtime.jsx)("div", { className: "xhs-note-slider-item", children: imageMap[id] ? ((0,jsx_runtime.jsx)("img", { src: imageMap[id], alt: `Slide ${idx + 1}`, className: "xhs-note-real-image" })) : ((0,jsx_runtime.jsx)("div", { className: "cp-xhs-cover cp-xhs-cover--ivory", style: { width: "100%", height: "100%" } })) }, id || idx))) }), (0,jsx_runtime.jsxs)("div", { className: "xhs-note-slider-indicator", children: [activeSlide + 1, " / ", imageIds.length] }), (0,jsx_runtime.jsx)("div", { className: "xhs-note-slider-dots", children: imageIds.map((_, idx) => ((0,jsx_runtime.jsx)("span", { className: `xhs-slider-dot ${idx === activeSlide ? "is-active" : ""}` }, idx))) })] }));
+}
+function NoteImage({ note, imageMap, hideTextImageDescription = false, collapseBilingualTranslation, isDetail, }) {
+    const imageIds = (note.imageAssetIds && note.imageAssetIds.length > 0)
+        ? note.imageAssetIds
+        : (note.imageAssetId ? [note.imageAssetId] : []);
+    if (note.type === "video") {
+        return ((0,jsx_runtime.jsx)("div", { className: `cp-xhs-cover cp-xhs-cover--video cp-xhs-cover--${note.tone}`, style: VIDEO_XHS_IMAGE_FRAME_STYLE, children: note.imageAssetId && imageMap[note.imageAssetId] ? ((0,jsx_runtime.jsx)("img", { src: imageMap[note.imageAssetId], alt: "", className: "xhs-video-real-image" })) : ((0,jsx_runtime.jsx)("span", { children: note.videoDescription || note.imageDescription ? ((0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: note.videoDescription || note.imageDescription || "", tone: "light", collapseBilingualTranslation: collapseBilingualTranslation })) : note.coverIcon })) }));
+    }
+    if (imageIds.length > 0 && imageIds.some(id => Boolean(imageMap[id]))) {
+        if (isDetail && imageIds.length > 1) {
+            return (0,jsx_runtime.jsx)(NoteDetailSlider, { note: note, imageIds: imageIds, imageMap: imageMap });
+        }
+        const firstImgId = imageIds.find(id => Boolean(imageMap[id])) || imageIds[0];
+        return ((0,jsx_runtime.jsxs)("div", { className: "xhs-note-real-image-frame", style: getImageFrameStyle(note.imageWidth, note.imageHeight), children: [(0,jsx_runtime.jsx)("img", { src: imageMap[firstImgId], alt: "", className: "xhs-note-real-image" }), !isDetail && imageIds.length > 1 ? ((0,jsx_runtime.jsx)("div", { className: "xhs-waterfall-multi-badge", children: (0,jsx_runtime.jsxs)("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: [(0,jsx_runtime.jsx)("rect", { x: "3", y: "3", width: "14", height: "14", rx: "2" }), (0,jsx_runtime.jsx)("path", { d: "M7 21h12a2 2 0 0 0 2-2V7" })] }) })) : null] }));
+    }
+    if (note.imageDescription?.trim() && !hideTextImageDescription) {
+        return ((0,jsx_runtime.jsx)("div", { className: `cp-xhs-cover cp-xhs-cover--${note.tone} xhs-note-text-image`, style: TEXT_XHS_IMAGE_FRAME_STYLE, children: (0,jsx_runtime.jsx)("span", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: note.imageDescription, tone: "xiaohongshu", collapseBilingualTranslation: collapseBilingualTranslation }) }) }));
+    }
+    return ((0,jsx_runtime.jsx)("div", { className: `cp-xhs-cover cp-xhs-cover--${note.tone}`, style: getIconImageFrameStyle(note), children: (0,jsx_runtime.jsx)("span", { className: "cp-xhs-cover-icon", children: note.coverIcon }) }));
+}
+function NoteCard({ note, imageMap, avatarSrc, onOpen, hideTextImageDescription, collapseBilingualTranslation, }) {
+    const variant = getNoteCardVariant(note);
+    return ((0,jsx_runtime.jsxs)("button", { type: "button", className: `cp-xhs-note-card cp-xhs-note-card--${variant}`, onClick: onOpen, children: [(0,jsx_runtime.jsx)(NoteImage, { note: note, imageMap: imageMap, hideTextImageDescription: hideTextImageDescription, collapseBilingualTranslation: collapseBilingualTranslation }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-note-body", children: [(0,jsx_runtime.jsx)("strong", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: note.title, tone: "xiaohongshu", collapseBilingualTranslation: collapseBilingualTranslation }) }), (0,jsx_runtime.jsx)("p", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: note.body, tone: "xiaohongshu", collapseBilingualTranslation: collapseBilingualTranslation }) }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-note-foot", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-note-author", children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-note-author-avatar", src: avatarSrc, name: note.authorName }), (0,jsx_runtime.jsx)("span", { children: note.authorName })] }), (0,jsx_runtime.jsxs)("em", { className: note.liked ? "is-liked" : "", children: [(0,jsx_runtime.jsx)(Heart, { size: 12, strokeWidth: 2.4, fill: note.liked ? "currentColor" : "none" }), formatCount(note.likeCount)] })] })] })] }));
+}
+function orderCommentsForDisplay(comments) {
+    const byId = new Map(comments.map(comment => [comment.id, comment]));
+    const indexById = new Map(comments.map((comment, index) => [comment.id, index]));
+    const childrenByParent = new Map();
+    const childIds = new Set();
+    function wouldCreateCycle(commentId, parentId) {
+        const seen = new Set([commentId]);
+        let currentId = parentId;
+        while (currentId) {
+            if (seen.has(currentId))
+                return true;
+            seen.add(currentId);
+            currentId = byId.get(currentId)?.replyToCommentId || "";
+        }
+        return false;
+    }
+    comments.forEach((comment) => {
+        const parentId = comment.replyToCommentId;
+        if (!parentId || !byId.has(parentId) || wouldCreateCycle(comment.id, parentId))
+            return;
+        childIds.add(comment.id);
+        const children = childrenByParent.get(parentId) ?? [];
+        children.push(comment);
+        childrenByParent.set(parentId, children);
+    });
+    // 小红书式二级平铺：每条顶级评论下，把它的全部后代（回复、回复的回复…）
+    // 平铺成一层，统一按添加顺序排——避免线程式 DFS 里"回复的回复"插队到
+    // 更早的同级回复前面。
+    const ordered = [];
+    const visited = new Set();
+    function collectDescendants(id, acc) {
+        for (const child of childrenByParent.get(id) ?? []) {
+            if (visited.has(child.id))
+                continue;
+            visited.add(child.id);
+            acc.push(child);
+            collectDescendants(child.id, acc);
+        }
+    }
+    for (const comment of comments) {
+        if (childIds.has(comment.id) || visited.has(comment.id))
+            continue;
+        visited.add(comment.id);
+        ordered.push(comment);
+        const descendants = [];
+        collectDescendants(comment.id, descendants);
+        descendants.sort((a, b) => (indexById.get(a.id) ?? 0) - (indexById.get(b.id) ?? 0));
+        ordered.push(...descendants);
+    }
+    // 兜底：循环引用等漏网的评论追加在末尾
+    for (const comment of comments) {
+        if (!visited.has(comment.id)) {
+            visited.add(comment.id);
+            ordered.push(comment);
+        }
+    }
+    return ordered;
+}
+function collectCommentThreadIds(comments, rootId) {
+    const ids = new Set([rootId]);
+    let changed = true;
+    while (changed) {
+        changed = false;
+        comments.forEach((comment) => {
+            if (comment.replyToCommentId && ids.has(comment.replyToCommentId) && !ids.has(comment.id)) {
+                ids.add(comment.id);
+                changed = true;
+            }
+        });
+    }
+    return ids;
+}
+function CommentList({ comments, getAvatar, onReply, onDeleteComment, onVoteComment, collapseBilingualTranslation, }) {
+    if (comments.length === 0)
+        return (0,jsx_runtime.jsx)("div", { className: "cp-xhs-mini-empty", children: "\u8FD8\u6CA1\u6709\u8BC4\u8BBA" });
+    const orderedComments = orderCommentsForDisplay(comments);
+    return ((0,jsx_runtime.jsx)(jsx_runtime.Fragment, { children: orderedComments.map((comment) => {
+            const parentComment = comment.replyToCommentId
+                ? comments.find(item => item.id === comment.replyToCommentId)
+                : null;
+            const targetName = parentComment?.authorName ?? (!comment.replyToCommentId ? comment.replyTo : undefined);
+            const depth = parentComment || (!comment.replyToCommentId && comment.replyTo) ? 1 : 0;
+            return ((0,jsx_runtime.jsxs)("div", { className: `cp-xhs-comment-card cp-xhs-comment-card--depth-${depth}`, children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-comment-avatar", src: getAvatar(comment), name: comment.authorName }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-comment-content", children: [(0,jsx_runtime.jsxs)("strong", { children: [comment.authorName, targetName ? (0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("span", { className: "cp-xhs-comment-reply-label", children: "\u56DE\u590D" }), targetName] }) : null] }), (0,jsx_runtime.jsx)("p", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: comment.text, tone: "xiaohongshu", variant: "inline", collapseBilingualTranslation: collapseBilingualTranslation }) }), (0,jsx_runtime.jsxs)("div", { className: "xhs-comment-actions", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-comment-text-actions", children: [(0,jsx_runtime.jsx)("time", { className: "xhs-comment-time", dateTime: comment.createdAt, children: formatTime(comment.createdAt) }), (0,jsx_runtime.jsx)("button", { type: "button", onClick: () => onReply(comment), children: "\u56DE\u590D" }), (0,jsx_runtime.jsx)("button", { type: "button", onClick: () => onDeleteComment(comment), children: "\u5220\u9664" })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-comment-vote-actions", children: [(0,jsx_runtime.jsxs)("button", { type: "button", className: `xhs-comment-vote-btn ${comment.liked ? "is-active" : ""}`, onClick: () => onVoteComment(comment, "like"), "aria-label": "\u70B9\u8D5E\u8BC4\u8BBA", children: [(0,jsx_runtime.jsx)(Heart, { size: 20, strokeWidth: 2.15, fill: comment.liked ? "currentColor" : "none" }), comment.likeCount > 0 ? (0,jsx_runtime.jsx)("span", { children: formatCount(comment.likeCount) }) : null] }), (0,jsx_runtime.jsxs)("button", { type: "button", className: `xhs-comment-vote-btn ${comment.disliked ? "is-active is-disliked" : ""}`, onClick: () => onVoteComment(comment, "dislike"), "aria-label": "\u70B9\u8E29\u8BC4\u8BBA", children: [(0,jsx_runtime.jsx)(XhsDislikeIcon, {}), comment.dislikeCount > 0 ? (0,jsx_runtime.jsx)("span", { children: formatCount(comment.dislikeCount) }) : null] })] })] })] })] }, comment.id));
+        }) }));
+}
+function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBusyChange }) {
+    const [state, setState] = (0,react.useState)(() => (0,xiaohongshu_storage.loadXiaohongshuState)());
+    const [characters, setCharacters] = (0,react.useState)([]);
+    const [selectedTab, setSelectedTab] = (0,react.useState)("home");
+    const [homeFeedTab, setHomeFeedTab] = (0,react.useState)("discover");
+    const [settingsOpen, setSettingsOpen] = (0,react.useState)(false);
+    const [profileOpen, setProfileOpen] = (0,react.useState)(!(0,identity/* hasUserProfile */.l2)());
+    const [composeOpen, setComposeOpen] = (0,react.useState)(false);
+    const [selectedNoteId, setSelectedNoteId] = (0,react.useState)(null);
+    const [busy, setBusy] = (0,react.useState)("idle");
+    const [error, setError] = (0,react.useState)("");
+    const [debugErrorTitle, setDebugErrorTitle] = (0,react.useState)("暂时无法完成小红书操作。");
+    const [debugRawOutput, setDebugRawOutput] = (0,react.useState)("");
+    const [debugParseError, setDebugParseError] = (0,react.useState)("");
+    const [imageMap, setImageMap] = (0,react.useState)({});
+    const [profileTopbarVisible, setProfileTopbarVisible] = (0,react.useState)(false);
+    const [profileTab, setProfileTab] = (0,react.useState)("notes");
+    const [commentDraft, setCommentDraft] = (0,react.useState)("");
+    const [replyTarget, setReplyTarget] = (0,react.useState)(null);
+    const [commentComposerFocused, setCommentComposerFocused] = (0,react.useState)(false);
+    const [videoCommentsOpen, setVideoCommentsOpen] = (0,react.useState)(false);
+    const videoSwipeStartRef = (0,react.useRef)(null);
+    const videoLastWheelAtRef = (0,react.useRef)(0);
+    const videoSettleTimerRef = (0,react.useRef)(null);
+    const [videoDragOffset, setVideoDragOffset] = (0,react.useState)(0);
+    const [videoDragSettling, setVideoDragSettling] = (0,react.useState)(false);
+    const [videoDragDirection, setVideoDragDirection] = (0,react.useState)(null);
+    const [videoCaptionExpanded, setVideoCaptionExpanded] = (0,react.useState)(false);
+    const [videoCaptionCanExpand, setVideoCaptionCanExpand] = (0,react.useState)(false);
+    const [collapsedVideoCaption, setCollapsedVideoCaption] = (0,react.useState)("");
+    const videoCaptionMeasureRef = (0,react.useRef)(null);
+    const [messagePanel, setMessagePanel] = (0,react.useState)(null);
+    const [selectedDmThreadId, setSelectedDmThreadId] = (0,react.useState)(null);
+    const [dmDraft, setDmDraft] = (0,react.useState)("");
+    const [dmEmojiOpen, setDmEmojiOpen] = (0,react.useState)(false);
+    const [commentEmojiOpen, setCommentEmojiOpen] = (0,react.useState)(false);
+    const [commentMentionOpen, setCommentMentionOpen] = (0,react.useState)(false);
+    const [deleteTarget, setDeleteTarget] = (0,react.useState)(null);
+    const [pendingFeedAction, setPendingFeedAction] = (0,react.useState)(null);
+    const [profileDraft, setProfileDraft] = (0,react.useState)(state.profile);
+    const [settingsDraft, setSettingsDraft] = (0,react.useState)(state.settings);
+    const [expandedPrompts, setExpandedPrompts] = (0,react.useState)(new Set());
+    const [draft, setDraft] = (0,react.useState)({
+        title: "",
+        body: "",
+        tags: [],
+        image: {},
+    });
+    const [tagInput, setTagInput] = (0,react.useState)("");
+    const fileRef = (0,react.useRef)(null);
+    const profileCoverFileRef = (0,react.useRef)(null);
+    const profileAvatarFileRef = (0,react.useRef)(null); // ANON-FORK: independent local avatar.
+    const mainScrollRef = (0,react.useRef)(null);
+    const detailScrollRef = (0,react.useRef)(null);
+    const mainScrollTopRef = (0,react.useRef)(0);
+    const selectedNote = selectedNoteId ? state.notes.find(note => note.id === selectedNoteId) ?? null : null;
+    // CUSTOM-APP-ADAPTER: Host owns requests; closing is unconditional.
+    const requestClose = () => onClose(false);
+    const commentComposerExpanded = commentComposerFocused || Boolean(commentDraft.trim()) || Boolean(replyTarget) || commentEmojiOpen || commentMentionOpen;
+    const unreadCount = state.notifications.reduce((total, item) => total + notificationUnreadWeight(item), 0);
+    const engagementUnreadCount = state.notifications.reduce((total, item) => {
+        if (item.type !== "like" && item.type !== "save")
+            return total;
+        return total + notificationUnreadWeight(item);
+    }, 0);
+    const followUnreadCount = state.notifications.filter(item => item.unread && item.type === "follow").length;
+    const commentUnreadCount = state.notifications.filter(item => item.unread && item.type === "comment").length;
+    const dmNotifications = state.notifications.filter(item => item.type === "dm");
+    const dmThreads = (0,react.useMemo)(() => {
+        const groups = new Map();
+        dmNotifications.forEach((notice) => {
+            const threadName = notice.threadName?.trim() || notice.actorName.trim() || "小红书用户";
+            const threadId = notice.threadId?.trim() || `dm:${threadName}`;
+            groups.set(threadId, [...(groups.get(threadId) ?? []), notice]);
+        });
+        return Array.from(groups.entries())
+            .flatMap(([threadId, notifications]) => {
+            const sorted = [...notifications].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+            const latest = sorted[sorted.length - 1];
+            if (!latest)
+                return [];
+            const actorName = latest.threadName || sorted.find(item => item.direction !== "outgoing")?.actorName || latest.actorName || "小红书用户";
+            return [{
+                    id: threadId,
+                    actorName,
+                    notifications: sorted,
+                    latest,
+                    unreadCount: sorted.reduce((total, item) => total + notificationUnreadWeight(item), 0),
+                }];
+        })
+            .sort((a, b) => Date.parse(b.latest.createdAt) - Date.parse(a.latest.createdAt));
+    }, [dmNotifications]);
+    const selectedDmThread = selectedDmThreadId ? dmThreads.find(thread => thread.id === selectedDmThreadId) ?? null : null;
+    const selectedMessageNotifications = messagePanel
+        ? state.notifications.filter(item => messagePanel === "engagement" ? item.type === "like" || item.type === "save" : item.type === messagePanel)
+        : [];
+    const selectedMessagePanelLabel = messagePanel === "engagement" ? "点赞和收藏" : messagePanel === "follow" ? "新增关注" : messagePanel === "comment" ? "评论" : "";
+    const selectedMessagePanelTitle = messagePanel === "engagement" ? "收到的赞和收藏" : selectedMessagePanelLabel;
+    const isMessageSubpage = selectedTab === "messages" && (Boolean(messagePanel) || Boolean(selectedDmThread));
+    const selectedAuthorAccount = selectedNote ? makeAccountFromNote(selectedNote) : null;
+    const selectedAuthorFollowing = isFollowingAccount(selectedAuthorAccount);
+    (0,react.useEffect)(() => {
+        const isBusy = busy !== "idle";
+        onBusyChange?.(isBusy);
+        if (!visible && !isBusy) {
+            onIdle?.();
+        }
+    }, [busy, visible, onBusyChange, onIdle]);
+    const hiddenFeedNoteIds = (0,react.useMemo)(() => new Set(state.feedHiddenNoteIds), [state.feedHiddenNoteIds]);
+    const followedAccountKeys = (0,react.useMemo)(() => new Set(state.socialGraph.following.map(accountKey)), [state.socialGraph.following]);
+    const discoverNotes = (0,react.useMemo)(() => state.notes.filter(note => note.type === "post" && note.feedScope !== "nearby" && !hiddenFeedNoteIds.has(note.id)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [hiddenFeedNoteIds, state.notes]);
+    const nearbyNotes = (0,react.useMemo)(() => state.notes.filter(note => note.type === "post" && note.feedScope === "nearby" && !hiddenFeedNoteIds.has(note.id)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [hiddenFeedNoteIds, state.notes]);
+    const followedNotes = (0,react.useMemo)(() => state.notes.filter(note => note.source !== "user" && !hiddenFeedNoteIds.has(note.id) && followedAccountKeys.has(noteAuthorKey(note))).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [followedAccountKeys, hiddenFeedNoteIds, state.notes]);
+    const videoNotes = (0,react.useMemo)(() => state.notes.filter(note => note.type === "video" && !hiddenFeedNoteIds.has(note.id)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [hiddenFeedNoteIds, state.notes]);
+    const activeHomeNotes = homeFeedTab === "follow" ? followedNotes : homeFeedTab === "video" ? videoNotes : discoverNotes;
+    const activeVideoNoteIndex = (0,react.useMemo)(() => videoNotes.findIndex(note => note.id === selectedNoteId), [selectedNoteId, videoNotes]);
+    const activeVideoCaption = selectedNote?.type === "video" ? selectedNote.body : "";
+    const myNotes = (0,react.useMemo)(() => state.notes.filter(note => note.source === "user").sort((a, b) => b.createdAt.localeCompare(a.createdAt)), [state.notes]);
+    const profileNotes = (0,react.useMemo)(() => {
+        if (profileTab === "notes")
+            return myNotes;
+        const ids = profileTab === "comments"
+            ? [
+                ...state.userInteractions.commentedNoteIds,
+                ...state.notes.filter(note => note.comments.some(comment => comment.authorType === "user")).map(note => note.id),
+            ]
+            : profileTab === "saved"
+                ? [
+                    ...state.userInteractions.savedNoteIds,
+                    ...state.notes.filter(note => note.saved).map(note => note.id),
+                ]
+                : profileTab === "liked"
+                    ? [
+                        ...state.userInteractions.likedNoteIds,
+                        ...state.notes.filter(note => note.liked).map(note => note.id),
+                    ]
+                    : [];
+        const idSet = new Set(ids);
+        return state.notes
+            .filter(note => idSet.has(note.id))
+            .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    }, [myNotes, profileTab, state.notes, state.userInteractions]);
+    const homeColumns = (0,react.useMemo)(() => splitColumns(activeHomeNotes), [activeHomeNotes]);
+    const nearbyColumns = (0,react.useMemo)(() => splitColumns(nearbyNotes), [nearbyNotes]);
+    const profileColumns = (0,react.useMemo)(() => splitColumns(profileNotes), [profileNotes]);
+    const videoMovableStyle = {
+        transform: `translate3d(0, ${videoDragOffset}px, 0)`,
+        transition: videoDragSettling ? "transform 190ms cubic-bezier(0.2, 0.82, 0.2, 1)" : "none",
+        willChange: "transform",
+    };
+    const videoPreviewNote = videoDragDirection ? getSiblingVideo(videoDragDirection) : undefined;
+    const videoPreviewStyle = videoDragDirection
+        ? {
+            transform: videoDragDirection === "next"
+                ? `translate3d(0, calc(${videoDragOffset}px + 100vh), 0)`
+                : `translate3d(0, calc(${videoDragOffset}px - 100vh), 0)`,
+            transition: videoDragSettling ? "transform 190ms cubic-bezier(0.2, 0.82, 0.2, 1)" : "none",
+            willChange: "transform",
+            pointerEvents: "none",
+        }
+        : null;
+    const userIdentity = (0,settings/* resolveUserIdentity */.GH)(undefined, "xiaohongshu") ?? (0,settings/* resolveUserIdentity */.GH)();
+    const userAvatar = userIdentity?.avatarUrl || pickDefaultAvatar(`user:${userIdentity?.id || state.profile.nickname}`);
+    const profileCoverImage = state.profile.coverImageAssetId ? imageMap[state.profile.coverImageAssetId] : "";
+    const profileCoverStyle = profileCoverImage
+        ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.34), rgba(0,0,0,0.54)), url(${profileCoverImage})` }
+        : undefined;
+    const profileStats = (0,react.useMemo)(() => ({
+        followingCount: state.socialGraph.following.length,
+        followerCount: state.socialGraph.followers.length,
+        likedAndSavedCount: state.notes
+            .filter(note => note.source === "user")
+            .reduce((total, note) => total + note.likeCount + note.saveCount, 0),
+    }), [state.notes, state.socialGraph.followers.length, state.socialGraph.following.length]);
+    const characterAvatarMap = (0,react.useMemo)(() => {
+        const map = new Map();
+        characters.forEach((character) => {
+            if (character.avatar)
+                map.set(character.id, character.avatar);
+        });
+        return map;
+    }, [characters]);
+    const followedMentionCharacters = (0,react.useMemo)(() => {
+        const characterById = new Map(characters.map(character => [character.id, character]));
+        return state.socialGraph.following
+            .filter(account => account.type === "character")
+            .map(account => {
+            const character = characterById.get(account.id);
+            if (!character)
+                return null;
+            return {
+                account,
+                character,
+                displayName: account.name || resolveCharacterXiaohongshuDisplayName(character),
+                avatar: account.avatar || character.avatar || "",
+            };
+        })
+            .filter((item) => Boolean(item));
+    }, [characters, state.socialGraph.following]);
+    function findMentionCharacterInText(text) {
+        return [...followedMentionCharacters]
+            .sort((left, right) => right.displayName.length - left.displayName.length)
+            .find(item => text.includes(`@${item.displayName}`))
+            ?.character;
+    }
+    function clearErrorState() {
+        setError("");
+        setDebugErrorTitle("暂时无法完成小红书操作。");
+        setDebugRawOutput("");
+        setDebugParseError("");
+    }
+    function handleGenerationError(err, title = "暂时无法完成小红书操作。") {
+        const message = err instanceof Error ? err.message : String(err);
+        setDebugErrorTitle(title);
+        setError(message);
+        if (err instanceof XiaohongshuGenerationError) {
+            setDebugRawOutput(err.rawOutput || "");
+            setDebugParseError(err.parseError || "");
+        }
+        else {
+            setDebugRawOutput("");
+            setDebugParseError(message);
+        }
+        onNotice?.(message);
+    }
+    function resolveAuthorAvatar(source, authorId, authorName, seed) {
+        if (source === "user")
+            return userAvatar;
+        if (source === "character")
+            return characterAvatarMap.get(authorId) || pickDefaultAvatar(`character:${authorId || authorName}`);
+        return pickDefaultAvatar(`npc:${authorName || authorId || seed}`);
+    }
+    function getNoteAvatar(note) {
+        return resolveAuthorAvatar(note.source, note.authorId, note.authorName, note.id);
+    }
+    function getCommentAvatar(comment) {
+        return resolveAuthorAvatar(comment.authorType, comment.authorId, comment.authorName, comment.id);
+    }
+    function getNotificationAvatar(actorName, seed) {
+        const character = characters.find(item => item.name === actorName || resolveCharacterXiaohongshuDisplayName(item) === actorName);
+        if (character?.avatar)
+            return character.avatar;
+        if (actorName === state.profile.nickname || actorName === userIdentity?.name)
+            return userAvatar;
+        return pickDefaultAvatar(`notice:${actorName || seed}`);
+    }
+    function getNotificationNote(notice) {
+        if (!notice.noteId)
+            return null;
+        return state.notes.find(note => note.id === notice.noteId) ?? null;
+    }
+    function renderNotificationThumbnail(notice) {
+        const note = getNotificationNote(notice);
+        if (note?.imageAssetId && imageMap[note.imageAssetId]) {
+            return (0,jsx_runtime.jsx)("img", { src: imageMap[note.imageAssetId], alt: "" });
+        }
+        return (0,jsx_runtime.jsx)("span", { children: getXhsPlainText(notice.thumbnailText || note?.title || "笔记") });
+    }
+    function notificationEngagementCount(notice) {
+        if (notice.type !== "like" && notice.type !== "save")
+            return 1;
+        return Math.max(1, Math.round(notice.count ?? parseNotificationCountFromText(notice.text)));
+    }
+    function notificationUnreadWeight(notice) {
+        if (!notice.unread)
+            return 0;
+        return notificationEngagementCount(notice);
+    }
+    function notificationActorLabel(notice) {
+        if (notice.type === "like" || notice.type === "save") {
+            const match = notice.text.match(/^(.+?)等\s*[0-9][\d.,，]*(?:\.\d+)?\s*(?:[kKwW万千])?\s*人/);
+            return match?.[1]?.trim() || notice.actorName;
+        }
+        return notice.actorName;
+    }
+    function formatNotificationAction(notice) {
+        if (notice.type === "like") {
+            const count = notificationEngagementCount(notice);
+            return count > 1 ? `等${formatCount(count)}人赞了你的笔记` : "赞了你的笔记";
+        }
+        if (notice.type === "save") {
+            const count = notificationEngagementCount(notice);
+            return count > 1 ? `等${formatCount(count)}人收藏了你的笔记` : "收藏了你的笔记";
+        }
+        if (notice.type === "follow")
+            return "关注了你";
+        if (notice.type === "comment")
+            return "评论了你的笔记";
+        return notice.text;
+    }
+    function formatNotificationPreview(notice) {
+        if (notice.type !== "comment")
+            return "";
+        return notice.text
+            .replace(new RegExp(`^${notice.actorName}\\s*(评论了你的笔记|回复了你)[:：]?\\s*`), "")
+            .trim();
+    }
+    function notificationMatchesMessagePanel(notice, panel) {
+        if (panel === "engagement")
+            return notice.type === "like" || notice.type === "save";
+        return notice.type === panel;
+    }
+    function handleOpenMessagePanel(panel) {
+        setSelectedDmThreadId(null);
+        setMessagePanel(panel);
+        setState((current) => {
+            let hasUnread = false;
+            const notifications = current.notifications.map((notice) => {
+                if (!notice.unread || !notificationMatchesMessagePanel(notice, panel))
+                    return notice;
+                hasUnread = true;
+                return { ...notice, unread: false };
+            });
+            if (!hasUnread)
+                return current;
+            return (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...current,
+                notifications,
+            });
+        });
+    }
+    function handleOpenDmThread(thread) {
+        setMessagePanel(null);
+        setSelectedDmThreadId(thread.id);
+        const noticeIds = new Set(thread.notifications.map(notice => notice.id));
+        setState((current) => {
+            let hasUnread = false;
+            const notifications = current.notifications.map((notice) => {
+                if (!notice.unread || !noticeIds.has(notice.id))
+                    return notice;
+                hasUnread = true;
+                return { ...notice, unread: false };
+            });
+            if (!hasUnread)
+                return current;
+            return (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...current,
+                notifications,
+            });
+        });
+    }
+    function createOutgoingDmMessage(thread, text, createdAt = new Date().toISOString()) {
+        const userName = state.profile.nickname || userIdentity?.name || "我";
+        return {
+            ...(0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+                type: "dm",
+                actorName: userName,
+                text,
+                thumbnailText: "私信",
+                direction: "outgoing",
+                threadId: thread.id,
+                threadName: thread.actorName,
+                unread: false,
+            }),
+            createdAt,
+        };
+    }
+    function handleSendDmMessage(thread) {
+        const text = dmDraft.trim();
+        if (!text || busy !== "idle")
+            return;
+        setDmDraft("");
+        setDmEmojiOpen(false);
+        clearErrorState();
+        const userMessage = createOutgoingDmMessage(thread, text);
+        const current = (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+            ...state,
+            notifications: [userMessage, ...state.notifications],
+        });
+        setState(current);
+    }
+    async function handleGenerateDmReply(thread) {
+        if (busy !== "idle")
+            return;
+        // CUSTOM-APP-ADAPTER: save the original handler input before the first await.
+        if (!(await (0,tasks/* beginAction */.yU)("handleGenerateDmReply", { state, draft, tagInput, commentDraft, replyTarget, selectedNoteId, dmDraft, selectedDmThreadId }, [thread])))
+            return;
+        setBusy("dm-reply");
+        clearErrorState();
+        setDmEmojiOpen(false);
+        const pendingText = dmDraft.trim();
+        const pendingMessage = pendingText ? createOutgoingDmMessage(thread, pendingText, new Date().toISOString()) : null;
+        if (pendingMessage)
+            setDmDraft("");
+        let current = pendingMessage
+            ? (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...state,
+                notifications: [pendingMessage, ...state.notifications],
+            })
+            : state;
+        if (pendingMessage)
+            setState(current);
+        const threadId = thread.id;
+        const threadName = thread.actorName;
+        const userName = state.profile.nickname || userIdentity?.name || "我";
+        const baseMessages = pendingMessage ? [...thread.notifications, pendingMessage] : thread.notifications;
+        const latestUserText = pendingMessage?.text ?? [...baseMessages].reverse().find(message => message.direction === "outgoing")?.text ?? "";
+        if (!latestUserText) {
+            await (0,tasks/* finishAction */._Q)(); // CUSTOM-APP-ADAPTER: no request started.
+            setBusy("idle");
+            onNotice?.("请先发送一条私信");
+            return;
+        }
+        try {
+            const reply = await generateXiaohongshuNpcDmReply({
+                threadName,
+                userName,
+                messages: baseMessages,
+                latestUserText,
+                settings: current.settings,
+            });
+            const replies = reply.messages
+                .filter(Boolean)
+                .map((message, index) => ({
+                ...(0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+                    type: "dm",
+                    actorName: threadName,
+                    text: message,
+                    thumbnailText: "私信",
+                    direction: "incoming",
+                    threadId,
+                    threadName,
+                    unread: selectedDmThreadId !== threadId,
+                }),
+                createdAt: new Date((0,tasks/* actionNow */.$P)() + index + 1).toISOString(),
+            }));
+            if (replies.length > 0) {
+                current = (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                    ...current,
+                    notifications: [...replies, ...current.notifications],
+                });
+                setState(current);
+            }
+        }
+        catch (err) {
+            handleGenerationError(err, "暂时无法生成私信回复。");
+        }
+        finally {
+            await (0,tasks/* finishAction */._Q)(); // CUSTOM-APP-ADAPTER: durable checkpoint.
+            setBusy("idle");
+        }
+    }
+    function touchCharacterMemory(character) {
+        (0,memory/* incrementEventCounter */.aD)(character.id);
+        (0,memory/* maybeRunSummarization */.ZL)(character.id, character.name)
+            .catch(err => console.warn("[Xiaohongshu] Summarization check failed:", err));
+    }
+    function recordCharacterThreadCommentEvents(character, sourceNote, appliedNote, threadComments) {
+        threadComments
+            .filter(comment => comment.authorType === "character"
+            && comment.authorId === character.id
+            && comment.text.trim()
+            && (comment.replyToCommentId || comment.replyTo))
+            .forEach((comment) => {
+            const targetComment = comment.replyToCommentId
+                ? appliedNote.comments.find(item => item.id === comment.replyToCommentId)
+                : undefined;
+            recordXiaohongshuReplyEvent({
+                characterId: character.id,
+                characterName: character.name,
+                note: sourceNote,
+                comment,
+                targetComment,
+            });
+        });
+    }
+    function makeCharacterAccount(character) {
+        return {
+            type: "character",
+            id: character.id,
+            name: resolveCharacterXiaohongshuDisplayName(character),
+            avatar: character.avatar || undefined,
+            followedAt: new Date().toISOString(),
+        };
+    }
+    function makeAccountFromNote(note) {
+        if (note.source === "user")
+            return null;
+        return {
+            type: note.source,
+            id: note.authorId || (note.source === "npc" ? (0,xiaohongshu_storage/* makeXiaohongshuNpcId */.YS)(note.authorName) : note.source),
+            name: note.authorName,
+            followedAt: new Date().toISOString(),
+        };
+    }
+    function isFollowingAccount(account) {
+        if (!account)
+            return false;
+        const key = accountKey(account);
+        return state.socialGraph.following.some(item => accountKey(item) === key);
+    }
+    function addFollowersToState(current, accounts, note) {
+        const existing = new Set(current.socialGraph.followers.map(accountKey));
+        const added = dedupeAccounts(accounts.filter(account => account.name.trim()))
+            .filter(account => !existing.has(accountKey(account)))
+            .map(account => ({ ...account, followedAt: account.followedAt || new Date().toISOString() }));
+        if (added.length === 0)
+            return { next: current, added };
+        const notifications = added.map(account => (0,xiaohongshu_storage/* makeXiaohongshuNotification */.LM)({
+            type: "follow",
+            noteId: note?.id,
+            actorName: account.name,
+            text: `${account.name} 关注了你`,
+            thumbnailText: note?.title,
+            unread: true,
+        }));
+        return {
+            added,
+            next: {
+                ...current,
+                profile: {
+                    ...current.profile,
+                    followerCount: current.socialGraph.followers.length + added.length,
+                },
+                socialGraph: {
+                    ...current.socialGraph,
+                    followers: [...added, ...current.socialGraph.followers],
+                },
+                notifications: [...notifications, ...current.notifications],
+            },
+        };
+    }
+    (0,react.useEffect)(() => {
+        setCharacters((0,adapters_characters/* loadCharacters */.fR)());
+        return (0,adapters_characters/* subscribeCharacters */.tX)(() => setCharacters((0,adapters_characters/* loadCharacters */.fR)()));
+    }, []);
+    (0,react.useEffect)(() => {
+        const handleExternalUpdate = () => {
+            setState((0,xiaohongshu_storage.loadXiaohongshuState)());
+            setImageMap({});
+        };
+        window.addEventListener("xiaohongshu-updated", handleExternalUpdate);
+        return () => window.removeEventListener("xiaohongshu-updated", handleExternalUpdate);
+    }, []);
+    (0,react.useEffect)(() => {
+        setProfileTopbarVisible(false);
+        if (selectedTab !== "messages") {
+            setMessagePanel(null);
+            setSelectedDmThreadId(null);
+            setDmEmojiOpen(false);
+        }
+    }, [selectedTab]);
+    (0,react.useEffect)(() => {
+        setDmDraft("");
+        setDmEmojiOpen(false);
+    }, [selectedDmThreadId]);
+    (0,react.useEffect)(() => {
+        setCommentDraft("");
+        setReplyTarget(null);
+        setCommentComposerFocused(false);
+        setVideoCommentsOpen(false);
+        setVideoDragOffset(0);
+        setVideoDragSettling(false);
+        setVideoDragDirection(null);
+        setVideoCaptionExpanded(false);
+        setVideoCaptionCanExpand(false);
+        setCollapsedVideoCaption("");
+    }, [selectedNoteId]);
+    (0,react.useLayoutEffect)(() => {
+        if (selectedNoteId) {
+            detailScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+            return;
+        }
+        mainScrollRef.current?.scrollTo({ top: mainScrollTopRef.current, left: 0, behavior: "auto" });
+    }, [selectedNoteId]);
+    (0,react.useEffect)(() => {
+        return () => {
+            if (videoSettleTimerRef.current !== null) {
+                window.clearTimeout(videoSettleTimerRef.current);
+            }
+        };
+    }, []);
+    (0,react.useEffect)(() => {
+        if (!activeVideoCaption) {
+            setVideoCaptionCanExpand(false);
+            setCollapsedVideoCaption("");
+            return;
+        }
+        if (videoCaptionExpanded)
+            return;
+        const frame = window.requestAnimationFrame(() => {
+            const measureNode = videoCaptionMeasureRef.current;
+            if (!measureNode)
+                return;
+            const computedStyle = window.getComputedStyle(measureNode);
+            const lineHeight = Number.parseFloat(computedStyle.lineHeight) || 19.6;
+            const maxHeight = lineHeight * 3 + 1;
+            measureNode.textContent = activeVideoCaption;
+            if (measureNode.scrollHeight <= maxHeight) {
+                setVideoCaptionCanExpand(false);
+                setCollapsedVideoCaption(activeVideoCaption);
+                return;
+            }
+            let left = 0;
+            let right = activeVideoCaption.length;
+            let best = "";
+            while (left <= right) {
+                const middle = Math.floor((left + right) / 2);
+                const candidate = activeVideoCaption.slice(0, middle).trimEnd();
+                measureNode.textContent = `${candidate}...  展开`;
+                if (measureNode.scrollHeight <= maxHeight) {
+                    best = candidate;
+                    left = middle + 1;
+                }
+                else {
+                    right = middle - 1;
+                }
+            }
+            setVideoCaptionCanExpand(true);
+            setCollapsedVideoCaption(best.slice(0, Math.max(0, best.length - 1)).trimEnd());
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [selectedNote?.id, activeVideoCaption, videoCaptionExpanded]);
+    (0,react.useEffect)(() => {
+        const assetIds = Array.from(new Set([
+            ...state.notes.flatMap(note => (note.imageAssetIds && note.imageAssetIds.length > 0 ? note.imageAssetIds : [note.imageAssetId])),
+            state.profile.coverImageAssetId,
+        ].filter(Boolean)));
+        assetIds.forEach((assetId) => {
+            if (imageMap[assetId])
+                return;
+            (0,media/* getChatImageFromIndexedDB */.HF)(assetId)
+                .then((dataUrl) => {
+                if (dataUrl)
+                    setImageMap(prev => ({ ...prev, [assetId]: dataUrl }));
+            })
+                .catch(() => undefined);
+        });
+    }, [state.notes, state.profile.coverImageAssetId, imageMap]);
+    // CUSTOM-APP-ADAPTER: restore original handler inputs after iframe destruction.
+    const [recoveryStep, setRecoveryStep] = (0,react.useState)(0);
+    (0,react.useEffect)(() => {
+        const pending = (0,tasks/* pendingAction */.MU)();
+        if (!pending)
+            return;
+        const v = pending.view;
+        setState(v.state);
+        setDraft(v.draft);
+        setTagInput(v.tagInput);
+        setCommentDraft(v.commentDraft);
+        setReplyTarget(v.replyTarget);
+        setSelectedNoteId(v.selectedNoteId);
+        setDmDraft(v.dmDraft);
+        setSelectedDmThreadId(v.selectedDmThreadId);
+        setRecoveryStep(1);
+    }, []);
+    (0,react.useEffect)(() => {
+        if (recoveryStep !== 1 || !characters.length)
+            return;
+        setRecoveryStep(2);
+        const pending = (0,tasks/* pendingAction */.MU)();
+        if (!pending)
+            return;
+        const actions = { handleGenerateHomeContent, handlePublish, submitUserComment, handleLoadMoreComments, handleGenerateDmReply };
+        void actions[pending.kind]?.(...pending.args);
+    }, [recoveryStep, characters]);
+    function persist(next) {
+        const saved = (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)(next);
+        setState(saved);
+        return saved;
+    }
+    async function generateNpcFeedState(baseState, activeSettings) {
+        const generated = await generateXiaohongshuNpcFeed(activeSettings, baseState.socialGraph.following.filter(account => account.type === "npc"), baseState.profile.ipLocation, baseState.profile.nickname);
+        if (generated.length === 0)
+            throw new Error("没有解析到小红书笔记。");
+        return {
+            generated,
+            state: (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...baseState,
+                notes: [
+                    ...generated,
+                    ...baseState.notes,
+                ],
+            }),
+        };
+    }
+    async function generateCharacterActivityState(baseState, activeSettings) {
+        const ids = activeSettings.participantCharacterIds;
+        void (0,adapters_characters/* initializeNicknames */.QT)(ids); // ANON-FORK: one background batch, never awaited by feed.
+        let current = baseState;
+        if (ids.length === 0)
+            return current;
+        const participants = ids
+            .map(characterId => characters.find(item => item.id === characterId))
+            .filter((character) => Boolean(character));
+        let successCount = 0;
+        let firstError = null;
+        for (const character of participants) {
+            let activity = null;
+            try {
+                activity = await generateXiaohongshuCharacterActivity(character.id, current.notes.slice(0, 30), activeSettings);
+            }
+            catch (err) {
+                firstError ??= err;
+                console.warn("[Xiaohongshu] Character activity failed:", character.name, err);
+                continue;
+            }
+            if (!activity)
+                continue;
+            successCount += 1;
+            const collectedNotifications = [];
+            const updatedNotes = current.notes.map((note) => {
+                const related = activity.comments.filter(comment => comment.noteId === note.id);
+                if (related.length === 0)
+                    return note;
+                let nextNote = note;
+                for (const parsed of related) {
+                    if (!parsed.text.trim())
+                        continue;
+                    const result = applyCharacterActivityComment({
+                        note: nextNote,
+                        character,
+                        text: parsed.text,
+                        liked: parsed.liked,
+                        saved: parsed.saved,
+                        thread: parsed.thread,
+                    });
+                    nextNote = result.note;
+                    collectedNotifications.push(...result.notifications);
+                    recordXiaohongshuCommentEvent({
+                        characterId: character.id,
+                        characterName: character.name,
+                        note,
+                        comment: result.mainComment,
+                        liked: parsed.liked,
+                        saved: parsed.saved,
+                    });
+                    recordCharacterThreadCommentEvents(character, note, result.note, result.threadComments);
+                    touchCharacterMemory(character);
+                }
+                return nextNote;
+            });
+            const characterPost = createCharacterPost(character, activity);
+            if (characterPost) {
+                recordXiaohongshuPostEvent({
+                    characterId: character.id,
+                    characterName: character.name,
+                    note: characterPost,
+                });
+                recordCharacterThreadCommentEvents(character, characterPost, characterPost, characterPost.comments);
+                touchCharacterMemory(character);
+            }
+            current = (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...current,
+                notes: characterPost ? [characterPost, ...updatedNotes] : updatedNotes,
+                notifications: collectedNotifications.length > 0
+                    ? [...collectedNotifications, ...current.notifications]
+                    : current.notifications,
+            });
+            setState(current);
+        }
+        if (successCount === 0 && firstError) {
+            throw firstError instanceof Error ? firstError : new Error(String(firstError));
+        }
+        return current;
+    }
+    async function handleGenerateHomeContent() {
+        if (busy !== "idle")
+            return;
+        // CUSTOM-APP-ADAPTER: save the original handler input before the first await.
+        if (!(await (0,tasks/* beginAction */.yU)("handleGenerateHomeContent", { state, draft, tagInput, commentDraft, replyTarget, selectedNoteId, dmDraft, selectedDmThreadId }, [])))
+            return;
+        clearErrorState();
+        try {
+            const activeSettings = state.settings;
+            void (0,adapters_characters/* initializeNicknames */.QT)(activeSettings.participantCharacterIds); // ANON-FORK: overlaps NPC generation.
+            setBusy("npc-feed");
+            const { state: withNpc } = await generateNpcFeedState(state, activeSettings);
+            setState(withNpc);
+            if (activeSettings.participantCharacterIds.length > 0) {
+                setBusy("character-activity");
+                const withCharacters = await generateCharacterActivityState(withNpc, activeSettings);
+                setState(withCharacters);
+            }
+            onNotice?.("小红书内容已生成");
+        }
+        catch (err) {
+            handleGenerationError(err, "暂时无法刷新小红书内容。");
+        }
+        finally {
+            await (0,tasks/* finishAction */._Q)(); // CUSTOM-APP-ADAPTER: durable checkpoint.
+            setBusy("idle");
+        }
+    }
+    function handleSaveProfile() {
+        if (!(0,identity/* setUserProfile */.p)(profileDraft.nickname))
+            return; // ANON-FORK: no global user profile.
+        persist({
+            ...state,
+            profile: {
+                ...profileDraft,
+                followingCount: profileStats.followingCount,
+                followerCount: profileStats.followerCount,
+                likedAndSavedCount: profileStats.likedAndSavedCount,
+            },
+        });
+        setProfileOpen(false);
+    }
+    function handleSaveSettings() {
+        persist({
+            ...state,
+            settings: {
+                ...settingsDraft,
+                bilingualTranslationPrompt: settingsDraft.bilingualTranslationPrompt.trim() || bilingual_prompt_defaults/* DEFAULT_XIAOHONGSHU_BILINGUAL_PROMPT */.tQ,
+                sendToCharacterProbability: Math.max(0, Math.min(100, Number(settingsDraft.sendToCharacterProbability) || 0)),
+            },
+        });
+        setSettingsOpen(false);
+    }
+    function handleResetSettingsDraft() {
+        setSettingsDraft(xiaohongshu_types/* DEFAULT_XIAOHONGSHU_SETTINGS */.iK);
+    }
+    async function processImageFile(file) {
+        return new Promise((resolve) => {
+            const image = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            image.onload = () => {
+                const canvas = document.createElement("canvas");
+                const maxSize = 960;
+                const sourceWidth = image.width;
+                let sourceHeight = image.height;
+                const sourceX = 0;
+                let sourceY = 0;
+                if (sourceHeight / sourceWidth > XHS_MAX_IMAGE_HEIGHT_RATIO) {
+                    sourceHeight = Math.round(sourceWidth * XHS_MAX_IMAGE_HEIGHT_RATIO);
+                    sourceY = Math.round((image.height - sourceHeight) / 2);
+                }
+                let width = sourceWidth;
+                let height = sourceHeight;
+                if (width > maxSize || height > maxSize) {
+                    if (width > height) {
+                        height = Math.round(height / width * maxSize);
+                        width = maxSize;
+                    }
+                    else {
+                        width = Math.round(width / height * maxSize);
+                        height = maxSize;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const context = canvas.getContext("2d");
+                if (!context) {
+                    URL.revokeObjectURL(objectUrl);
+                    resolve(null);
+                    return;
+                }
+                context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+                canvas.toBlob((blob) => {
+                    URL.revokeObjectURL(objectUrl);
+                    if (!blob) {
+                        resolve(null);
+                        return;
+                    }
+                    (0,media/* saveChatImageToIndexedDB */.VW)(blob).then((assetId) => {
+                        const preview = URL.createObjectURL(blob);
+                        setImageMap(prev => ({ ...prev, [assetId]: preview }));
+                        resolve({ assetId, dataUrl: preview, width: canvas.width, height: canvas.height });
+                    }).catch(() => resolve(null));
+                }, "image/jpeg", 0.82);
+            };
+            image.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                resolve(null);
+            };
+            image.src = objectUrl;
+        });
+    }
+    async function handleImageChange(event) {
+        const files = Array.from(event.target.files || []);
+        event.target.value = "";
+        if (files.length === 0)
+            return;
+        const results = (await Promise.all(files.map(processImageFile))).filter((img) => Boolean(img));
+        if (results.length === 0)
+            return;
+        setDraft((prev) => {
+            const existing = prev.images || (prev.image?.dataUrl ? [prev.image] : []);
+            const nextImages = [...existing, ...results];
+            return {
+                ...prev,
+                image: nextImages[0] || {},
+                images: nextImages,
+            };
+        });
+    }
+    // ANON-FORK: reuse the native image processor for this App's own user avatar only.
+    async function handleProfileAvatarChange(event) {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file)
+            return;
+        const image = await processImageFile(file);
+        if (!image?.assetId)
+            return;
+        const dataUrl = await (0,media/* getChatImageFromIndexedDB */.HF)(image.assetId);
+        if (!dataUrl)
+            return;
+        (0,identity/* setUserAvatar */.jZ)(dataUrl);
+        setState((0,xiaohongshu_storage.loadXiaohongshuState)());
+    }
+    async function handleProfileCoverChange(event) {
+        const file = event.target.files?.[0];
+        event.target.value = "";
+        if (!file)
+            return;
+        const image = new Image();
+        const objectUrl = URL.createObjectURL(file);
+        image.onload = () => {
+            const canvas = document.createElement("canvas");
+            const maxWidth = 1440;
+            let width = image.width;
+            let height = image.height;
+            if (width > maxWidth) {
+                height = Math.round(height / width * maxWidth);
+                width = maxWidth;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext("2d");
+            if (!context) {
+                URL.revokeObjectURL(objectUrl);
+                return;
+            }
+            context.drawImage(image, 0, 0, width, height);
+            canvas.toBlob((blob) => {
+                URL.revokeObjectURL(objectUrl);
+                if (!blob)
+                    return;
+                (0,media/* saveChatImageToIndexedDB */.VW)(blob).then((assetId) => {
+                    const preview = URL.createObjectURL(blob);
+                    setImageMap(prev => ({ ...prev, [assetId]: preview }));
+                    setState((current) => (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                        ...current,
+                        profile: {
+                            ...current.profile,
+                            coverImageAssetId: assetId,
+                        },
+                    }));
+                });
+            }, "image/jpeg", 0.84);
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+        };
+        image.src = objectUrl;
+    }
+    async function handlePublish() {
+        if (busy !== "idle" || (!draft.title.trim() && !draft.body.trim()))
+            return;
+        // CUSTOM-APP-ADAPTER: save the original handler input before the first await.
+        if (!(await (0,tasks/* beginAction */.yU)("handlePublish", { state, draft, tagInput, commentDraft, replyTarget, selectedNoteId, dmDraft, selectedDmThreadId }, [])))
+            return;
+        setBusy("publish");
+        clearErrorState();
+        try {
+            const userNote = (0,xiaohongshu_storage/* createUserXiaohongshuNote */.Hw)({ ...draft, tags: tagInput.split(/[,，、#\s]+/).filter(Boolean) }, state.profile);
+            let current = (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...state,
+                notes: [userNote, ...state.notes],
+            });
+            setState(current);
+            setComposeOpen(false);
+            setDraft({ title: "", body: "", tags: [], image: {} });
+            setTagInput("");
+            setBusy("npc-reaction");
+            const npcReaction = await generateXiaohongshuNpcReactionForUserPost(userNote, current.settings);
+            const npcApplied = applyNpcReaction(userNote, npcReaction);
+            const npcFollowerAccounts = npcReaction.followerNames.map(makeNpcAccount);
+            let nextAfterNpc = {
+                ...current,
+                notes: current.notes.map(note => note.id === userNote.id ? npcApplied.note : note),
+                notifications: [...npcApplied.notifications, ...current.notifications],
+            };
+            nextAfterNpc = addFollowersToState(nextAfterNpc, npcFollowerAccounts, userNote).next;
+            current = (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)(nextAfterNpc);
+            setState(current);
+            setBusy("character-reaction");
+            void (0,adapters_characters/* initializeNicknames */.QT)(current.settings.participantCharacterIds);
+            for (const characterId of current.settings.participantCharacterIds) {
+                if ((0,tasks/* actionRandom */.eQ)() * 100 > current.settings.sendToCharacterProbability)
+                    continue;
+                const character = characters.find(item => item.id === characterId);
+                if (!character)
+                    continue;
+                const latestNote = current.notes.find(note => note.id === userNote.id) ?? userNote;
+                const reaction = await generateXiaohongshuCharacterReactionToUserPost(characterId, latestNote, current.settings);
+                if (!reaction?.comment.trim())
+                    continue;
+                const applied = applyCharacterReaction(latestNote, character, reaction);
+                const addedComment = findAddedCharacterComment(latestNote, applied.note, character);
+                let nextAfterCharacter = {
+                    ...current,
+                    notes: current.notes.map(note => note.id === latestNote.id ? applied.note : note),
+                    notifications: [...applied.notifications, ...current.notifications],
+                };
+                if (addedComment) {
+                    recordXiaohongshuCommentEvent({
+                        characterId: character.id,
+                        characterName: character.name,
+                        note: latestNote,
+                        comment: addedComment,
+                        liked: reaction.liked,
+                        saved: reaction.saved,
+                    });
+                    recordCharacterThreadCommentEvents(character, latestNote, applied.note, applied.threadComments);
+                    touchCharacterMemory(character);
+                }
+                if (reaction.followedAuthor) {
+                    const followerResult = addFollowersToState(nextAfterCharacter, [makeCharacterAccount(character)], latestNote);
+                    nextAfterCharacter = followerResult.next;
+                    if (followerResult.added.length > 0) {
+                        recordXiaohongshuFollowUserEvent({
+                            characterId: character.id,
+                            characterName: character.name,
+                            userDisplayName: latestNote.authorName,
+                        });
+                        touchCharacterMemory(character);
+                    }
+                }
+                current = (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)(nextAfterCharacter);
+                setState(current);
+            }
+            onNotice?.("小红书笔记已发布");
+        }
+        catch (err) {
+            handleGenerationError(err, "暂时无法发布小红书笔记。");
+        }
+        finally {
+            await (0,tasks/* finishAction */._Q)(); // CUSTOM-APP-ADAPTER: durable checkpoint.
+            setBusy("idle");
+        }
+    }
+    function handleToggleLike(note) {
+        setState((current) => {
+            let nextLiked = false;
+            const notes = current.notes.map((item) => {
+                if (item.id !== note.id)
+                    return item;
+                nextLiked = !item.liked;
+                return {
+                    ...item,
+                    liked: nextLiked,
+                    likeCount: Math.max(0, item.likeCount + (item.liked ? -1 : 1)),
+                    updatedAt: new Date().toISOString(),
+                };
+            });
+            return (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...current,
+                notes,
+                userInteractions: {
+                    ...current.userInteractions,
+                    likedNoteIds: nextLiked ? addId(current.userInteractions.likedNoteIds, note.id) : removeId(current.userInteractions.likedNoteIds, note.id),
+                },
+            });
+        });
+    }
+    function handleToggleSave(note) {
+        setState((current) => {
+            let nextSaved = false;
+            const notes = current.notes.map((item) => {
+                if (item.id !== note.id)
+                    return item;
+                nextSaved = !item.saved;
+                return {
+                    ...item,
+                    saved: nextSaved,
+                    saveCount: Math.max(0, item.saveCount + (item.saved ? -1 : 1)),
+                    updatedAt: new Date().toISOString(),
+                };
+            });
+            return (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...current,
+                notes,
+                userInteractions: {
+                    ...current.userInteractions,
+                    savedNoteIds: nextSaved ? addId(current.userInteractions.savedNoteIds, note.id) : removeId(current.userInteractions.savedNoteIds, note.id),
+                },
+            });
+        });
+    }
+    function handleToggleFollowAuthor(note) {
+        const account = makeAccountFromNote(note);
+        if (!account)
+            return;
+        setState((current) => {
+            const key = accountKey(account);
+            const following = current.socialGraph.following;
+            const exists = following.some(item => accountKey(item) === key);
+            const nextFollowing = exists
+                ? following.filter(item => accountKey(item) !== key)
+                : [{ ...account, followedAt: new Date().toISOString() }, ...following];
+            return (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...current,
+                profile: {
+                    ...current.profile,
+                    followingCount: nextFollowing.length,
+                },
+                socialGraph: {
+                    ...current.socialGraph,
+                    following: nextFollowing,
+                },
+            });
+        });
+    }
+    function handleVoteComment(comment, vote) {
+        setState((current) => (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+            ...current,
+            notes: current.notes.map((note) => {
+                if (note.id !== comment.noteId)
+                    return note;
+                return {
+                    ...note,
+                    comments: note.comments.map((item) => {
+                        if (item.id !== comment.id)
+                            return item;
+                        if (vote === "like") {
+                            const liked = !item.liked;
+                            return {
+                                ...item,
+                                liked,
+                                disliked: liked ? false : item.disliked,
+                                likeCount: Math.max(0, item.likeCount + (liked ? 1 : -1)),
+                                dislikeCount: liked && item.disliked ? Math.max(0, item.dislikeCount - 1) : item.dislikeCount,
+                            };
+                        }
+                        const disliked = !item.disliked;
+                        return {
+                            ...item,
+                            disliked,
+                            liked: disliked ? false : item.liked,
+                            dislikeCount: Math.max(0, item.dislikeCount + (disliked ? 1 : -1)),
+                            likeCount: disliked && item.liked ? Math.max(0, item.likeCount - 1) : item.likeCount,
+                        };
+                    }),
+                    updatedAt: new Date().toISOString(),
+                };
+            }),
+        }));
+    }
+    async function submitUserComment(options = {}) {
+        const text = (options.textOverride ?? commentDraft).trim();
+        if (busy !== "idle" || !selectedNote || !text)
+            return;
+        // CUSTOM-APP-ADAPTER: save the original handler input before the first await.
+        if (!(await (0,tasks/* beginAction */.yU)("submitUserComment", { state, draft, tagInput, commentDraft, replyTarget, selectedNoteId, dmDraft, selectedDmThreadId }, [options])))
+            return;
+        const target = replyTarget && selectedNote.comments.some(comment => comment.id === replyTarget.id)
+            ? replyTarget
+            : undefined;
+        const mentionCharacter = options.mentionCharacter ?? findMentionCharacterInText(text);
+        const userComment = (0,xiaohongshu_storage/* makeXiaohongshuComment */.nT)({
+            noteId: selectedNote.id,
+            authorType: "user",
+            authorId: "user",
+            authorName: state.profile.nickname || "我",
+            text,
+            replyTo: target?.authorName,
+            replyToCommentId: target?.id,
+        });
+        let current = (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+            ...state,
+            notes: state.notes.map(note => note.id === selectedNote.id
+                ? {
+                    ...note,
+                    comments: [...note.comments, userComment],
+                    commentCount: note.commentCount + 1,
+                    updatedAt: new Date().toISOString(),
+                }
+                : note),
+            userInteractions: {
+                ...state.userInteractions,
+                commentedNoteIds: addId(state.userInteractions.commentedNoteIds, selectedNote.id),
+            },
+        });
+        setState(current);
+        setCommentDraft("");
+        setCommentComposerFocused(false);
+        setCommentEmojiOpen(false);
+        setCommentMentionOpen(false);
+        setReplyTarget(null);
+        setBusy(mentionCharacter ? "mention-reply" : "comment-reply");
+        clearErrorState();
+        try {
+            let latestNote = current.notes.find(note => note.id === selectedNote.id);
+            if (!latestNote)
+                return;
+            if (mentionCharacter) {
+                const reaction = await generateXiaohongshuCharacterMentionReply(mentionCharacter.id, latestNote, userComment, target, current.settings);
+                if (!reaction) {
+                    onNotice?.("该角色暂时没有可用的小红书回复配置");
+                    return;
+                }
+                if (reaction.comment.trim()) {
+                    const applied = applyCharacterMentionReply(latestNote, mentionCharacter, reaction, userComment.id);
+                    const addedComment = findAddedCharacterComment(latestNote, applied.note, mentionCharacter);
+                    if (addedComment) {
+                        recordXiaohongshuReplyEvent({
+                            characterId: mentionCharacter.id,
+                            characterName: mentionCharacter.name,
+                            note: latestNote,
+                            comment: addedComment,
+                            targetComment: userComment,
+                        });
+                        recordCharacterThreadCommentEvents(mentionCharacter, latestNote, applied.note, applied.threadComments);
+                        touchCharacterMemory(mentionCharacter);
+                    }
+                    current = (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                        ...current,
+                        notes: current.notes.map(note => note.id === latestNote?.id ? applied.note : note),
+                        notifications: [...applied.notifications, ...current.notifications],
+                    });
+                    setState(current);
+                }
+                return;
+            }
+            const roleCharacterId = target?.authorType === "character"
+                ? target.authorId
+                : latestNote.source === "character"
+                    ? latestNote.authorId
+                    : "";
+            const character = roleCharacterId ? characters.find(item => item.id === roleCharacterId) : undefined;
+            if (character) {
+                try {
+                    const reaction = await generateXiaohongshuCharacterReplyToUserComment(character.id, latestNote, userComment, target, current.settings);
+                    if (reaction?.comment.trim()) {
+                        const applied = applyCharacterCommentReply(latestNote, character, reaction, userComment.id);
+                        const addedComment = findAddedCharacterComment(latestNote, applied.note, character);
+                        if (addedComment) {
+                            recordXiaohongshuReplyEvent({
+                                characterId: character.id,
+                                characterName: character.name,
+                                note: latestNote,
+                                comment: addedComment,
+                                targetComment: userComment,
+                            });
+                            recordCharacterThreadCommentEvents(character, latestNote, applied.note, applied.threadComments);
+                            touchCharacterMemory(character);
+                        }
+                        current = (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                            ...current,
+                            notes: current.notes.map(note => note.id === latestNote?.id ? applied.note : note),
+                            notifications: [...applied.notifications, ...current.notifications],
+                        });
+                        setState(current);
+                        latestNote = applied.note;
+                    }
+                }
+                catch (err) {
+                    handleGenerationError(err, "暂时无法生成评论回复。");
+                }
+            }
+            const npcReply = await generateXiaohongshuNpcReplyToUserComment(latestNote, userComment, current.settings, target);
+            const npcApplied = applyNpcCommentReply(latestNote, npcReply, userComment.id);
+            current = (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...current,
+                notes: current.notes.map(note => note.id === latestNote?.id ? npcApplied.note : note),
+                notifications: [...npcApplied.notifications, ...current.notifications],
+            });
+            setState(current);
+        }
+        catch (err) {
+            handleGenerationError(err, mentionCharacter ? "暂时无法生成@回复。" : "暂时无法生成评论回复。");
+        }
+        finally {
+            await (0,tasks/* finishAction */._Q)(); // CUSTOM-APP-ADAPTER: durable checkpoint.
+            setBusy("idle");
+        }
+    }
+    function handleSubmitUserComment() {
+        void submitUserComment();
+    }
+    async function handleLoadMoreComments(note) {
+        if (busy !== "idle")
+            return;
+        // CUSTOM-APP-ADAPTER: save the original handler input before the first await.
+        if (!(await (0,tasks/* beginAction */.yU)("handleLoadMoreComments", { state, draft, tagInput, commentDraft, replyTarget, selectedNoteId, dmDraft, selectedDmThreadId }, [note])))
+            return;
+        const latestNote = state.notes.find(item => item.id === note.id) ?? note;
+        setBusy("more-comments");
+        clearErrorState();
+        try {
+            const reaction = await generateXiaohongshuNpcMoreComments(latestNote, state.settings);
+            const addedCount = reaction.comments.filter(comment => comment.text).length;
+            if (addedCount === 0)
+                throw new Error("没有解析到新的小红书评论。");
+            const updatedNote = applyNpcMoreComments(latestNote, reaction);
+            setState((0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...state,
+                notes: state.notes.map(item => item.id === latestNote.id ? updatedNote : item),
+            }));
+            onNotice?.(`已加载 ${addedCount} 条新评论`);
+        }
+        catch (err) {
+            handleGenerationError(err, "暂时无法加载更多评论。");
+        }
+        finally {
+            await (0,tasks/* finishAction */._Q)(); // CUSTOM-APP-ADAPTER: durable checkpoint.
+            setBusy("idle");
+        }
+    }
+    function requestDeleteNote(note) {
+        setDeleteTarget({
+            type: "note",
+            noteId: note.id,
+            title: note.title.trim() || note.body.trim().slice(0, 24) || "这篇笔记",
+        });
+    }
+    function requestDeleteComment(comment) {
+        const note = state.notes.find(item => item.id === comment.noteId);
+        setDeleteTarget({
+            type: "comment",
+            comment,
+            noteTitle: note?.title.trim() || note?.body.trim().slice(0, 24) || "这篇笔记",
+        });
+    }
+    function handleDeleteComment(comment) {
+        const sourceNote = state.notes.find(note => note.id === comment.noteId);
+        const deletedCommentIdsForEvents = sourceNote ? collectCommentThreadIds(sourceNote.comments, comment.id) : new Set([comment.id]);
+        deletedCommentIdsForEvents.forEach(id => deleteXiaohongshuProjectionEventForComment(id));
+        setState((current) => {
+            const notes = current.notes.map((note) => {
+                if (note.id !== comment.noteId)
+                    return note;
+                const deletedCommentIds = collectCommentThreadIds(note.comments, comment.id);
+                const comments = note.comments.filter(item => !deletedCommentIds.has(item.id));
+                return {
+                    ...note,
+                    comments,
+                    commentCount: Math.max(0, note.commentCount - deletedCommentIds.size),
+                    updatedAt: new Date().toISOString(),
+                };
+            });
+            const targetNote = notes.find(note => note.id === comment.noteId);
+            return (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+                ...current,
+                notes,
+                userInteractions: {
+                    ...current.userInteractions,
+                    commentedNoteIds: targetNote && (comment.authorType !== "user" || noteHasUserComment(targetNote))
+                        ? current.userInteractions.commentedNoteIds
+                        : removeId(current.userInteractions.commentedNoteIds, comment.noteId),
+                },
+            });
+        });
+        if (replyTarget && deletedCommentIdsForEvents.has(replyTarget.id))
+            setReplyTarget(null);
+    }
+    function handleDeleteNote(noteId) {
+        deleteXiaohongshuProjectionEventsForNote(noteId);
+        setState((current) => (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+            ...current,
+            notes: current.notes.filter(note => note.id !== noteId),
+            feedHiddenNoteIds: removeId(current.feedHiddenNoteIds, noteId),
+            notifications: current.notifications.filter(notice => notice.noteId !== noteId),
+            userInteractions: {
+                likedNoteIds: removeId(current.userInteractions.likedNoteIds, noteId),
+                savedNoteIds: removeId(current.userInteractions.savedNoteIds, noteId),
+                commentedNoteIds: removeId(current.userInteractions.commentedNoteIds, noteId),
+            },
+        }));
+        setSelectedNoteId(null);
+        setVideoCommentsOpen(false);
+        setReplyTarget(null);
+        setCommentDraft("");
+        setCommentEmojiOpen(false);
+        setCommentMentionOpen(false);
+    }
+    function requestFeedAction(action) {
+        if (busy !== "idle")
+            return;
+        setPendingFeedAction(action);
+    }
+    function handleClearAllContent() {
+        const visibleFeedIds = new Set([...discoverNotes, ...nearbyNotes, ...videoNotes].map(note => note.id));
+        visibleFeedIds.forEach(noteId => deleteXiaohongshuProjectionEventsForNote(noteId));
+        setState((current) => (0,xiaohongshu_storage/* saveXiaohongshuState */.Gx)({
+            ...current,
+            feedHiddenNoteIds: Array.from(new Set([...current.feedHiddenNoteIds, ...visibleFeedIds])),
+        }));
+        if (selectedNoteId && visibleFeedIds.has(selectedNoteId)) {
+            setSelectedNoteId(null);
+            setVideoCommentsOpen(false);
+        }
+        setMessagePanel(null);
+        setSelectedDmThreadId(null);
+        setReplyTarget(null);
+        setCommentDraft("");
+        setCommentEmojiOpen(false);
+        setCommentMentionOpen(false);
+        onNotice?.("首页推荐、附近和视频内容已清空");
+    }
+    function handleConfirmDelete() {
+        if (!deleteTarget)
+            return;
+        if (deleteTarget.type === "note") {
+            handleDeleteNote(deleteTarget.noteId);
+        }
+        else {
+            handleDeleteComment(deleteTarget.comment);
+        }
+        setDeleteTarget(null);
+    }
+    async function handleConfirmFeedAction() {
+        if (!pendingFeedAction)
+            return;
+        const action = pendingFeedAction;
+        setPendingFeedAction(null);
+        if (action === "refresh") {
+            await handleGenerateHomeContent();
+        }
+        else {
+            handleClearAllContent();
+        }
+    }
+    function handlePickCommentEmoji(emoji) {
+        setCommentDraft(prev => `${prev}${emoji}`);
+        setCommentComposerFocused(true);
+    }
+    function handleMentionCharacter(displayName) {
+        const mention = `@${displayName}`;
+        setCommentDraft((current) => {
+            const base = current.replace(/\s+$/g, "");
+            if (base.includes(mention))
+                return `${base} `;
+            return base ? `${base} ${mention} ` : `${mention} `;
+        });
+        setCommentMentionOpen(false);
+        setCommentEmojiOpen(false);
+        setCommentComposerFocused(true);
+    }
+    const commentToolbar = ((0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [commentMentionOpen ? ((0,jsx_runtime.jsx)("div", { className: "xhs-comment-mention-panel", children: followedMentionCharacters.length > 0 ? (followedMentionCharacters.map(({ account, displayName, avatar }) => ((0,jsx_runtime.jsxs)("button", { type: "button", onMouseDown: event => event.preventDefault(), onClick: () => handleMentionCharacter(displayName), disabled: busy !== "idle", children: [(0,jsx_runtime.jsx)("span", { children: avatar ? (0,jsx_runtime.jsx)("img", { src: avatar, alt: "" }) : displayName.slice(0, 1) }), (0,jsx_runtime.jsx)("em", { children: displayName })] }, `${account.type}:${account.id}`)))) : ((0,jsx_runtime.jsx)("span", { className: "xhs-comment-panel-empty", children: "\u6682\u65E0\u5DF2\u5173\u6CE8\u89D2\u8272" })) })) : null, commentEmojiOpen ? ((0,jsx_runtime.jsx)("div", { className: "xhs-comment-emoji-panel", children: XHS_DM_EMOJIS.map(emoji => ((0,jsx_runtime.jsx)("button", { type: "button", onMouseDown: event => event.preventDefault(), onClick: () => handlePickCommentEmoji(emoji), children: emoji }, emoji))) })) : null, (0,jsx_runtime.jsxs)("div", { className: "xhs-comment-toolbar", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-comment-toolbar-icons", children: [(0,jsx_runtime.jsx)("button", { type: "button", className: commentMentionOpen ? "is-active" : "", "aria-label": "@\u5DF2\u5173\u6CE8\u89D2\u8272", onMouseDown: event => event.preventDefault(), onClick: () => {
+                                    setCommentMentionOpen(prev => !prev);
+                                    setCommentEmojiOpen(false);
+                                }, disabled: busy !== "idle", children: (0,jsx_runtime.jsx)(AtSign, { size: 22, strokeWidth: 2.05 }) }), (0,jsx_runtime.jsx)("button", { type: "button", className: commentEmojiOpen ? "is-active" : "", "aria-label": "\u9009\u62E9\u8868\u60C5", onMouseDown: event => event.preventDefault(), onClick: () => {
+                                    setCommentEmojiOpen(prev => !prev);
+                                    setCommentMentionOpen(false);
+                                }, disabled: busy !== "idle", children: (0,jsx_runtime.jsx)(Smile, { size: 22, strokeWidth: 2.05 }) })] }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-comment-toolbar-send", onClick: handleSubmitUserComment, disabled: busy !== "idle" || !commentDraft.trim(), children: busy === "comment-reply" || busy === "mention-reply" ? (0,jsx_runtime.jsx)(LoaderCircle, { className: "cp-spin", size: 15 }) : "发送" })] })] }));
+    function handleMainScroll(event) {
+        mainScrollTopRef.current = event.currentTarget.scrollTop;
+        if (selectedTab !== "profile") {
+            setProfileTopbarVisible(false);
+            return;
+        }
+        const nextVisible = event.currentTarget.scrollTop >= 58;
+        setProfileTopbarVisible(current => current === nextVisible ? current : nextVisible);
+    }
+    function openNote(noteId) {
+        mainScrollTopRef.current = mainScrollRef.current?.scrollTop ?? mainScrollTopRef.current;
+        setSelectedNoteId(noteId);
+        setCommentEmojiOpen(false);
+        setCommentMentionOpen(false);
+    }
+    function handleShareNote(note) {
+        const description = (note.type === "video"
+            ? note.videoDescription || note.imageDescription
+            : note.imageDescription) || "";
+        const share = {
+            type: "xiaohongshu_note",
+            authorName: note.authorName,
+            title: getXhsPlainText(note.title),
+            body: getXhsPlainText(note.body),
+            description: getXhsPlainText(description),
+            noteType: note.type,
+            tags: note.tags,
+            imageAssetId: note.imageAssetId,
+            coverIcon: note.coverIcon,
+            tone: note.tone,
+        };
+        void shareCard(share); // CUSTOM-APP-ADAPTER: existing Host chat.sendCard boundary.
+        onNotice?.("选择聊天对象后发送小红书帖子");
+    }
+    function getSiblingVideo(direction) {
+        if (activeVideoNoteIndex < 0)
+            return undefined;
+        const nextIndex = direction === "previous" ? activeVideoNoteIndex - 1 : activeVideoNoteIndex + 1;
+        return videoNotes[nextIndex];
+    }
+    function settleVideoDrag(nextNoteId) {
+        if (videoSettleTimerRef.current !== null) {
+            window.clearTimeout(videoSettleTimerRef.current);
+        }
+        videoSettleTimerRef.current = window.setTimeout(() => {
+            if (nextNoteId)
+                setSelectedNoteId(nextNoteId);
+            setVideoDragSettling(false);
+            setVideoDragOffset(0);
+            setVideoDragDirection(null);
+            videoSettleTimerRef.current = null;
+        }, 190);
+    }
+    function animateSiblingVideo(direction) {
+        if (selectedNote?.type !== "video" || videoCommentsOpen)
+            return false;
+        const nextVideo = getSiblingVideo(direction);
+        if (!nextVideo)
+            return false;
+        setVideoDragSettling(true);
+        setVideoDragDirection(direction);
+        setVideoDragOffset(direction === "next" ? -window.innerHeight : window.innerHeight);
+        settleVideoDrag(nextVideo.id);
+        return true;
+    }
+    function handleVideoWheel(event) {
+        if (videoCommentsOpen)
+            return;
+        const absY = Math.abs(event.deltaY);
+        if (absY < 42 || absY < Math.abs(event.deltaX))
+            return;
+        event.preventDefault();
+        const now = (0,tasks/* actionNow */.$P)();
+        if (now - videoLastWheelAtRef.current < 520)
+            return;
+        videoLastWheelAtRef.current = now;
+        animateSiblingVideo(event.deltaY > 0 ? "next" : "previous");
+    }
+    function handleVideoTouchStart(event) {
+        if (videoCommentsOpen)
+            return;
+        if (videoSettleTimerRef.current !== null) {
+            window.clearTimeout(videoSettleTimerRef.current);
+            videoSettleTimerRef.current = null;
+        }
+        setVideoDragSettling(false);
+        setVideoDragOffset(0);
+        setVideoDragDirection(null);
+        const touch = event.touches[0];
+        videoSwipeStartRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+    }
+    function handleVideoTouchMove(event) {
+        if (videoCommentsOpen)
+            return;
+        const start = videoSwipeStartRef.current;
+        const touch = event.touches[0];
+        if (!start || !touch)
+            return;
+        const deltaX = touch.clientX - start.x;
+        const deltaY = touch.clientY - start.y;
+        const absY = Math.abs(deltaY);
+        if (absY < 2 || absY < Math.abs(deltaX) * 1.12)
+            return;
+        const direction = deltaY < 0 ? "next" : "previous";
+        const nextVideo = getSiblingVideo(direction);
+        if (!nextVideo) {
+            setVideoDragOffset(0);
+            setVideoDragDirection(null);
+            return;
+        }
+        event.preventDefault();
+        setVideoDragSettling(false);
+        setVideoDragDirection(direction);
+        setVideoDragOffset(deltaY);
+    }
+    function handleVideoTouchEnd(event) {
+        if (videoCommentsOpen)
+            return;
+        const start = videoSwipeStartRef.current;
+        videoSwipeStartRef.current = null;
+        const touch = event.changedTouches[0];
+        if (!start || !touch)
+            return;
+        const deltaX = touch.clientX - start.x;
+        const deltaY = touch.clientY - start.y;
+        const absY = Math.abs(deltaY);
+        if (absY < 56 || absY < Math.abs(deltaX) * 1.15) {
+            setVideoDragSettling(true);
+            setVideoDragOffset(0);
+            settleVideoDrag();
+            return;
+        }
+        const direction = deltaY < 0 ? "next" : "previous";
+        const nextVideo = getSiblingVideo(direction);
+        if (!nextVideo) {
+            setVideoDragSettling(true);
+            setVideoDragOffset(0);
+            settleVideoDrag();
+            return;
+        }
+        setVideoDragSettling(true);
+        setVideoDragDirection(direction);
+        setVideoDragOffset(direction === "next" ? -window.innerHeight : window.innerHeight);
+        settleVideoDrag(nextVideo.id);
+    }
+    function renderVideoMovingLayer(note, style, preview = false) {
+        const account = makeAccountFromNote(note);
+        const following = isFollowingAccount(account);
+        const showCaptionControls = !preview && note.id === selectedNote?.id;
+        return ((0,jsx_runtime.jsx)("div", { className: `cp-xhs-video-moving-layer${preview ? " cp-xhs-video-moving-layer--preview" : ""}`, style: style, children: (0,jsx_runtime.jsxs)("main", { className: "cp-xhs-video-stage", children: [(0,jsx_runtime.jsx)("div", { className: `cp-xhs-video-frame cp-xhs-cover--${note.tone}`, children: note.imageAssetId && imageMap[note.imageAssetId] ? ((0,jsx_runtime.jsx)("img", { className: "xhs-video-real-image", src: imageMap[note.imageAssetId], alt: "" })) : note.videoDescription?.trim() || note.imageDescription?.trim() ? ((0,jsx_runtime.jsx)("div", { className: "cp-xhs-video-frame-text", children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: note.videoDescription || note.imageDescription || "", tone: "light", collapseBilingualTranslation: state.settings.collapseBilingualTranslation }) })) : null }), (0,jsx_runtime.jsxs)("section", { className: "cp-xhs-video-meta", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-video-author-row", children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-video-author-avatar", src: getNoteAvatar(note), name: note.authorName }), (0,jsx_runtime.jsx)("strong", { children: note.authorName }), account ? ((0,jsx_runtime.jsx)("button", { type: "button", className: following ? "is-following" : "", onClick: () => handleToggleFollowAuthor(note), children: following ? "已关注" : "关注" })) : null, (0,jsx_runtime.jsx)("time", { children: formatTime(note.createdAt) }), (0,jsx_runtime.jsxs)("button", { type: "button", className: "xhs-delete-note-btn xhs-video-delete-note-btn", onClick: () => requestDeleteNote(note), "aria-label": "\u5220\u9664\u5E16\u5B50", children: [(0,jsx_runtime.jsx)(Trash2, { size: 14, strokeWidth: 2.1 }), "\u5220\u9664"] })] }), (0,jsx_runtime.jsx)("h3", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: note.title, tone: "light", collapseBilingualTranslation: state.settings.collapseBilingualTranslation }) }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-video-caption-wrap", children: [showCaptionControls ? ((0,jsx_runtime.jsx)("div", { ref: videoCaptionMeasureRef, "aria-hidden": "true", className: "cp-xhs-video-caption-measure" })) : null, (0,jsx_runtime.jsxs)("p", { className: !videoCaptionExpanded || preview ? "is-collapsed" : "", children: [(0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: showCaptionControls && videoCaptionCanExpand && !videoCaptionExpanded
+                                                    ? `${collapsedVideoCaption}...`
+                                                    : note.body, tone: "light", collapseBilingualTranslation: state.settings.collapseBilingualTranslation }), showCaptionControls && videoCaptionCanExpand ? ((0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: ["  ", (0,jsx_runtime.jsx)("button", { type: "button", className: "cp-xhs-video-caption-toggle", onClick: (event) => {
+                                                            event.stopPropagation();
+                                                            setVideoCaptionExpanded((current) => !current);
+                                                        }, onTouchStart: (event) => event.stopPropagation(), onTouchEnd: (event) => event.stopPropagation(), children: videoCaptionExpanded ? "收起" : "展开" })] })) : null] })] }), note.tags.length > 0 ? ((0,jsx_runtime.jsx)("div", { className: "cp-xhs-video-tags", children: note.tags.map(tag => (0,jsx_runtime.jsxs)("em", { children: ["#", tag] }, tag)) })) : null, (0,jsx_runtime.jsx)("div", { className: "cp-xhs-video-progress", "aria-hidden": "true" })] })] }) }));
+    }
+    function renderWaterfall(columns, options = {}) {
+        if (columns[0].length + columns[1].length === 0) {
+            return ((0,jsx_runtime.jsxs)("div", { className: "cp-xhs-status cp-empty-copy", children: [(0,jsx_runtime.jsx)("p", { children: "\u6682\u65E0\u5C0F\u7EA2\u4E66\u5185\u5BB9" }), (0,jsx_runtime.jsx)("span", { children: "\u751F\u6210\u9996\u9875\u3001\u9644\u8FD1\u3001\u89C6\u9891\u548C\u89D2\u8272\u4E92\u52A8" }), options.showGenerateButton ? ((0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-empty-generate-btn", onClick: handleGenerateHomeContent, disabled: busy !== "idle", children: busy === "npc-feed" || busy === "character-activity" ? "正在生成" : "生成小红书内容" })) : null] }));
+        }
+        return ((0,jsx_runtime.jsxs)("div", { className: "cp-xhs-waterfall-grid", children: [(0,jsx_runtime.jsx)("div", { className: "cp-xhs-waterfall-column", children: columns[0].map(note => ((0,jsx_runtime.jsx)(NoteCard, { note: note, imageMap: imageMap, avatarSrc: getNoteAvatar(note), hideTextImageDescription: options.hideCharacterTextImages && note.source === "character" && note.type === "post", collapseBilingualTranslation: state.settings.collapseBilingualTranslation, onOpen: () => openNote(note.id) }, note.id))) }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-waterfall-column", children: columns[1].map(note => ((0,jsx_runtime.jsx)(NoteCard, { note: note, imageMap: imageMap, avatarSrc: getNoteAvatar(note), hideTextImageDescription: options.hideCharacterTextImages && note.source === "character" && note.type === "post", collapseBilingualTranslation: state.settings.collapseBilingualTranslation, onOpen: () => openNote(note.id) }, note.id))) })] }));
+    }
+    return ((0,jsx_runtime.jsxs)("section", { className: "xhs-app cp-xhs-module", children: [selectedTab !== "profile" && !selectedNote && !selectedDmThread ? ((0,jsx_runtime.jsxs)("header", { className: "cp-xhs-appbar xhs-appbar", children: [(0,jsx_runtime.jsx)("button", { type: "button", className: "cp-float-back", onClick: isMessageSubpage ? () => {
+                            setMessagePanel(null);
+                            setSelectedDmThreadId(null);
+                        } : requestClose, "aria-label": isMessageSubpage ? "返回消息" : "返回桌面", children: (0,jsx_runtime.jsx)(ChevronLeft, { size: 24, strokeWidth: 2 }) }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-header-stack", children: isMessageSubpage ? ((0,jsx_runtime.jsx)("div", { className: "cp-xhs-header-title is-active", children: selectedMessagePanelTitle })) : selectedTab === "home" ? ((0,jsx_runtime.jsx)(jsx_runtime.Fragment, { children: HOME_FEED_TABS.map(tab => ((0,jsx_runtime.jsx)("button", { type: "button", className: `cp-xhs-header-title ${homeFeedTab === tab.id ? "is-active" : ""}`, onClick: () => setHomeFeedTab(tab.id), "aria-current": homeFeedTab === tab.id ? "page" : undefined, children: tab.label }, tab.id))) })) : ((0,jsx_runtime.jsx)("div", { className: "cp-xhs-header-title is-active", children: selectedTab === "video" ? "附近" : selectedTab === "messages" ? "消息" : "发布" })) }), !isMessageSubpage ? (0,jsx_runtime.jsxs)("div", { className: "cp-appbar-actions", children: [(0,jsx_runtime.jsx)("button", { type: "button", className: "cp-float-refresh xhs-icon-action xhs-icon-action--refresh", onClick: () => requestFeedAction("refresh"), disabled: busy !== "idle", "aria-label": "\u5237\u65B0\u5C0F\u7EA2\u4E66\u5185\u5BB9", children: (0,jsx_runtime.jsx)(RotateCw, { size: 18, strokeWidth: 1.75 }) }), (0,jsx_runtime.jsx)("button", { type: "button", className: "cp-float-refresh xhs-icon-action xhs-icon-action--clear", onClick: () => requestFeedAction("clear"), disabled: busy !== "idle" || state.notes.length === 0, "aria-label": "\u6E05\u7A7A\u5C0F\u7EA2\u4E66\u5185\u5BB9", children: (0,jsx_runtime.jsx)(Trash2, { size: 17, strokeWidth: 1.8 }) })] }) : (0,jsx_runtime.jsx)("div", { className: "cp-appbar-actions" })] })) : null, busy !== "idle" ? ((0,jsx_runtime.jsxs)("div", { className: "cp-refresh-indicator cp-refresh-indicator--floating", "aria-live": "polite", children: [(0,jsx_runtime.jsx)("span", { className: "cp-refresh-indicator-text", children: busy === "npc-feed" ? "正在生成帖子内容" : busy === "character-activity" ? "正在生成角色互动内容" : busy === "publish" ? "正在发布笔记" : busy === "comment-reply" || busy === "mention-reply" ? "正在生成回复内容" : busy === "dm-reply" ? "正在生成私信回复" : "正在生成互动内容" }), (0,jsx_runtime.jsxs)("span", { className: "cp-refresh-indicator-dots", "aria-hidden": "true", children: [(0,jsx_runtime.jsx)("i", {}), (0,jsx_runtime.jsx)("i", {}), (0,jsx_runtime.jsx)("i", {})] })] })) : null, error ? ((0,jsx_runtime.jsx)(CheckPhoneDebugErrorCard, { title: debugErrorTitle, error: error, debugParseError: debugParseError, debugRawOutput: debugRawOutput })) : null, (0,jsx_runtime.jsx)("main", { className: "cp-xhs-body", children: selectedDmThread ? ((0,jsx_runtime.jsxs)("div", { className: "cp-xhs-thread-screen xhs-dm-thread-screen", children: [(0,jsx_runtime.jsxs)("header", { className: "cp-xhs-thread-appbar", children: [(0,jsx_runtime.jsx)("button", { type: "button", className: "cp-xhs-thread-nav-button", onClick: () => setSelectedDmThreadId(null), "aria-label": "\u8FD4\u56DE\u6D88\u606F", children: (0,jsx_runtime.jsx)(ChevronLeft, { size: 26, strokeWidth: 2.4 }) }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-thread-title-block", children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-thread-avatar cp-xhs-thread-avatar--header", src: getNotificationAvatar(selectedDmThread.actorName, selectedDmThread.id), name: selectedDmThread.actorName }), (0,jsx_runtime.jsx)("strong", { children: selectedDmThread.actorName })] }), (0,jsx_runtime.jsx)("button", { type: "button", className: "cp-xhs-thread-nav-button", "aria-label": "\u66F4\u591A", children: (0,jsx_runtime.jsx)(Ellipsis, { size: 27, strokeWidth: 2.4 }) })] }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-thread-messages", children: (0,jsx_runtime.jsx)("div", { className: "cp-xhs-chat-stack", children: selectedDmThread.notifications.map((notice, index) => {
+                                    const previous = selectedDmThread.notifications[index - 1];
+                                    const showTime = !previous || formatTime(previous.createdAt) !== formatTime(notice.createdAt);
+                                    const outgoing = notice.direction === "outgoing";
+                                    return ((0,jsx_runtime.jsxs)("div", { className: "cp-xhs-chat-message-block", children: [showTime ? (0,jsx_runtime.jsx)("time", { className: "cp-xhs-chat-time", children: formatTime(notice.createdAt) }) : null, (0,jsx_runtime.jsxs)("div", { className: `cp-xhs-chat-row ${outgoing ? "is-outgoing" : "is-incoming"}`, children: [!outgoing ? ((0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-chat-avatar", src: getNotificationAvatar(notice.actorName, notice.id), name: notice.actorName })) : null, (0,jsx_runtime.jsx)("div", { className: "cp-xhs-chat-content", children: (0,jsx_runtime.jsx)("p", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: notice.text, tone: "xiaohongshu", variant: "inline", collapseBilingualTranslation: state.settings.collapseBilingualTranslation }) }) }), outgoing ? ((0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-chat-avatar cp-xhs-chat-avatar--me", src: userAvatar, name: state.profile.nickname })) : null] })] }, notice.id));
+                                }) }) }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-thread-composer", children: [dmEmojiOpen ? ((0,jsx_runtime.jsx)("div", { className: "xhs-dm-emoji-panel", children: XHS_DM_EMOJIS.map(emoji => ((0,jsx_runtime.jsx)("button", { type: "button", onClick: () => setDmDraft(prev => `${prev}${emoji}`), children: emoji }, emoji))) })) : null, (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-thread-inputbar", children: [(0,jsx_runtime.jsx)("button", { type: "button", "aria-label": "\u8868\u60C5", className: dmEmojiOpen ? "is-active" : "", onClick: () => setDmEmojiOpen(prev => !prev), children: (0,jsx_runtime.jsx)(Smile, { size: 24, strokeWidth: 1.8 }) }), (0,jsx_runtime.jsx)("input", { className: "cp-xhs-thread-input-field", value: dmDraft, onChange: event => setDmDraft(event.target.value), onKeyDown: event => {
+                                                if (event.key === "Enter" && !event.shiftKey) {
+                                                    event.preventDefault();
+                                                    handleSendDmMessage(selectedDmThread);
+                                                }
+                                            }, placeholder: "\u53D1\u6D88\u606F..." }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-dm-generate-btn", "aria-label": "\u751F\u6210\u56DE\u590D", disabled: busy !== "idle", onClick: () => handleGenerateDmReply(selectedDmThread), children: busy === "dm-reply" ? (0,jsx_runtime.jsx)(LoaderCircle, { className: "cp-spin", size: 21 }) : (0,jsx_runtime.jsx)(Sparkles, { size: 22, strokeWidth: 1.8 }) }), (0,jsx_runtime.jsx)("button", { type: "button", "aria-label": "\u53D1\u9001", disabled: busy !== "idle" || !dmDraft.trim(), onClick: () => handleSendDmMessage(selectedDmThread), children: (0,jsx_runtime.jsx)(Send, { size: 22, strokeWidth: 1.8 }) })] })] })] })) : selectedNote ? selectedNote.type === "video" ? ((0,jsx_runtime.jsxs)("div", { className: `cp-xhs-video-detail-screen xhs-video-detail-screen${videoCommentsOpen ? " is-comments-open" : ""}`, onWheel: handleVideoWheel, onTouchStart: handleVideoTouchStart, onTouchMove: handleVideoTouchMove, onTouchEnd: handleVideoTouchEnd, onTouchCancel: handleVideoTouchEnd, children: [(0,jsx_runtime.jsxs)("header", { className: "cp-xhs-video-detail-topbar", children: [(0,jsx_runtime.jsx)("button", { type: "button", onClick: () => setSelectedNoteId(null), "aria-label": "\u8FD4\u56DE", children: (0,jsx_runtime.jsx)(ChevronLeft, { size: 26, strokeWidth: 2 }) }), (0,jsx_runtime.jsx)("button", { type: "button", "aria-label": "\u66F4\u591A\u89C6\u9891", children: (0,jsx_runtime.jsx)("span", { className: "cp-xhs-video-stack-icon", "aria-hidden": "true" }) }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-video-topbar-spacer" }), (0,jsx_runtime.jsx)("button", { type: "button", "aria-label": "\u641C\u7D22", children: (0,jsx_runtime.jsx)(Search, { size: 22, strokeWidth: 2.2 }) }), (0,jsx_runtime.jsx)("button", { type: "button", "aria-label": "\u5206\u4EAB", onClick: () => handleShareNote(selectedNote), children: (0,jsx_runtime.jsx)(n, { size: 23, weight: "regular" }) })] }), videoPreviewNote && videoPreviewStyle ? renderVideoMovingLayer(videoPreviewNote, videoPreviewStyle, true) : null, renderVideoMovingLayer(selectedNote, videoMovableStyle), (0,jsx_runtime.jsxs)("footer", { className: "cp-xhs-video-actions xhs-video-actions", children: [(0,jsx_runtime.jsx)("button", { type: "button", className: "cp-xhs-video-input xhs-video-input-button", onClick: () => setVideoCommentsOpen(true), children: "\u8BF4\u70B9\u4EC0\u4E48..." }), (0,jsx_runtime.jsxs)("button", { type: "button", className: `cp-xhs-video-action ${selectedNote.liked ? "is-active" : ""}`, onClick: () => handleToggleLike(selectedNote), "aria-label": "\u70B9\u8D5E", children: [(0,jsx_runtime.jsx)(Heart, { size: 24, strokeWidth: 2.1, fill: selectedNote.liked ? "currentColor" : "none" }), (0,jsx_runtime.jsx)("span", { children: formatCount(selectedNote.likeCount) })] }), (0,jsx_runtime.jsxs)("button", { type: "button", className: `cp-xhs-video-action ${selectedNote.saved ? "is-active" : ""}`, onClick: () => handleToggleSave(selectedNote), "aria-label": "\u6536\u85CF", children: [(0,jsx_runtime.jsx)(Bookmark, { size: 24, strokeWidth: 2.1, fill: selectedNote.saved ? "currentColor" : "none" }), (0,jsx_runtime.jsx)("span", { children: formatCount(selectedNote.saveCount) })] }), (0,jsx_runtime.jsxs)("button", { type: "button", className: "cp-xhs-video-action", onClick: () => setVideoCommentsOpen(true), "aria-label": "\u8BC4\u8BBA", children: [(0,jsx_runtime.jsx)(MessageCircle, { size: 24, strokeWidth: 2.1 }), (0,jsx_runtime.jsx)("span", { children: formatCount(selectedNote.commentCount) })] })] }), videoCommentsOpen ? ((0,jsx_runtime.jsx)("div", { className: "cp-xhs-video-comments-backdrop", onClick: () => setVideoCommentsOpen(false), children: (0,jsx_runtime.jsxs)("section", { className: "cp-xhs-video-comments-sheet xhs-video-comments-sheet", onClick: event => event.stopPropagation(), children: [(0,jsx_runtime.jsx)("div", { className: "cp-xhs-video-comments-handle", "aria-hidden": "true" }), (0,jsx_runtime.jsxs)("header", { children: [(0,jsx_runtime.jsxs)("strong", { children: ["\u8BC4\u8BBA ", formatCount(selectedNote.commentCount)] }), (0,jsx_runtime.jsx)("button", { type: "button", onClick: () => setVideoCommentsOpen(false), "aria-label": "\u5173\u95ED\u8BC4\u8BBA", children: "\u00D7" })] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-comment-list xhs-video-comment-list", children: [(0,jsx_runtime.jsx)(CommentList, { comments: selectedNote.comments, getAvatar: getCommentAvatar, onReply: comment => setReplyTarget(comment), onDeleteComment: requestDeleteComment, onVoteComment: handleVoteComment, collapseBilingualTranslation: state.settings.collapseBilingualTranslation }), (0,jsx_runtime.jsxs)("button", { type: "button", className: "xhs-load-comments-btn", onClick: () => void handleLoadMoreComments(selectedNote), disabled: busy !== "idle", children: [busy === "more-comments" ? (0,jsx_runtime.jsx)(LoaderCircle, { className: "cp-spin", size: 15 }) : null, busy === "more-comments" ? "加载中" : "加载更多评论"] })] }), (0,jsx_runtime.jsxs)("div", { className: `xhs-video-comment-composer ${commentComposerExpanded ? "is-expanded" : ""}`, children: [replyTarget && replyTarget.noteId === selectedNote.id ? ((0,jsx_runtime.jsxs)("div", { className: "xhs-reply-target", children: [(0,jsx_runtime.jsxs)("span", { children: ["\u56DE\u590D ", replyTarget.authorName] }), (0,jsx_runtime.jsx)("button", { type: "button", onClick: () => setReplyTarget(null), children: "\u53D6\u6D88" })] })) : null, (0,jsx_runtime.jsxs)("div", { className: "xhs-comment-input-row", children: [(0,jsx_runtime.jsx)("textarea", { value: commentDraft, onChange: event => setCommentDraft(event.target.value), onFocus: () => setCommentComposerFocused(true), onBlur: () => window.setTimeout(() => setCommentComposerFocused(false), 120), placeholder: replyTarget ? "写回复" : "写评论", rows: commentComposerExpanded ? 3 : 1 }), !commentComposerExpanded ? ((0,jsx_runtime.jsxs)("button", { type: "button", onClick: handleSubmitUserComment, disabled: busy !== "idle" || !commentDraft.trim(), children: [busy === "comment-reply" || busy === "mention-reply" ? (0,jsx_runtime.jsx)(LoaderCircle, { className: "cp-spin", size: 15 }) : null, "\u53D1\u9001"] })) : null] }), commentComposerExpanded ? commentToolbar : null] })] }) })) : null] })) : ((0,jsx_runtime.jsxs)("div", { ref: detailScrollRef, className: "cp-xhs-scroll cp-xhs-scroll--detail xhs-detail-page", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-note-detail-header", children: [(0,jsx_runtime.jsx)("button", { type: "button", className: "cp-xhs-detail-back", onClick: () => setSelectedNoteId(null), "aria-label": "\u8FD4\u56DE", children: (0,jsx_runtime.jsx)(ChevronLeft, { size: 24, strokeWidth: 2.1 }) }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-detail-author-info", children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-detail-avatar", src: getNoteAvatar(selectedNote), name: selectedNote.authorName }), (0,jsx_runtime.jsx)("span", { className: "cp-xhs-detail-name", children: selectedNote.authorName })] }), selectedAuthorAccount ? ((0,jsx_runtime.jsx)("button", { type: "button", className: `cp-xhs-detail-follow ${selectedAuthorFollowing ? "is-following" : ""}`, onClick: () => handleToggleFollowAuthor(selectedNote), children: selectedAuthorFollowing ? "已关注" : "关注" })) : null, (0,jsx_runtime.jsx)("button", { type: "button", className: "cp-xhs-detail-share", "aria-label": "\u5206\u4EAB", onClick: () => handleShareNote(selectedNote), children: (0,jsx_runtime.jsx)(n, { size: 25, weight: "regular" }) })] }), (0,jsx_runtime.jsxs)("article", { className: "cp-xhs-note-detail xhs-note-detail-page", children: [(0,jsx_runtime.jsx)("div", { className: "xhs-note-detail-media", children: (0,jsx_runtime.jsx)(NoteImage, { note: selectedNote, imageMap: imageMap, collapseBilingualTranslation: state.settings.collapseBilingualTranslation, isDetail: true }) }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-note-detail-card", children: [(0,jsx_runtime.jsx)("h3", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: selectedNote.title, tone: "xiaohongshu", collapseBilingualTranslation: state.settings.collapseBilingualTranslation }) }), (0,jsx_runtime.jsx)("p", { className: "cp-xhs-note-detail-body", children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: selectedNote.body, tone: "xiaohongshu", collapseBilingualTranslation: state.settings.collapseBilingualTranslation }) }), selectedNote.tags.length ? ((0,jsx_runtime.jsx)("div", { className: "cp-xhs-note-detail-tags", children: selectedNote.tags.map(tag => (0,jsx_runtime.jsxs)("em", { children: ["#", tag] }, tag)) })) : null, (0,jsx_runtime.jsxs)("div", { className: "xhs-note-detail-meta-row", children: [(0,jsx_runtime.jsx)("div", { className: "cp-xhs-note-detail-time", children: formatTime(selectedNote.createdAt) }), (0,jsx_runtime.jsxs)("button", { type: "button", className: "xhs-delete-note-btn", onClick: () => requestDeleteNote(selectedNote), "aria-label": "\u5220\u9664\u5E16\u5B50", children: [(0,jsx_runtime.jsx)(Trash2, { size: 14, strokeWidth: 2.1 }), "\u5220\u9664"] })] })] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-comment-section xhs-detail-comment-section", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-comment-count", children: ["\u5171 ", formatCount(selectedNote.commentCount), " \u6761\u8BC4\u8BBA"] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-comment-list", children: [(0,jsx_runtime.jsx)(CommentList, { comments: selectedNote.comments, getAvatar: getCommentAvatar, onReply: comment => setReplyTarget(comment), onDeleteComment: requestDeleteComment, onVoteComment: handleVoteComment, collapseBilingualTranslation: state.settings.collapseBilingualTranslation }), (0,jsx_runtime.jsxs)("button", { type: "button", className: "xhs-load-comments-btn", onClick: () => void handleLoadMoreComments(selectedNote), disabled: busy !== "idle", children: [busy === "more-comments" ? (0,jsx_runtime.jsx)(LoaderCircle, { className: "cp-spin", size: 15 }) : null, busy === "more-comments" ? "加载中" : "加载更多评论"] })] })] })] }), (0,jsx_runtime.jsxs)("div", { className: `cp-xhs-detail-bottom-bar xhs-detail-bottom-bar ${commentComposerExpanded ? "is-expanded" : ""}`, children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-detail-comment-stack", children: [replyTarget && replyTarget.noteId === selectedNote.id ? ((0,jsx_runtime.jsxs)("div", { className: "xhs-reply-target xhs-detail-reply-target", children: [(0,jsx_runtime.jsxs)("span", { children: ["\u56DE\u590D ", replyTarget.authorName] }), (0,jsx_runtime.jsx)("button", { type: "button", onClick: () => setReplyTarget(null), children: "\u53D6\u6D88" })] })) : null, (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-input-box xhs-detail-input-box", children: [(0,jsx_runtime.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true", children: [(0,jsx_runtime.jsx)("path", { d: "M12 20h9" }), (0,jsx_runtime.jsx)("path", { d: "M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" })] }), (0,jsx_runtime.jsx)("textarea", { value: commentDraft, onChange: event => setCommentDraft(event.target.value), onFocus: () => setCommentComposerFocused(true), onBlur: () => window.setTimeout(() => setCommentComposerFocused(false), 120), placeholder: replyTarget ? "写回复" : "说点什么...", rows: commentComposerExpanded ? 3 : 1 })] }), commentComposerExpanded ? commentToolbar : null] }), !commentComposerExpanded && commentDraft.trim() ? ((0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-detail-send-btn", onClick: handleSubmitUserComment, disabled: busy !== "idle", children: busy === "comment-reply" || busy === "mention-reply" ? (0,jsx_runtime.jsx)(LoaderCircle, { className: "cp-spin", size: 15 }) : "发送" })) : null, !commentComposerExpanded ? (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-action-icons", children: [(0,jsx_runtime.jsxs)("button", { type: "button", className: `cp-xhs-action-btn ${selectedNote.liked ? "is-liked" : ""}`, onClick: () => handleToggleLike(selectedNote), "aria-label": "\u70B9\u8D5E", children: [(0,jsx_runtime.jsx)(Heart, { size: 24, strokeWidth: 1.72, fill: selectedNote.liked ? "currentColor" : "none" }), (0,jsx_runtime.jsx)("span", { children: formatCount(selectedNote.likeCount) })] }), (0,jsx_runtime.jsxs)("button", { type: "button", className: `cp-xhs-action-btn ${selectedNote.saved ? "is-saved" : ""}`, onClick: () => handleToggleSave(selectedNote), "aria-label": "\u6536\u85CF", children: [(0,jsx_runtime.jsx)(Bookmark, { size: 24, strokeWidth: 1.72, fill: selectedNote.saved ? "currentColor" : "none" }), (0,jsx_runtime.jsx)("span", { children: formatCount(selectedNote.saveCount) })] }), (0,jsx_runtime.jsxs)("button", { type: "button", className: "cp-xhs-action-btn", "aria-label": "\u8BC4\u8BBA", children: [(0,jsx_runtime.jsx)(MessageCircle, { size: 24, strokeWidth: 1.72 }), (0,jsx_runtime.jsx)("span", { children: formatCount(selectedNote.commentCount) })] })] }) : null] })] })) : ((0,jsx_runtime.jsxs)("div", { ref: mainScrollRef, className: `cp-xhs-scroll ${selectedTab === "profile" ? "cp-xhs-scroll--profile" : ""}`, onScroll: handleMainScroll, children: [selectedTab === "home" ? ((0,jsx_runtime.jsx)("section", { className: "cp-xhs-home", children: renderWaterfall(homeColumns, { showGenerateButton: true, hideCharacterTextImages: true }) })) : null, selectedTab === "video" ? ((0,jsx_runtime.jsx)("section", { className: "cp-xhs-home", children: renderWaterfall(nearbyColumns, { showGenerateButton: true }) })) : null, selectedTab === "messages" ? (messagePanel ? ((0,jsx_runtime.jsx)("section", { className: "cp-xhs-panel cp-xhs-message-page xhs-message-detail-page", children: (0,jsx_runtime.jsx)("div", { className: "xhs-message-detail-list", children: selectedMessageNotifications.length === 0 ? ((0,jsx_runtime.jsxs)("div", { className: "cp-xhs-mini-empty", children: ["\u6682\u65E0", selectedMessagePanelLabel, "\u901A\u77E5"] })) : selectedMessageNotifications.map((notice, index) => ((0,jsx_runtime.jsxs)("button", { type: "button", className: "xhs-message-detail-card", onClick: () => notice.noteId && openNote(notice.noteId), children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: `xhs-message-detail-avatar cp-xhs-thread-avatar--tone-${(index % 6) + 1}`, src: getNotificationAvatar(notice.actorName, notice.id), name: notice.actorName }), (0,jsx_runtime.jsxs)("div", { className: "xhs-message-detail-copy", children: [(0,jsx_runtime.jsxs)("div", { children: [(0,jsx_runtime.jsx)("strong", { children: notificationActorLabel(notice) }), notice.type === "follow" ? (0,jsx_runtime.jsx)("em", { children: "\u4F60\u7684\u7C89\u4E1D" }) : null] }), (0,jsx_runtime.jsxs)("span", { children: [formatNotificationAction(notice), " ", (0,jsx_runtime.jsx)("time", { children: formatTime(notice.createdAt) })] }), notice.type === "comment" ? ((0,jsx_runtime.jsx)("p", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: formatNotificationPreview(notice), tone: "xiaohongshu", variant: "inline", collapseBilingualTranslation: state.settings.collapseBilingualTranslation }) })) : null] }), (0,jsx_runtime.jsx)("div", { className: "xhs-message-detail-thumb", children: renderNotificationThumbnail(notice) })] }, notice.id))) }) })) : ((0,jsx_runtime.jsxs)("section", { className: "cp-xhs-panel cp-xhs-message-page xhs-message-page", children: [(0,jsx_runtime.jsx)("div", { className: "cp-xhs-message-overview", children: [
+                                        { id: "engagement", label: "点赞和收藏", count: engagementUnreadCount, icon: "heart", tone: "heart" },
+                                        { id: "follow", label: "新增关注", count: followUnreadCount, icon: "user", tone: "follow" },
+                                        { id: "comment", label: "评论", count: commentUnreadCount, icon: "chat", tone: "chat" },
+                                    ].map(panel => ((0,jsx_runtime.jsxs)("button", { type: "button", className: "cp-xhs-overview-card", onClick: () => handleOpenMessagePanel(panel.id), children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-overview-icon-wrapper", children: [(0,jsx_runtime.jsx)("div", { className: `cp-xhs-overview-icon cp-xhs-overview-icon--${panel.tone}`, children: (0,jsx_runtime.jsx)(XiaohongshuOverviewGlyph, { type: panel.icon }) }), panel.count > 0 ? (0,jsx_runtime.jsx)("span", { className: "cp-xhs-overview-badge", children: formatBadgeCount(panel.count) }) : null] }), (0,jsx_runtime.jsx)("span", { children: panel.label })] }, panel.id))) }), (0,jsx_runtime.jsxs)("div", { className: "xhs-message-section-title", children: [(0,jsx_runtime.jsx)("strong", { children: "\u79C1\u4FE1" }), dmThreads.length > 0 ? (0,jsx_runtime.jsxs)("span", { children: [dmThreads.length, " \u4E2A\u5BF9\u8BDD"] }) : null] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-thread-list", children: [dmThreads.length === 0 ? (0,jsx_runtime.jsx)("div", { className: "cp-xhs-mini-empty", children: "\u6682\u65E0\u79C1\u4FE1" }) : null, dmThreads.map((thread, index) => ((0,jsx_runtime.jsxs)("button", { type: "button", className: "cp-xhs-thread-card", onClick: () => handleOpenDmThread(thread), children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: `cp-xhs-thread-avatar cp-xhs-thread-avatar--tone-${(index % 6) + 1}`, src: getNotificationAvatar(thread.actorName, thread.id), name: thread.actorName }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-thread-meta", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-thread-text", children: [(0,jsx_runtime.jsx)("span", { className: "cp-xhs-thread-name", children: thread.actorName }), (0,jsx_runtime.jsx)("span", { className: "cp-xhs-thread-preview", children: getXhsPlainText(thread.latest.text) })] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-thread-status", children: [(0,jsx_runtime.jsx)("time", { className: "cp-xhs-thread-time", children: formatTime(thread.latest.createdAt) }), thread.unreadCount > 0 ? (0,jsx_runtime.jsx)("span", { className: "cp-xhs-thread-unread-badge", children: formatBadgeCount(thread.unreadCount) }) : (0,jsx_runtime.jsx)("span", { className: "cp-xhs-thread-spacer" })] })] })] }, thread.id)))] })] }))) : null, selectedTab === "profile" ? ((0,jsx_runtime.jsxs)("section", { className: "cp-xhs-profile xhs-profile", children: [(0,jsx_runtime.jsxs)("div", { className: `cp-xhs-profile-topbar ${profileTopbarVisible ? "is-visible" : ""}`, children: [(0,jsx_runtime.jsx)("button", { type: "button", onClick: requestClose, "aria-label": "\u8FD4\u56DE\u684C\u9762", children: (0,jsx_runtime.jsx)(ChevronLeft, { size: 24, strokeWidth: 2.4 }) }), (0,jsx_runtime.jsx)("div", { children: (0,jsx_runtime.jsx)("button", { type: "button", onClick: () => setSettingsOpen(true), "aria-label": "\u8BBE\u7F6E", children: (0,jsx_runtime.jsx)(Ellipsis, { size: 22, strokeWidth: 1.5 }) }) })] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-hero", children: [(0,jsx_runtime.jsx)("button", { type: "button", className: "cp-xhs-profile-cover", style: profileCoverStyle, "aria-label": "\u66F4\u6362\u4E3B\u9875\u80CC\u666F\u56FE", onClick: () => profileCoverFileRef.current?.click() }), (0,jsx_runtime.jsx)("input", { ref: profileCoverFileRef, type: "file", accept: "image/*", hidden: true, onChange: handleProfileCoverChange }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-main", children: [(0,jsx_runtime.jsx)("input", { ref: profileAvatarFileRef, type: "file", accept: "image/*", hidden: true, onChange: handleProfileAvatarChange }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-profile-avatar-wrap", role: "button", tabIndex: 0, "aria-label": "\u4FEE\u6539\u533F\u540D\u5934\u50CF", onClick: () => profileAvatarFileRef.current?.click(), onKeyDown: event => { if (event.key === "Enter")
+                                                        profileAvatarFileRef.current?.click(); }, children: (0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-profile-avatar", src: userAvatar, name: state.profile.nickname }) }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-meta", children: [(0,jsx_runtime.jsxs)("h3", { children: [state.profile.nickname, (0,jsx_runtime.jsx)(ChevronDown, { size: 16, strokeWidth: 2.3 })] }), (0,jsx_runtime.jsxs)("span", { children: ["\u5C0F\u7EA2\u4E66\u53F7\uFF1A", state.profile.handle] }), (0,jsx_runtime.jsxs)("span", { children: ["IP \u5C5E\u5730\uFF1A", state.profile.ipLocation] })] })] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-bio", children: [(0,jsx_runtime.jsx)("p", { children: state.profile.signature }), (0,jsx_runtime.jsx)("em", { className: getGenderClassName(state.profile.gender), children: state.profile.gender || "♀" })] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-actions", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-stats", children: [(0,jsx_runtime.jsxs)("div", { children: [(0,jsx_runtime.jsx)("strong", { children: formatCount(profileStats.followingCount) }), (0,jsx_runtime.jsx)("span", { children: "\u5173\u6CE8" })] }), (0,jsx_runtime.jsxs)("div", { children: [(0,jsx_runtime.jsx)("strong", { children: formatCount(profileStats.followerCount) }), (0,jsx_runtime.jsx)("span", { children: "\u7C89\u4E1D" })] }), (0,jsx_runtime.jsxs)("div", { children: [(0,jsx_runtime.jsx)("strong", { children: formatCount(profileStats.likedAndSavedCount) }), (0,jsx_runtime.jsx)("span", { children: "\u83B7\u8D5E\u4E0E\u6536\u85CF" })] })] }), (0,jsx_runtime.jsx)("button", { type: "button", className: "cp-xhs-profile-edit", onClick: () => { setProfileDraft(state.profile); setProfileOpen(true); }, children: "\u7F16\u8F91\u8D44\u6599" }), (0,jsx_runtime.jsx)("button", { type: "button", className: "cp-xhs-profile-settings", "aria-label": "Profile settings", onClick: () => setSettingsOpen(true), children: (0,jsx_runtime.jsx)(Ellipsis, { size: 22, strokeWidth: 1.5 }) })] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-tools", children: [(0,jsx_runtime.jsxs)("div", { children: [(0,jsx_runtime.jsx)("strong", { children: "\u521B\u4F5C\u7075\u611F" }), (0,jsx_runtime.jsx)("span", { children: "\u5B66\u521B\u4F5C\u627E\u7075\u611F" })] }), (0,jsx_runtime.jsxs)("div", { children: [(0,jsx_runtime.jsx)("strong", { children: "RED \u521B\u4F5C\u5927\u8D5B" }), (0,jsx_runtime.jsx)("span", { children: "\u4E3A\u65B0\u751F\u4EE3\u597D\u4F5C\u54C1\u52A9\u529B" })] }), (0,jsx_runtime.jsxs)("div", { children: [(0,jsx_runtime.jsx)("strong", { children: "\u6D4F\u89C8\u8BB0\u5F55" }), (0,jsx_runtime.jsx)("span", { children: "\u770B\u8FC7\u7684\u7B14\u8BB0" })] })] })] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-content", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-tabs", children: [PROFILE_TABS.map(tab => ((0,jsx_runtime.jsx)("button", { type: "button", className: profileTab === tab.id ? "is-active" : "", onClick: () => setProfileTab(tab.id), children: tab.label }, tab.id))), (0,jsx_runtime.jsx)(Search, { size: 20, strokeWidth: 1.55 })] }), renderWaterfall(profileColumns)] })] })) : null] })) }), !selectedNote && !isMessageSubpage ? (0,jsx_runtime.jsx)("nav", { className: "cp-xhs-tabbar xhs-tabbar", "aria-label": "\u5C0F\u7EA2\u4E66\u5BFC\u822A", children: TABS.map((tab) => {
+                    if (tab.id === "publish") {
+                        return ((0,jsx_runtime.jsx)("button", { type: "button", className: "cp-xhs-tab-publish", onClick: () => setComposeOpen(true), "aria-label": "\u53D1\u5E03", children: (0,jsx_runtime.jsx)("div", { className: "cp-xhs-tab-publish-inner", children: (0,jsx_runtime.jsx)(Plus, { size: 20, strokeWidth: 3 }) }) }, tab.id));
+                    }
+                    const active = selectedTab === tab.id;
+                    return ((0,jsx_runtime.jsx)("button", { type: "button", className: `cp-xhs-tab ${active ? "is-active" : ""}`, onClick: () => setSelectedTab(tab.id), children: (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-tab-inner", children: [(0,jsx_runtime.jsx)("span", { children: tab.label }), tab.id === "messages" && unreadCount > 0 ? ((0,jsx_runtime.jsx)("span", { className: "cp-xhs-tab-badge", children: unreadCount > 99 ? "99+" : unreadCount })) : null] }) }, tab.id));
+                }) }) : null, composeOpen ? ((0,jsx_runtime.jsx)("div", { className: "xhs-modal-backdrop", onClick: () => setComposeOpen(false), children: (0,jsx_runtime.jsxs)("section", { className: "xhs-publish-sheet", onClick: event => event.stopPropagation(), children: [(0,jsx_runtime.jsxs)("header", { children: [(0,jsx_runtime.jsx)("strong", { children: "\u53D1\u5E03\u65B0\u7B14\u8BB0" }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-sheet-close-btn", onClick: () => setComposeOpen(false), "aria-label": "\u5173\u95ED", children: "\u00D7" })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-publish-content", children: [(0,jsx_runtime.jsx)("div", { className: "xhs-publish-left", children: ((draft.images && draft.images.length > 0) || draft.image?.dataUrl) ? ((0,jsx_runtime.jsxs)("div", { className: "xhs-publish-multi-images", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-publish-images-grid", children: [(draft.images || [draft.image]).map((img, idx) => ((0,jsx_runtime.jsxs)("div", { className: "xhs-publish-grid-item", children: [(0,jsx_runtime.jsx)("img", { src: img.dataUrl, alt: `Preview ${idx + 1}` }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-publish-img-remove", onClick: () => {
+                                                                    setDraft((prev) => {
+                                                                        const list = (prev.images || [prev.image]).filter((_, i) => i !== idx);
+                                                                        return {
+                                                                            ...prev,
+                                                                            image: list[0] || {},
+                                                                            images: list.length > 0 ? list : undefined,
+                                                                        };
+                                                                    });
+                                                                }, "aria-label": "\u5220\u9664\u56FE\u7247", children: "\u00D7" })] }, img.assetId || idx))), (0,jsx_runtime.jsxs)("button", { type: "button", className: "xhs-publish-grid-add", onClick: () => fileRef.current?.click(), "aria-label": "\u7EE7\u7EED\u6DFB\u52A0\u56FE\u7247", children: [(0,jsx_runtime.jsx)(Plus, { size: 24 }), (0,jsx_runtime.jsx)("span", { children: "\u6DFB\u52A0" })] })] }), (0,jsx_runtime.jsx)("input", { ref: fileRef, type: "file", accept: "image/*", multiple: true, hidden: true, onChange: handleImageChange }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-upload-change-btn", onClick: () => setDraft(prev => ({ ...prev, image: {}, images: undefined })), children: "\u6E05\u7A7A\u6240\u6709\u56FE\u7247" })] })) : draft.image?.description === undefined ? ((0,jsx_runtime.jsxs)("div", { className: "xhs-image-upload-area", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-publish-placeholder", children: [(0,jsx_runtime.jsx)(ImagePlus, { size: 42, strokeWidth: 1.5, color: "#bbb" }), (0,jsx_runtime.jsxs)("div", { className: "xhs-placeholder-actions", children: [(0,jsx_runtime.jsx)("button", { type: "button", onClick: () => fileRef.current?.click(), children: "\u4E0A\u4F20\u56FE\u7247 (\u652F\u6301\u591A\u5F20)" }), (0,jsx_runtime.jsx)("button", { type: "button", onClick: () => setDraft(prev => ({ ...prev, image: { ...prev.image, description: "" } })), children: "\u63CF\u8FF0\u56FE\u7247" })] })] }), (0,jsx_runtime.jsx)("input", { ref: fileRef, type: "file", accept: "image/*", multiple: true, hidden: true, onChange: handleImageChange })] })) : ((0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("div", { className: "xhs-image-upload-area is-text-mode", children: (0,jsx_runtime.jsx)("div", { className: "xhs-text-image-preview", children: draft.image.description?.trim() || "在此区域下方输入描述\n即可生成文字图片" }) }), (0,jsx_runtime.jsxs)("div", { className: "xhs-publish-field", children: [(0,jsx_runtime.jsx)("label", { children: "\u6587\u5B57\u56FE\u7247\u5185\u5BB9" }), (0,jsx_runtime.jsx)("textarea", { placeholder: "\u8F93\u5165\u6587\u5B57\u63CF\u8FF0...", value: draft.image.description || "", onChange: event => setDraft(prev => ({ ...prev, image: { ...prev.image, description: event.target.value } })), autoFocus: true })] }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-upload-change-btn", onClick: () => setDraft(prev => ({ ...prev, image: {} })), children: "\u53D6\u6D88\u5E76\u91CD\u65B0\u9009\u62E9" })] })) }), (0,jsx_runtime.jsxs)("div", { className: "xhs-publish-right", children: [(0,jsx_runtime.jsx)("input", { className: "xhs-publish-title-input", placeholder: "\u586B\u5199\u6807\u9898\u4F1A\u6709\u66F4\u591A\u8D5E\u54E6~", value: draft.title, onChange: event => setDraft(prev => ({ ...prev, title: event.target.value })) }), (0,jsx_runtime.jsx)("textarea", { className: "xhs-publish-body-input", placeholder: "\u6DFB\u52A0\u6B63\u6587\uFF0C\u548C\u5927\u5BB6\u5206\u4EAB\u4F60\u7684\u89C1\u95FB...", value: draft.body, onChange: event => setDraft(prev => ({ ...prev, body: event.target.value })) }), (0,jsx_runtime.jsxs)("div", { className: "xhs-publish-tag-input", children: [(0,jsx_runtime.jsx)("span", { children: "#" }), (0,jsx_runtime.jsx)("input", { value: tagInput, onChange: event => setTagInput(event.target.value), placeholder: "\u6DFB\u52A0\u6807\u7B7E\uFF0C\u7528\u7A7A\u683C\u6216\u9017\u53F7\u5206\u9694" })] }), (0,jsx_runtime.jsx)("div", { className: "xhs-publish-actions", children: (0,jsx_runtime.jsxs)("button", { type: "button", className: "xhs-publish-submit-btn", onClick: handlePublish, disabled: busy !== "idle" || (!draft.title.trim() && !draft.body.trim()), children: [busy === "publish" ? (0,jsx_runtime.jsx)(LoaderCircle, { className: "cp-spin", size: 18 }) : (0,jsx_runtime.jsx)(Send, { size: 18 }), "\u53D1\u5E03\u7B14\u8BB0"] }) })] })] })] }) })) : null, settingsOpen ? ((0,jsx_runtime.jsx)("div", { className: "xhs-modal-backdrop", onClick: () => setSettingsOpen(false), children: (0,jsx_runtime.jsxs)("section", { className: "xhs-profile-edit-sheet xhs-settings-edit-sheet", onClick: event => event.stopPropagation(), children: [(0,jsx_runtime.jsxs)("header", { className: "xhs-profile-edit-header", children: [(0,jsx_runtime.jsx)("strong", { children: "\u5C0F\u7EA2\u4E66\u8BBE\u7F6E" }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-sheet-close-btn", onClick: () => setSettingsOpen(false), "aria-label": "\u5173\u95ED", children: "\u00D7" })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-body", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-field", children: [(0,jsx_runtime.jsxs)("span", { className: "xhs-profile-edit-section-title", children: ["INTERACTION ", (0,jsx_runtime.jsx)("em", { children: "\u89D2\u8272\u4E92\u52A8\u6982\u7387" })] }), (0,jsx_runtime.jsx)("input", { className: "xhs-profile-edit-pill", type: "number", min: 0, max: 100, value: settingsDraft.sendToCharacterProbability, placeholder: "\u53D1\u7ED9\u89D2\u8272\u7684\u6982\u7387 (0\u2013100)", onChange: event => setSettingsDraft(prev => ({ ...prev, sendToCharacterProbability: Number(event.target.value) })) })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-field", children: [(0,jsx_runtime.jsxs)("span", { className: "xhs-profile-edit-section-title", children: ["TRANSLATION ", (0,jsx_runtime.jsx)("em", { children: "\u53CC\u8BED\u7FFB\u8BD1" })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-settings-toggle-list", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-settings-toggle-row", children: [(0,jsx_runtime.jsxs)("div", { children: [(0,jsx_runtime.jsx)("strong", { children: "\u53CC\u8BED\u7FFB\u8BD1" }), (0,jsx_runtime.jsx)("span", { children: "\u89D2\u8272\u5185\u5BB9" })] }), (0,jsx_runtime.jsx)(Toggle, { checked: settingsDraft.bilingualTranslationEnabled, onChange: checked => setSettingsDraft(prev => ({ ...prev, bilingualTranslationEnabled: checked })) })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-settings-toggle-row", children: [(0,jsx_runtime.jsxs)("div", { children: [(0,jsx_runtime.jsx)("strong", { children: "\u6298\u53E0\u7FFB\u8BD1" }), (0,jsx_runtime.jsx)("span", { children: "\u9ED8\u8BA4\u6536\u8D77" })] }), (0,jsx_runtime.jsx)(Toggle, { checked: settingsDraft.collapseBilingualTranslation, onChange: checked => setSettingsDraft(prev => ({ ...prev, collapseBilingualTranslation: checked })) })] })] })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-field", children: [(0,jsx_runtime.jsxs)("span", { className: "xhs-profile-edit-section-title", children: ["PARTICIPANTS ", (0,jsx_runtime.jsx)("em", { children: "\u53C2\u4E0E\u89D2\u8272" })] }), (0,jsx_runtime.jsx)("div", { className: "xhs-settings-edit-participants", children: characters.length === 0 ? ((0,jsx_runtime.jsx)("span", { className: "xhs-settings-edit-participants-empty", children: "\u6682\u65E0\u89D2\u8272" })) : (characters.map((character) => {
+                                                const selected = settingsDraft.participantCharacterIds.includes(character.id);
+                                                return ((0,jsx_runtime.jsxs)("button", { type: "button", className: selected ? "is-selected" : "", onClick: () => setSettingsDraft(prev => ({
+                                                        ...prev,
+                                                        participantCharacterIds: selected
+                                                            ? prev.participantCharacterIds.filter(id => id !== character.id)
+                                                            : [...prev.participantCharacterIds, character.id],
+                                                    })), children: [(0,jsx_runtime.jsx)("span", { children: character.avatar ? (0,jsx_runtime.jsx)("img", { src: character.avatar, alt: "" }) : character.name.slice(0, 1) }), (0,jsx_runtime.jsx)("em", { children: (0,adapters_characters/* managementName */.pi)(character.id) })] }, character.id));
+                                            })) })] }), (0,jsx_runtime.jsx)(NicknameSettings, { onChange: () => { setCharacters((0,adapters_characters/* loadCharacters */.fR)()); setState((0,xiaohongshu_storage.loadXiaohongshuState)()); } }), (0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-field", children: [(0,jsx_runtime.jsxs)("span", { className: "xhs-profile-edit-section-title", children: ["PROMPTS ", (0,jsx_runtime.jsx)("em", { children: "\u63D0\u793A\u8BCD" })] }), [
+                                            { key: "npcIdentityGuardPrompt", label: "NPC身份保护", value: settingsDraft.npcIdentityGuardPrompt ?? xiaohongshu_types/* DEFAULT_XIAOHONGSHU_SETTINGS */.iK.npcIdentityGuardPrompt, onChange: (v) => setSettingsDraft(prev => ({ ...prev, npcIdentityGuardPrompt: v })) },
+                                            { key: "npcFeedPrompt", label: "帖子生成", value: settingsDraft.npcFeedPrompt, onChange: (v) => setSettingsDraft(prev => ({ ...prev, npcFeedPrompt: v })) },
+                                            { key: "npcUserPostReactionPrompt", label: "评论用户帖子", value: settingsDraft.npcUserPostReactionPrompt, onChange: (v) => setSettingsDraft(prev => ({ ...prev, npcUserPostReactionPrompt: v })) },
+                                            { key: "npcCommentReplyPrompt", label: "回复用户评论", value: settingsDraft.npcCommentReplyPrompt, onChange: (v) => setSettingsDraft(prev => ({ ...prev, npcCommentReplyPrompt: v })) },
+                                            { key: "npcMoreCommentsPrompt", label: "加载更多评论", value: settingsDraft.npcMoreCommentsPrompt ?? "", onChange: (v) => setSettingsDraft(prev => ({ ...prev, npcMoreCommentsPrompt: v })) },
+                                            { key: "npcDmReplyPrompt", label: "回复私信", value: settingsDraft.npcDmReplyPrompt ?? "", onChange: (v) => setSettingsDraft(prev => ({ ...prev, npcDmReplyPrompt: v })) },
+                                            { key: "bilingualTranslationPrompt", label: "双语翻译", value: settingsDraft.bilingualTranslationPrompt || bilingual_prompt_defaults/* DEFAULT_XIAOHONGSHU_BILINGUAL_PROMPT */.tQ, onChange: (v) => setSettingsDraft(prev => ({ ...prev, bilingualTranslationPrompt: v })) },
+                                        ].map(({ key, label, value, onChange }) => {
+                                            const isOpen = expandedPrompts.has(key);
+                                            return ((0,jsx_runtime.jsxs)("div", { className: `xhs-settings-edit-prompt${isOpen ? " is-open" : ""}`, children: [(0,jsx_runtime.jsxs)("button", { type: "button", className: "xhs-settings-edit-prompt-head", onClick: () => setExpandedPrompts(prev => {
+                                                            const next = new Set(prev);
+                                                            if (next.has(key))
+                                                                next.delete(key);
+                                                            else
+                                                                next.add(key);
+                                                            return next;
+                                                        }), children: [(0,jsx_runtime.jsx)("span", { children: label }), (0,jsx_runtime.jsx)(ChevronDown, { size: 15, strokeWidth: 2 })] }), isOpen ? ((0,jsx_runtime.jsx)("textarea", { className: "xhs-profile-edit-pill xhs-settings-edit-prompt-textarea", value: value, onChange: event => onChange(event.target.value) })) : null] }, key));
+                                        })] })] }), (0,jsx_runtime.jsxs)("footer", { className: "xhs-profile-edit-footer", children: [(0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-profile-edit-footer-cancel", onClick: handleResetSettingsDraft, children: "\u6062\u590D\u9ED8\u8BA4" }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-profile-edit-footer-save", onClick: handleSaveSettings, children: "\u4FDD\u5B58\u8BBE\u7F6E" })] })] }) })) : null, profileOpen ? ((0,jsx_runtime.jsx)("div", { className: "xhs-modal-backdrop", onClick: () => setProfileOpen(false), children: (0,jsx_runtime.jsxs)("section", { className: "xhs-profile-edit-sheet", onClick: event => event.stopPropagation(), children: [(0,jsx_runtime.jsxs)("header", { className: "xhs-profile-edit-header", children: [(0,jsx_runtime.jsx)("strong", { children: "\u7F16\u8F91\u8D44\u6599" }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-sheet-close-btn", onClick: () => setProfileOpen(false), "aria-label": "\u5173\u95ED", children: "\u00D7" })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-body", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-row-2", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-field", children: [(0,jsx_runtime.jsxs)("span", { className: "xhs-profile-edit-section-title", children: ["NICKNAME ", (0,jsx_runtime.jsx)("em", { children: "\u6635\u79F0" })] }), (0,jsx_runtime.jsx)("input", { className: "xhs-profile-edit-pill", value: profileDraft.nickname, placeholder: "\u7ED9\u81EA\u5DF1\u8D77\u4E2A\u540D\u5B57", onChange: event => setProfileDraft(prev => ({ ...prev, nickname: event.target.value })) })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-field", children: [(0,jsx_runtime.jsxs)("span", { className: "xhs-profile-edit-section-title", children: ["ID ", (0,jsx_runtime.jsx)("em", { children: "\u5C0F\u7EA2\u4E66\u53F7" })] }), (0,jsx_runtime.jsx)("input", { className: "xhs-profile-edit-pill", value: profileDraft.handle, placeholder: "\u672A\u8BBE\u7F6E", onChange: event => setProfileDraft(prev => ({ ...prev, handle: event.target.value })) })] })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-row-2", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-field", children: [(0,jsx_runtime.jsxs)("span", { className: "xhs-profile-edit-section-title", children: ["GENDER ", (0,jsx_runtime.jsx)("em", { children: "\u6027\u522B" })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-gender", children: [(0,jsx_runtime.jsx)("button", { type: "button", className: /女|♀|female/i.test(profileDraft.gender ?? "") ? "is-active" : "", onClick: () => setProfileDraft(prev => ({ ...prev, gender: "♀" })), "aria-label": "\u5973", children: "\u2640" }), (0,jsx_runtime.jsx)("button", { type: "button", className: /男|♂|male/i.test(profileDraft.gender ?? "") ? "is-active" : "", onClick: () => setProfileDraft(prev => ({ ...prev, gender: "♂" })), "aria-label": "\u7537", children: "\u2642" })] })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-field", children: [(0,jsx_runtime.jsxs)("span", { className: "xhs-profile-edit-section-title", children: ["IP LOCATION ", (0,jsx_runtime.jsx)("em", { children: "\u5C5E\u5730" })] }), (0,jsx_runtime.jsx)("input", { className: "xhs-profile-edit-pill", value: profileDraft.ipLocation, placeholder: "\u5317\u4EAC", onChange: event => setProfileDraft(prev => ({ ...prev, ipLocation: event.target.value })) })] })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-profile-edit-field", children: [(0,jsx_runtime.jsxs)("span", { className: "xhs-profile-edit-section-title", children: ["SIGNATURE ", (0,jsx_runtime.jsx)("em", { children: "\u7B7E\u540D" })] }), (0,jsx_runtime.jsx)("textarea", { className: "xhs-profile-edit-pill xhs-profile-edit-bio", value: profileDraft.signature, placeholder: "\u8BF4\u70B9\u4EC0\u4E48...", onChange: event => setProfileDraft(prev => ({ ...prev, signature: event.target.value })) })] })] }), (0,jsx_runtime.jsxs)("footer", { className: "xhs-profile-edit-footer", children: [(0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-profile-edit-footer-cancel", onClick: () => setProfileOpen(false), children: "\u5173\u95ED" }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-profile-edit-footer-save", onClick: handleSaveProfile, children: "\u4FDD\u5B58" })] })] }) })) : null, deleteTarget ? ((0,jsx_runtime.jsx)("div", { className: "xhs-modal-backdrop", onClick: () => setDeleteTarget(null), children: (0,jsx_runtime.jsxs)("section", { className: "xhs-confirm-sheet", onClick: event => event.stopPropagation(), role: "dialog", "aria-modal": "true", "aria-label": "\u786E\u8BA4\u5220\u9664", children: [(0,jsx_runtime.jsxs)("header", { children: [(0,jsx_runtime.jsx)("strong", { children: deleteTarget.type === "note" ? "删除这篇笔记？" : "删除这条评论？" }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-sheet-close-btn", onClick: () => setDeleteTarget(null), "aria-label": "\u5173\u95ED", children: "\u00D7" })] }), (0,jsx_runtime.jsx)("p", { children: deleteTarget.type === "note"
+                                ? `将删除《${deleteTarget.title}》，相关评论、消息和短期记忆事件也会一并清理。`
+                                : `将删除 ${deleteTarget.comment.authorName} 在《${deleteTarget.noteTitle}》下的评论，相关短期记忆事件也会一并清理。` }), deleteTarget.type === "comment" ? ((0,jsx_runtime.jsx)("blockquote", { children: deleteTarget.comment.text })) : null, (0,jsx_runtime.jsxs)("div", { className: "xhs-confirm-actions", children: [(0,jsx_runtime.jsx)("button", { type: "button", onClick: () => setDeleteTarget(null), children: "\u53D6\u6D88" }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-confirm-delete-btn", onClick: handleConfirmDelete, children: "\u786E\u8BA4\u5220\u9664" })] })] }) })) : null, pendingFeedAction ? ((0,jsx_runtime.jsx)("div", { className: "xhs-modal-backdrop", onClick: () => setPendingFeedAction(null), children: (0,jsx_runtime.jsxs)("section", { className: "xhs-confirm-sheet", onClick: event => event.stopPropagation(), role: "dialog", "aria-modal": "true", "aria-label": pendingFeedAction === "refresh" ? "确认刷新" : "确认清空内容流", children: [(0,jsx_runtime.jsxs)("header", { children: [(0,jsx_runtime.jsx)("strong", { children: pendingFeedAction === "refresh" ? "新增一批小红书内容？" : "清空首页、附近和视频内容？" }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-sheet-close-btn", onClick: () => setPendingFeedAction(null), "aria-label": "\u5173\u95ED", children: "\u00D7" })] }), (0,jsx_runtime.jsx)("p", { children: pendingFeedAction === "refresh"
+                                ? "将生成一批新的首页与视频内容，已有内容会保留，旧内容不会回传给本次生成链路。"
+                                : "将清空首页推荐、附近和视频页当前可见内容；消息、私信、用户主页和互动记录会保留。" }), (0,jsx_runtime.jsxs)("div", { className: "xhs-confirm-actions", children: [(0,jsx_runtime.jsx)("button", { type: "button", onClick: () => setPendingFeedAction(null), children: "\u53D6\u6D88" }), (0,jsx_runtime.jsx)("button", { type: "button", className: pendingFeedAction === "clear" ? "xhs-confirm-delete-btn" : "xhs-confirm-primary-btn", onClick: () => void handleConfirmFeedAction(), children: pendingFeedAction === "refresh" ? "确认新增" : "确认清空" })] })] }) })) : null] }));
+}
 
 
 /***/ }),
@@ -16710,6 +22538,108 @@ exports.jsxs = jsxProd;
 
 /***/ }),
 
+/***/ 776:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   $P: () => (/* binding */ actionNow),
+/* harmony export */   MH: () => (/* binding */ actionUuid),
+/* harmony export */   MU: () => (/* binding */ pendingAction),
+/* harmony export */   _Q: () => (/* binding */ finishAction),
+/* harmony export */   eQ: () => (/* binding */ actionRandom),
+/* harmony export */   g2: () => (/* binding */ durableRaw),
+/* harmony export */   yU: () => (/* binding */ beginAction)
+/* harmony export */ });
+/* unused harmony export DurableGenerationError */
+/* harmony import */ var _host__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(802);
+/* harmony import */ var _storage__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(923);
+// CUSTOM-APP-ADAPTER: replay the copied upstream handlers, never a second product reducer.
+
+
+class DurableGenerationError extends Error {
+    code;
+    constructor(message, code) {
+        super(message);
+        this.code = code;
+        this.name = 'DurableGenerationError';
+    }
+}
+let active = null;
+let randomIndex = 0;
+let callIndex = 0;
+function pendingAction() { return JSON.parse((0,_storage__WEBPACK_IMPORTED_MODULE_0__/* .kvGet */ .M3)('continuation') || 'null'); }
+async function beginAction(kind, view, args) {
+    if (active)
+        return false;
+    active = pendingAction() || { id: crypto.randomUUID(), kind, view: structuredClone(view), args: structuredClone(args), startedAt: Date.now() };
+    randomIndex = 0;
+    callIndex = 0;
+    (0,_storage__WEBPACK_IMPORTED_MODULE_0__/* .kvSet */ .or)('continuation', JSON.stringify(active));
+    await (0,_storage__WEBPACK_IMPORTED_MODULE_0__/* .flush */ .bX)();
+    return true;
+}
+async function finishAction() { await (0,_storage__WEBPACK_IMPORTED_MODULE_0__/* .flush */ .bX)(); (0,_storage__WEBPACK_IMPORTED_MODULE_0__/* .kvRemove */ .ED)('continuation'); await (0,_storage__WEBPACK_IMPORTED_MODULE_0__/* .flush */ .bX)(); active = null; randomIndex = 0; callIndex = 0; }
+function actionNow() { return active?.startedAt ?? Date.now(); }
+function actionRandom() {
+    if (!active)
+        return Math.random();
+    const text = active.id + ':' + randomIndex++;
+    let h = 2166136261;
+    for (const c of text)
+        h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+    return (h >>> 0) / 4294967296;
+}
+function actionUuid() { return active ? `${active.id}_${randomIndex++}` : crypto.randomUUID(); }
+async function durableRaw(request, standaloneKey, knowledgeKey) {
+    const key = standaloneKey || `${active?.id || crypto.randomUUID()}.${callIndex++}`;
+    let record = await (0,_host__WEBPACK_IMPORTED_MODULE_1__/* .host */ .H)().db.get('fork_calls', key);
+    if (record && record.knowledgeKey !== knowledgeKey)
+        throw Error('身份知识已更新，请重新生成。');
+    if (record?.content !== undefined)
+        return record.content;
+    if (!record) {
+        record = { id: key, request, knowledgeKey };
+        const { put } = await Promise.resolve(/* import() */).then(__webpack_require__.bind(__webpack_require__, 923));
+        await put('fork_calls', key, record);
+    }
+    let task = await (0,_host__WEBPACK_IMPORTED_MODULE_1__/* .host */ .H)().ai.startTask({ idempotencyKey: key, request: record.request });
+    while (task.status === 'running') {
+        await new Promise(r => setTimeout(r, 300));
+        const next = await (0,_host__WEBPACK_IMPORTED_MODULE_1__/* .host */ .H)().ai.getTask({ taskId: task.taskId });
+        if (!next)
+            throw Error('生成记录暂时不可用');
+        task = next;
+    }
+    if (task.status === 'consumed') {
+        const stored = await (0,_host__WEBPACK_IMPORTED_MODULE_1__/* .host */ .H)().db.get('fork_calls', key);
+        if (stored?.content !== undefined)
+            return stored.content;
+        throw Error('生成记录缺少已保存结果');
+    }
+    if (task.status !== 'completed')
+        throw new DurableGenerationError(task.error || '本次生成未完成，请稍后再试。', task.errorCode || 'UNKNOWN');
+    const content = task.result?.content || '';
+    const result = await (0,_host__WEBPACK_IMPORTED_MODULE_1__/* .host */ .H)().ai.consumeTask({ taskId: task.taskId, writes: [{ collection: 'fork_calls', id: key, operation: 'put', value: { id: key, content, knowledgeKey } }] });
+    if (!result.applied)
+        return (await (0,_host__WEBPACK_IMPORTED_MODULE_1__/* .host */ .H)().db.get('fork_calls', key)).content;
+    return content;
+}
+
+
+/***/ }),
+
+/***/ 802:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   H: () => (/* binding */ host)
+/* harmony export */ });
+function host() { const api = window.AiPhone || window.AiPhoneApp; if (!api?.ai?.startTask || !api.app?.setPolicy)
+    throw Error('需要已安装 Phase 0.5 Host Capability Patch 的 Float 浏览器 Host。'); return api; }
+
+
+/***/ }),
+
 /***/ 848:
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
@@ -16718,6 +22648,37 @@ exports.jsxs = jsxProd;
 if (true) {
   module.exports = __webpack_require__(698);
 } else {}
+
+
+/***/ }),
+
+/***/ 861:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   GH: () => (/* binding */ resolveUserIdentity),
+/* harmony export */   JF: () => (/* binding */ CHECKPHONE_SETTINGS_CHANGED_EVENT),
+/* harmony export */   __: () => (/* binding */ loadBindingConfig),
+/* harmony export */   g5: () => (/* binding */ loadCheckPhoneSettings),
+/* harmony export */   yx: () => (/* binding */ loadApiConfigs)
+/* harmony export */ });
+/* unused harmony exports resolveBinding, loadPresets, loadWorldBooks, loadRegexes */
+/* harmony import */ var _identity__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(58);
+/* harmony import */ var _characters__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(588);
+/* harmony import */ var _storage__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(923);
+// CUSTOM-APP-ADAPTER: no native user identity, phone snapshot, preset or mixed memory is read.
+
+
+
+function resolveUserIdentity(..._args) { const a = (0,_identity__WEBPACK_IMPORTED_MODULE_0__/* .userAccount */ .Ny)(); return a ? { id: a.accountId, name: a.displayName, avatarUrl: a.avatar || '' } : null; }
+function loadApiConfigs() { return [{ id: 'background', enableImageRecognition: true, defaultModel: '' }]; }
+function loadBindingConfig() { return { globalDefaults: { apiConfigId: 'background' } }; }
+function resolveBinding(..._args) { return { apiConfigId: loadCharacters()[0]?.id || 'background', worldBookIds: [], regexIds: [] }; }
+function loadPresets() { return []; }
+function loadWorldBooks() { return []; }
+function loadRegexes() { return []; }
+const CHECKPHONE_SETTINGS_CHANGED_EVENT = 'anonymous-xhs-settings-changed';
+function loadCheckPhoneSettings() { return { collapseBilingualTranslation: JSON.parse((0,_storage__WEBPACK_IMPORTED_MODULE_2__/* .kvGet */ .M3)('ai_phone_xiaohongshu_state_v1') || '{}').settings?.collapseBilingualTranslation !== false }; }
 
 
 /***/ }),
@@ -17271,835 +23232,102 @@ exports.version = "19.2.4";
 
 /***/ }),
 
-/***/ 961:
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+/***/ 923:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   ED: () => (/* binding */ kvRemove),
+/* harmony export */   M3: () => (/* binding */ kvGet),
+/* harmony export */   Qv: () => (/* binding */ hydrate),
+/* harmony export */   bX: () => (/* binding */ flush),
+/* harmony export */   dT: () => (/* binding */ registerKvMigration),
+/* harmony export */   oD: () => (/* binding */ kvKeysWithPrefix),
+/* harmony export */   or: () => (/* binding */ kvSet),
+/* harmony export */   put: () => (/* binding */ put),
+/* harmony export */   vp: () => (/* binding */ registerDynamicPrefix)
+/* harmony export */ });
+/* harmony import */ var _host__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(802);
+// CUSTOM-APP-ADAPTER: synchronous native KV API over a hydrated, App-scoped SDK database.
+// Every key below is a record INSIDE this installed App, never Float's native KV namespace.
 
-
-function checkDCE() {
-  /* global __REACT_DEVTOOLS_GLOBAL_HOOK__ */
-  if (
-    typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ === 'undefined' ||
-    typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE !== 'function'
-  ) {
-    return;
-  }
-  if (false) {}
-  try {
-    // Verify that the code above has been dead code eliminated (DCE'd).
-    __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE(checkDCE);
-  } catch (err) {
-    // DevTools shouldn't crash React, no matter what.
-    // We should still report in case we break this code.
-    console.error(err);
-  }
+let values = {};
+let writes = Promise.resolve();
+let fault;
+async function put(collection, id, value) {
+    const api = (0,_host__WEBPACK_IMPORTED_MODULE_0__/* .host */ .H)();
+    const prior = await api.db.get(collection, id);
+    if (prior)
+        await api.db.update(collection, id, value);
+    else
+        await api.db.create(collection, { ...value, id });
 }
-
-if (true) {
-  // DCE check should happen before ReactDOM bundle executes so that
-  // DevTools can report bad minification during injection.
-  checkDCE();
-  module.exports = __webpack_require__(221);
-} else {}
+async function hydrate() {
+    const row = await (0,_host__WEBPACK_IMPORTED_MODULE_0__/* .host */ .H)().db.get('fork_storage', 'kv');
+    values = row?.values || {};
+    if (!row) {
+        const legacy = await (0,_host__WEBPACK_IMPORTED_MODULE_0__/* .host */ .H)().db.get('phase1a_state', 'state');
+        if (legacy) {
+            if (legacy.jobs?.some((job) => job.status === 'queued' || job.status === 'running'))
+                throw Error('旧版本仍有未完成任务；迁移暂停，原任务和数据均保留');
+            const platform = structuredClone(legacy.platform);
+            if (legacy.noteIds) {
+                platform.notes = await Promise.all(legacy.noteIds.map((id) => (0,_host__WEBPACK_IMPORTED_MODULE_0__/* .host */ .H)().db.get('notes_v2', id)));
+                if (platform.notes.some((n) => !n))
+                    throw Error('旧帖子索引不完整，迁移停止；原记录保持不变');
+            }
+            values['ai_phone_xiaohongshu_state_v1'] = JSON.stringify(platform);
+            values['identity'] = JSON.stringify({ accounts: legacy.accounts, bindings: legacy.bindings, disclosures: legacy.disclosures, userAccountId: legacy.userAccountId });
+            values['user_profile_initialized'] = legacy.userAccountId ? 'true' : 'false';
+            values['nickname-ready'] = JSON.stringify(legacy.bindings.filter((b) => b.ownerKind === 'character').map((b) => b.accountId));
+        }
+        else {
+            const accounts = await (0,_host__WEBPACK_IMPORTED_MODULE_0__/* .host */ .H)().db.list('social_accounts', { limit: 500 });
+            if (accounts.length) {
+                const { createDefaultXiaohongshuState } = await Promise.resolve(/* import() */).then(__webpack_require__.bind(__webpack_require__, 575));
+                const { migrateLegacy } = await Promise.resolve(/* import() */).then(__webpack_require__.bind(__webpack_require__, 66));
+                const migrated = { accounts: {}, bindings: [], disclosures: [], platform: createDefaultXiaohongshuState(), images: {} };
+                await migrateLegacy(migrated, accounts);
+                const { platform, images: _images, migrationNotice, ...identity } = migrated;
+                values['identity'] = JSON.stringify(identity);
+                values['ai_phone_xiaohongshu_state_v1'] = JSON.stringify(platform);
+                values['user_profile_initialized'] = identity.userAccountId ? 'true' : 'false';
+                values['migration_notice'] = migrationNotice || '';
+                values['nickname-ready'] = JSON.stringify(identity.bindings.filter(b => b.ownerKind === 'character').map(b => b.accountId));
+            }
+        }
+        await put('fork_storage', 'kv', { values });
+    }
+}
+function kvGet(key) { return values[key] ?? null; }
+function kvSet(key, value) { values[key] = value; enqueue(); }
+function kvRemove(key) { delete values[key]; enqueue(); }
+function kvKeysWithPrefix(prefix) { return Object.keys(values).filter(k => k.startsWith(prefix)); }
+function registerDynamicPrefix(_prefix) { }
+function registerKvMigration(_key) { }
+function enqueue() { const snapshot = structuredClone(values); writes = writes.then(() => put('fork_storage', 'kv', { values: snapshot })).catch(e => { fault = e; }); }
+async function flush() { await writes; if (fault) {
+    const e = fault;
+    fault = undefined;
+    throw e;
+} }
 
 
 /***/ }),
 
-/***/ 982:
-/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
-
-
-
-if (true) {
-  module.exports = __webpack_require__(477);
-} else {}
-
-
-/***/ })
-
-/******/ 	});
-/************************************************************************/
-/******/ 	// The module cache
-/******/ 	var __webpack_module_cache__ = {};
-/******/
-/******/ 	// The require function
-/******/ 	function __webpack_require__(moduleId) {
-/******/ 		// Check if module is in cache
-/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
-/******/ 		if (cachedModule !== undefined) {
-/******/ 			return cachedModule.exports;
-/******/ 		}
-/******/ 		// Create a new module (and put it into the cache)
-/******/ 		var module = __webpack_module_cache__[moduleId] = {
-/******/ 			// no module.id needed
-/******/ 			// no module.loaded needed
-/******/ 			exports: {}
-/******/ 		};
-/******/
-/******/ 		// Execute the module function
-/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
-/******/
-/******/ 		// Return the exports of the module
-/******/ 		return module.exports;
-/******/ 	}
-/******/
-/************************************************************************/
-var __webpack_exports__ = {};
-
-// EXTERNAL MODULE: ./node_modules/react/jsx-runtime.js
-var jsx_runtime = __webpack_require__(848);
-// EXTERNAL MODULE: ./node_modules/react/index.js
-var react = __webpack_require__(540);
-// EXTERNAL MODULE: ./node_modules/react-dom/client.js
-var client = __webpack_require__(338);
-;// ./node_modules/lucide-react/dist/esm/shared/src/utils/mergeClasses.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-const mergeClasses = (...classes) => classes.filter((className, index, array) => {
-  return Boolean(className) && className.trim() !== "" && array.indexOf(className) === index;
-}).join(" ").trim();
-
-
-//# sourceMappingURL=mergeClasses.js.map
-
-;// ./node_modules/lucide-react/dist/esm/shared/src/utils/toKebabCase.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-const toKebabCase = (string) => string.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
-
-
-//# sourceMappingURL=toKebabCase.js.map
-
-;// ./node_modules/lucide-react/dist/esm/shared/src/utils/toCamelCase.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-const toCamelCase = (string) => string.replace(
-  /^([A-Z])|[\s-_]+(\w)/g,
-  (match, p1, p2) => p2 ? p2.toUpperCase() : p1.toLowerCase()
-);
-
-
-//# sourceMappingURL=toCamelCase.js.map
-
-;// ./node_modules/lucide-react/dist/esm/shared/src/utils/toPascalCase.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-
-
-const toPascalCase = (string) => {
-  const camelCase = toCamelCase(string);
-  return camelCase.charAt(0).toUpperCase() + camelCase.slice(1);
-};
-
-
-//# sourceMappingURL=toPascalCase.js.map
-
-;// ./node_modules/lucide-react/dist/esm/defaultAttributes.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-var defaultAttributes = {
-  xmlns: "http://www.w3.org/2000/svg",
-  width: 24,
-  height: 24,
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round",
-  strokeLinejoin: "round"
-};
-
-
-//# sourceMappingURL=defaultAttributes.js.map
-
-;// ./node_modules/lucide-react/dist/esm/shared/src/utils/hasA11yProp.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-const hasA11yProp = (props) => {
-  for (const prop in props) {
-    if (prop.startsWith("aria-") || prop === "role" || prop === "title") {
-      return true;
-    }
-  }
-  return false;
-};
-
-
-//# sourceMappingURL=hasA11yProp.js.map
-
-;// ./node_modules/lucide-react/dist/esm/Icon.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-
-
-
-
-
-const Icon = (0,react.forwardRef)(
-  ({
-    color = "currentColor",
-    size = 24,
-    strokeWidth = 2,
-    absoluteStrokeWidth,
-    className = "",
-    children,
-    iconNode,
-    ...rest
-  }, ref) => (0,react.createElement)(
-    "svg",
-    {
-      ref,
-      ...defaultAttributes,
-      width: size,
-      height: size,
-      stroke: color,
-      strokeWidth: absoluteStrokeWidth ? Number(strokeWidth) * 24 / Number(size) : strokeWidth,
-      className: mergeClasses("lucide", className),
-      ...!children && !hasA11yProp(rest) && { "aria-hidden": "true" },
-      ...rest
-    },
-    [
-      ...iconNode.map(([tag, attrs]) => (0,react.createElement)(tag, attrs)),
-      ...Array.isArray(children) ? children : [children]
-    ]
-  )
-);
-
-
-//# sourceMappingURL=Icon.js.map
-
-;// ./node_modules/lucide-react/dist/esm/createLucideIcon.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-
-
-
-
-
-
-const createLucideIcon = (iconName, iconNode) => {
-  const Component = (0,react.forwardRef)(
-    ({ className, ...props }, ref) => (0,react.createElement)(Icon, {
-      ref,
-      iconNode,
-      className: mergeClasses(
-        `lucide-${toKebabCase(toPascalCase(iconName))}`,
-        `lucide-${iconName}`,
-        className
-      ),
-      ...props
-    })
-  );
-  Component.displayName = toPascalCase(iconName);
-  return Component;
-};
-
-
-//# sourceMappingURL=createLucideIcon.js.map
-
-;// ./node_modules/lucide-react/dist/esm/icons/chevron-left.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-
-
-const __iconNode = [["path", { d: "m15 18-6-6 6-6", key: "1wnfg3" }]];
-const ChevronLeft = createLucideIcon("chevron-left", __iconNode);
-
-
-//# sourceMappingURL=chevron-left.js.map
-
-;// ./node_modules/lucide-react/dist/esm/icons/rotate-cw.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-
-
-const rotate_cw_iconNode = [
-  ["path", { d: "M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8", key: "1p45f6" }],
-  ["path", { d: "M21 3v5h-5", key: "1q7to0" }]
-];
-const RotateCw = createLucideIcon("rotate-cw", rotate_cw_iconNode);
-
-
-//# sourceMappingURL=rotate-cw.js.map
-
-;// ./node_modules/lucide-react/dist/esm/icons/settings.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-
-
-const settings_iconNode = [
-  [
-    "path",
-    {
-      d: "M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915",
-      key: "1i5ecw"
-    }
-  ],
-  ["circle", { cx: "12", cy: "12", r: "3", key: "1v7zrd" }]
-];
-const Settings = createLucideIcon("settings", settings_iconNode);
-
-
-//# sourceMappingURL=settings.js.map
-
-;// ./node_modules/lucide-react/dist/esm/icons/loader-circle.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-
-
-const loader_circle_iconNode = [["path", { d: "M21 12a9 9 0 1 1-6.219-8.56", key: "13zald" }]];
-const LoaderCircle = createLucideIcon("loader-circle", loader_circle_iconNode);
-
-
-//# sourceMappingURL=loader-circle.js.map
-
-;// ./node_modules/lucide-react/dist/esm/icons/heart.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-
-
-const heart_iconNode = [
-  [
-    "path",
-    {
-      d: "M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5",
-      key: "mvr1a0"
-    }
-  ]
-];
-const Heart = createLucideIcon("heart", heart_iconNode);
-
-
-//# sourceMappingURL=heart.js.map
-
-;// ./node_modules/lucide-react/dist/esm/icons/bookmark.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-
-
-const bookmark_iconNode = [
-  [
-    "path",
-    {
-      d: "M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z",
-      key: "oz39mx"
-    }
-  ]
-];
-const Bookmark = createLucideIcon("bookmark", bookmark_iconNode);
-
-
-//# sourceMappingURL=bookmark.js.map
-
-;// ./node_modules/lucide-react/dist/esm/icons/plus.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
-
-
-const plus_iconNode = [
-  ["path", { d: "M5 12h14", key: "1ays0h" }],
-  ["path", { d: "M12 5v14", key: "s699le" }]
-];
-const Plus = createLucideIcon("plus", plus_iconNode);
-
-
-//# sourceMappingURL=plus.js.map
-
-;// ./custom-apps/anonymous-xiaohongshu/src/bilingual-text.ts
-// Forked from Float (AGPL-3.0-only), baseline da067218. See BASELINE.md.
-function containsChinese(text) {
-    return /[\u3400-\u9fff]/.test(text);
-}
-function normalizeBilingualTextInput(text) {
-    return text.replace(/\\r\\n|\\n|\\r/g, "\n");
-}
-function splitSegmentedBilingualLine(line) {
-    const parts = line.split("|").map(part => part.trim());
-    if (parts.length < 2 || parts.some(part => !part))
-        return null;
-    if (parts.length === 3) {
-        const [originalLabel, mixedLabelAndOriginal, translatedValue] = parts;
-        const colonIndex = mixedLabelAndOriginal.search(/[:：]/);
-        if (colonIndex > 0 && containsChinese(translatedValue) && !containsChinese(originalLabel)) {
-            const translatedLabel = mixedLabelAndOriginal.slice(0, colonIndex + 1).trim();
-            const originalValue = mixedLabelAndOriginal.slice(colonIndex + 1).trim();
-            if (translatedLabel && originalValue && containsChinese(translatedLabel)) {
-                return {
-                    original: `${originalLabel}: ${originalValue}`,
-                    translated: `${translatedLabel} ${translatedValue}`,
-                };
-            }
-        }
-    }
-    if (parts.length % 2 !== 0)
-        return null;
-    const originalParts = [];
-    const translatedParts = [];
-    let hasNonChineseOriginal = false;
-    for (let index = 0; index < parts.length; index += 2) {
-        const original = parts[index];
-        const translated = parts[index + 1];
-        if (!translated || !containsChinese(translated))
-            return null;
-        if (!containsChinese(original))
-            hasNonChineseOriginal = true;
-        originalParts.push(original);
-        translatedParts.push(translated);
-    }
-    if (!hasNonChineseOriginal)
-        return null;
-    return {
-        original: originalParts.join(" | "),
-        translated: translatedParts.join(" | "),
-    };
-}
-function splitBilingualText(text) {
-    const trimmed = normalizeBilingualTextInput(text).trim();
-    if (!trimmed || trimmed.includes("```") || /<script\b|<style\b/i.test(trimmed))
-        return null;
-    const firstPipe = trimmed.indexOf("|");
-    if (firstPipe <= 0)
-        return null;
-    if (firstPipe === trimmed.lastIndexOf("|")) {
-        const original = trimmed.slice(0, firstPipe).trim();
-        const translated = trimmed.slice(firstPipe + 1).trim();
-        if (!original || !translated)
-            return null;
-        if (!containsChinese(translated))
-            return null;
-        return { original, translated };
-    }
-    if (trimmed.includes("\n")) {
-        const originalLines = [];
-        const translatedLines = [];
-        let bilingualLineCount = 0;
-        for (const rawLine of trimmed.split("\n")) {
-            const line = rawLine.trim();
-            if (!line) {
-                originalLines.push("");
-                translatedLines.push("");
-                continue;
-            }
-            const linePipe = line.indexOf("|");
-            if (linePipe > 0 && linePipe === line.lastIndexOf("|")) {
-                const lineOriginal = line.slice(0, linePipe).trim();
-                const lineTranslated = line.slice(linePipe + 1).trim();
-                if (!lineOriginal || !lineTranslated || !containsChinese(lineTranslated))
-                    return null;
-                originalLines.push(lineOriginal);
-                translatedLines.push(lineTranslated);
-                bilingualLineCount += 1;
-                continue;
-            }
-            if (line.includes("|")) {
-                const segmented = splitSegmentedBilingualLine(line);
-                if (!segmented)
-                    return null;
-                originalLines.push(segmented.original);
-                translatedLines.push(segmented.translated);
-                bilingualLineCount += 1;
-                continue;
-            }
-            originalLines.push(line);
-            translatedLines.push(line);
-        }
-        if (bilingualLineCount === 0)
-            return null;
-        const original = originalLines.join("\n").trim();
-        const translated = translatedLines.join("\n").trim();
-        if (!original || !translated || !containsChinese(translated))
-            return null;
-        return { original, translated };
-    }
-    const segmented = splitSegmentedBilingualLine(trimmed);
-    if (segmented)
-        return segmented;
-    return null;
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/bilingual-component.tsx
-// Forked from Float (AGPL-3.0-only), baseline da067218. See BASELINE.md.
-"use client";
-
-
-
-function normalizeCheckPhoneText(value) {
-    return normalizeBilingualTextInput(value);
-}
-function CheckPhoneBilingualText({ text, className = "", tone = "default", variant = "block", collapseBilingualTranslation: collapseBilingualTranslationOverride, }) {
-    const normalized = normalizeCheckPhoneText(text);
-    const bilingual = splitBilingualText(normalized);
-    const [settingsCollapseBilingualTranslation, setSettingsCollapseBilingualTranslation] = (0,react.useState)(true);
-    const [expanded, setExpanded] = (0,react.useState)(false);
-    const collapseBilingualTranslation = collapseBilingualTranslationOverride ?? settingsCollapseBilingualTranslation;
-    (0,react.useEffect)(() => {
-        setExpanded(!collapseBilingualTranslation);
-    }, [normalized, collapseBilingualTranslation]);
-    if (!bilingual) {
-        return (0,jsx_runtime.jsx)("span", { className: className, children: normalized });
-    }
-    function toggle(event) {
-        event.stopPropagation();
-        setExpanded((current) => !current);
-    }
-    function handleKeyDown(event) {
-        if (event.key !== "Enter" && event.key !== " ")
-            return;
-        event.preventDefault();
-        toggle(event);
-    }
-    return ((0,jsx_runtime.jsxs)("span", { className: `cp-bilingual cp-bilingual--${tone} cp-bilingual--${variant} ${className}`.trim(), children: [(0,jsx_runtime.jsx)("span", { className: "cp-bilingual-original", children: bilingual.original }), (0,jsx_runtime.jsx)("span", { className: "cp-bilingual-toggle", role: "button", tabIndex: 0, onClick: toggle, onKeyDown: handleKeyDown, "aria-expanded": expanded, children: expanded ? "收起中文" : "中文" }), expanded && variant === "inline" ? ((0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("span", { className: "cp-bilingual-inline-separator", "aria-hidden": "true", children: " " }), (0,jsx_runtime.jsx)("span", { className: "cp-bilingual-translation", children: bilingual.translated })] })) : null, expanded && variant === "block" ? ((0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("span", { className: "cp-bilingual-divider", "aria-hidden": "true" }), (0,jsx_runtime.jsx)("span", { className: "cp-bilingual-translation", children: bilingual.translated })] })) : null] }));
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/baseline-ui.tsx
-
-// Forked from Float (AGPL-3.0-only), baseline da067218. See BASELINE.md.
-
-
-
-
-const DEFAULT_XHS_AVATARS = (/* unused pure expression or super */ null && ([
-    "/xiaohongshu/avatars/default-01.png",
-    "/xiaohongshu/avatars/default-02.png",
-    "/xiaohongshu/avatars/default-03.png",
-    "/xiaohongshu/avatars/default-04.png",
-    "/xiaohongshu/avatars/default-05.png",
-    "/xiaohongshu/avatars/default-06.png",
-]));
-const XHS_MAX_IMAGE_HEIGHT_RATIO = 4 / 3;
-const XHS_TEXT_IMAGE_HEIGHT_RATIO = 1.18;
-const XHS_VIDEO_IMAGE_HEIGHT_RATIO = XHS_TEXT_IMAGE_HEIGHT_RATIO;
-const DEFAULT_XHS_IMAGE_FRAME_STYLE = { aspectRatio: `1 / ${XHS_MAX_IMAGE_HEIGHT_RATIO}` };
-const TEXT_XHS_IMAGE_FRAME_STYLE = { aspectRatio: `1 / ${XHS_TEXT_IMAGE_HEIGHT_RATIO}` };
-const VIDEO_XHS_IMAGE_FRAME_STYLE = { aspectRatio: `1 / ${XHS_VIDEO_IMAGE_HEIGHT_RATIO}` };
-const ICON_XHS_IMAGE_FRAME_STYLES = {
-    compact: { aspectRatio: "1 / 0.9" },
-    regular: { aspectRatio: `1 / ${XHS_TEXT_IMAGE_HEIGHT_RATIO}` },
-    tall: { aspectRatio: `1 / ${XHS_MAX_IMAGE_HEIGHT_RATIO}` },
-};
-function formatCount(value) {
-    if (value >= 10000)
-        return `${(value / 10000).toFixed(value >= 100000 ? 0 : 1)}万`;
-    if (value >= 1000)
-        return `${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k`;
-    return String(Math.max(0, Math.round(value)));
-}
-function formatTime(value) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime()))
-        return "";
-    const diffMinutes = Math.max(1, Math.round((Date.now() - date.getTime()) / 60000));
-    if (diffMinutes < 60)
-        return `${diffMinutes}分钟前`;
-    if (diffMinutes < 1440)
-        return `${Math.round(diffMinutes / 60)}小时前`;
-    return `${Math.round(diffMinutes / 1440)}天前`;
-}
-function hashString(value) {
-    let hash = 0;
-    for (let index = 0; index < value.length; index += 1) {
-        hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-    }
-    return hash;
-}
-function pickDefaultAvatar(seed) {
-    return DEFAULT_XHS_AVATARS[hashString(seed || "npc") % DEFAULT_XHS_AVATARS.length];
-}
-function XhsAvatar({ className, src, name }) {
-    const isDefaultAvatar = Boolean(src?.startsWith("/xiaohongshu/avatars/"));
-    return ((0,jsx_runtime.jsx)("div", { className: `${className}${isDefaultAvatar ? " xhs-default-avatar" : ""}`, children: src ? (0,jsx_runtime.jsx)("img", { src: src, alt: "" }) : (0,jsx_runtime.jsx)("span", { children: (name || "?").slice(0, 1) }) }));
-}
-function XhsDislikeIcon() {
-    return ((0,jsx_runtime.jsxs)("svg", { className: "xhs-comment-dislike-icon", width: "20", height: "20", viewBox: "0 0 24 24", "aria-hidden": "true", children: [(0,jsx_runtime.jsx)("circle", { cx: "12", cy: "12", r: "9.2" }), (0,jsx_runtime.jsx)("path", { d: "M8.3 9.7h1.9" }), (0,jsx_runtime.jsx)("path", { d: "M13.8 9.7h1.9" }), (0,jsx_runtime.jsx)("path", { d: "M8.9 15.5c1.7-.85 4.5-.85 6.2 0" })] }));
-}
-function getImageFrameStyle(width, height) {
-    if (!width || !height || width <= 0 || height <= 0)
-        return DEFAULT_XHS_IMAGE_FRAME_STYLE;
-    const heightRatio = Math.min(height / width, XHS_MAX_IMAGE_HEIGHT_RATIO);
-    return { aspectRatio: `1 / ${heightRatio.toFixed(4)}` };
-}
-function getXhsPlainText(text) {
-    const normalized = normalizeBilingualTextInput(text);
-    return splitBilingualText(normalized)?.original ?? normalized;
-}
-function getNoteCardVariant(note) {
-    const textLength = getXhsPlainText(note.body).length + getXhsPlainText(note.title).length;
-    if (textLength > 95)
-        return "tall";
-    if (textLength > 54)
-        return "regular";
-    return "compact";
-}
-function getIconImageFrameStyle(note) {
-    return ICON_XHS_IMAGE_FRAME_STYLES[getNoteCardVariant(note)];
-}
-function NoteDetailSlider({ note, imageIds, imageMap, }) {
-    const [activeSlide, setActiveSlide] = (0,react.useState)(0);
-    return ((0,jsx_runtime.jsxs)("div", { className: "xhs-note-slider-container", style: getImageFrameStyle(note.imageWidth, note.imageHeight), children: [(0,jsx_runtime.jsx)("div", { className: "xhs-note-slider-track", onScroll: (e) => {
-                    const el = e.currentTarget;
-                    const index = Math.round(el.scrollLeft / (el.clientWidth || 1));
-                    setActiveSlide(index);
-                }, children: imageIds.map((id, idx) => ((0,jsx_runtime.jsx)("div", { className: "xhs-note-slider-item", children: imageMap[id] ? ((0,jsx_runtime.jsx)("img", { src: imageMap[id], alt: `Slide ${idx + 1}`, className: "xhs-note-real-image" })) : ((0,jsx_runtime.jsx)("div", { className: "cp-xhs-cover cp-xhs-cover--ivory", style: { width: "100%", height: "100%" } })) }, id || idx))) }), (0,jsx_runtime.jsxs)("div", { className: "xhs-note-slider-indicator", children: [activeSlide + 1, " / ", imageIds.length] }), (0,jsx_runtime.jsx)("div", { className: "xhs-note-slider-dots", children: imageIds.map((_, idx) => ((0,jsx_runtime.jsx)("span", { className: `xhs-slider-dot ${idx === activeSlide ? "is-active" : ""}` }, idx))) })] }));
-}
-function NoteImage({ note, imageMap, hideTextImageDescription = false, collapseBilingualTranslation, isDetail, }) {
-    const imageIds = (note.imageAssetIds && note.imageAssetIds.length > 0)
-        ? note.imageAssetIds
-        : (note.imageAssetId ? [note.imageAssetId] : []);
-    if (note.type === "video") {
-        return ((0,jsx_runtime.jsx)("div", { className: `cp-xhs-cover cp-xhs-cover--video cp-xhs-cover--${note.tone}`, style: VIDEO_XHS_IMAGE_FRAME_STYLE, children: note.imageAssetId && imageMap[note.imageAssetId] ? ((0,jsx_runtime.jsx)("img", { src: imageMap[note.imageAssetId], alt: "", className: "xhs-video-real-image" })) : ((0,jsx_runtime.jsx)("span", { children: note.videoDescription || note.imageDescription ? ((0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: note.videoDescription || note.imageDescription || "", tone: "light", collapseBilingualTranslation: collapseBilingualTranslation })) : note.coverIcon })) }));
-    }
-    if (imageIds.length > 0 && imageIds.some(id => Boolean(imageMap[id]))) {
-        if (isDetail && imageIds.length > 1) {
-            return (0,jsx_runtime.jsx)(NoteDetailSlider, { note: note, imageIds: imageIds, imageMap: imageMap });
-        }
-        const firstImgId = imageIds.find(id => Boolean(imageMap[id])) || imageIds[0];
-        return ((0,jsx_runtime.jsxs)("div", { className: "xhs-note-real-image-frame", style: getImageFrameStyle(note.imageWidth, note.imageHeight), children: [(0,jsx_runtime.jsx)("img", { src: imageMap[firstImgId], alt: "", className: "xhs-note-real-image" }), !isDetail && imageIds.length > 1 ? ((0,jsx_runtime.jsx)("div", { className: "xhs-waterfall-multi-badge", children: (0,jsx_runtime.jsxs)("svg", { width: "12", height: "12", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2.5", children: [(0,jsx_runtime.jsx)("rect", { x: "3", y: "3", width: "14", height: "14", rx: "2" }), (0,jsx_runtime.jsx)("path", { d: "M7 21h12a2 2 0 0 0 2-2V7" })] }) })) : null] }));
-    }
-    if (note.imageDescription?.trim() && !hideTextImageDescription) {
-        return ((0,jsx_runtime.jsx)("div", { className: `cp-xhs-cover cp-xhs-cover--${note.tone} xhs-note-text-image`, style: TEXT_XHS_IMAGE_FRAME_STYLE, children: (0,jsx_runtime.jsx)("span", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: note.imageDescription, tone: "xiaohongshu", collapseBilingualTranslation: collapseBilingualTranslation }) }) }));
-    }
-    return ((0,jsx_runtime.jsx)("div", { className: `cp-xhs-cover cp-xhs-cover--${note.tone}`, style: getIconImageFrameStyle(note), children: (0,jsx_runtime.jsx)("span", { className: "cp-xhs-cover-icon", children: note.coverIcon }) }));
-}
-function NoteCard({ note, imageMap, avatarSrc, onOpen, hideTextImageDescription, collapseBilingualTranslation, }) {
-    const variant = getNoteCardVariant(note);
-    return ((0,jsx_runtime.jsxs)("button", { type: "button", className: `cp-xhs-note-card cp-xhs-note-card--${variant}`, onClick: onOpen, children: [(0,jsx_runtime.jsx)(NoteImage, { note: note, imageMap: imageMap, hideTextImageDescription: hideTextImageDescription, collapseBilingualTranslation: collapseBilingualTranslation }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-note-body", children: [(0,jsx_runtime.jsx)("strong", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: note.title, tone: "xiaohongshu", collapseBilingualTranslation: collapseBilingualTranslation }) }), (0,jsx_runtime.jsx)("p", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: note.body, tone: "xiaohongshu", collapseBilingualTranslation: collapseBilingualTranslation }) }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-note-foot", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-note-author", children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-note-author-avatar", src: avatarSrc, name: note.authorName }), (0,jsx_runtime.jsx)("span", { children: note.authorName })] }), (0,jsx_runtime.jsxs)("em", { className: note.liked ? "is-liked" : "", children: [(0,jsx_runtime.jsx)(Heart, { size: 12, strokeWidth: 2.4, fill: note.liked ? "currentColor" : "none" }), formatCount(note.likeCount)] })] })] })] }));
-}
-function orderCommentsForDisplay(comments) {
-    const byId = new Map(comments.map(comment => [comment.id, comment]));
-    const indexById = new Map(comments.map((comment, index) => [comment.id, index]));
-    const childrenByParent = new Map();
-    const childIds = new Set();
-    function wouldCreateCycle(commentId, parentId) {
-        const seen = new Set([commentId]);
-        let currentId = parentId;
-        while (currentId) {
-            if (seen.has(currentId))
-                return true;
-            seen.add(currentId);
-            currentId = byId.get(currentId)?.replyToCommentId || "";
-        }
-        return false;
-    }
-    comments.forEach((comment) => {
-        const parentId = comment.replyToCommentId;
-        if (!parentId || !byId.has(parentId) || wouldCreateCycle(comment.id, parentId))
-            return;
-        childIds.add(comment.id);
-        const children = childrenByParent.get(parentId) ?? [];
-        children.push(comment);
-        childrenByParent.set(parentId, children);
-    });
-    // 小红书式二级平铺：每条顶级评论下，把它的全部后代（回复、回复的回复…）
-    // 平铺成一层，统一按添加顺序排——避免线程式 DFS 里"回复的回复"插队到
-    // 更早的同级回复前面。
-    const ordered = [];
-    const visited = new Set();
-    function collectDescendants(id, acc) {
-        for (const child of childrenByParent.get(id) ?? []) {
-            if (visited.has(child.id))
-                continue;
-            visited.add(child.id);
-            acc.push(child);
-            collectDescendants(child.id, acc);
-        }
-    }
-    for (const comment of comments) {
-        if (childIds.has(comment.id) || visited.has(comment.id))
-            continue;
-        visited.add(comment.id);
-        ordered.push(comment);
-        const descendants = [];
-        collectDescendants(comment.id, descendants);
-        descendants.sort((a, b) => (indexById.get(a.id) ?? 0) - (indexById.get(b.id) ?? 0));
-        ordered.push(...descendants);
-    }
-    // 兜底：循环引用等漏网的评论追加在末尾
-    for (const comment of comments) {
-        if (!visited.has(comment.id)) {
-            visited.add(comment.id);
-            ordered.push(comment);
-        }
-    }
-    return ordered;
-}
-function CommentList({ comments, getAvatar, onReply, onDeleteComment, onVoteComment, collapseBilingualTranslation, }) {
-    if (comments.length === 0)
-        return (0,jsx_runtime.jsx)("div", { className: "cp-xhs-mini-empty", children: "\u8FD8\u6CA1\u6709\u8BC4\u8BBA" });
-    const orderedComments = orderCommentsForDisplay(comments);
-    return ((0,jsx_runtime.jsx)(jsx_runtime.Fragment, { children: orderedComments.map((comment) => {
-            const parentComment = comment.replyToCommentId
-                ? comments.find(item => item.id === comment.replyToCommentId)
-                : null;
-            const targetName = parentComment?.authorName ?? (!comment.replyToCommentId ? comment.replyTo : undefined);
-            const depth = parentComment || (!comment.replyToCommentId && comment.replyTo) ? 1 : 0;
-            return ((0,jsx_runtime.jsxs)("div", { className: `cp-xhs-comment-card cp-xhs-comment-card--depth-${depth}`, children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-comment-avatar", src: getAvatar(comment), name: comment.authorName }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-comment-content", children: [(0,jsx_runtime.jsxs)("strong", { children: [comment.authorName, targetName ? (0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("span", { className: "cp-xhs-comment-reply-label", children: "\u56DE\u590D" }), targetName] }) : null] }), (0,jsx_runtime.jsx)("p", { children: (0,jsx_runtime.jsx)(CheckPhoneBilingualText, { text: comment.text, tone: "xiaohongshu", variant: "inline", collapseBilingualTranslation: collapseBilingualTranslation }) }), (0,jsx_runtime.jsxs)("div", { className: "xhs-comment-actions", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-comment-text-actions", children: [(0,jsx_runtime.jsx)("time", { className: "xhs-comment-time", dateTime: comment.createdAt, children: formatTime(comment.createdAt) }), (0,jsx_runtime.jsx)("button", { type: "button", onClick: () => onReply(comment), children: "\u56DE\u590D" }), (0,jsx_runtime.jsx)("button", { type: "button", onClick: () => onDeleteComment(comment), children: "\u5220\u9664" })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-comment-vote-actions", children: [(0,jsx_runtime.jsxs)("button", { type: "button", className: `xhs-comment-vote-btn ${comment.liked ? "is-active" : ""}`, onClick: () => onVoteComment(comment, "like"), "aria-label": "\u70B9\u8D5E\u8BC4\u8BBA", children: [(0,jsx_runtime.jsx)(Heart, { size: 20, strokeWidth: 2.15, fill: comment.liked ? "currentColor" : "none" }), comment.likeCount > 0 ? (0,jsx_runtime.jsx)("span", { children: formatCount(comment.likeCount) }) : null] }), (0,jsx_runtime.jsxs)("button", { type: "button", className: `xhs-comment-vote-btn ${comment.disliked ? "is-active is-disliked" : ""}`, onClick: () => onVoteComment(comment, "dislike"), "aria-label": "\u70B9\u8E29\u8BC4\u8BBA", children: [(0,jsx_runtime.jsx)(XhsDislikeIcon, {}), comment.dislikeCount > 0 ? (0,jsx_runtime.jsx)("span", { children: formatCount(comment.dislikeCount) }) : null] })] })] })] })] }, comment.id));
-        }) }));
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/adapters/host.ts
-function host() { const api = window.AiPhone || window.AiPhoneApp; if (!api?.ai?.startTask || !api.app?.setPolicy)
-    throw Error('需要已安装 Phase 0.5 Host Capability Patch 的 Float 浏览器 Host。'); return api; }
-
-;// ./custom-apps/anonymous-xiaohongshu/src/bilingual-prompt-defaults.ts
-// Forked from Float (AGPL-3.0-only), baseline da067218. See BASELINE.md.
-const DEFAULT_CHECKPHONE_BILINGUAL_PROMPT = "This rule only applies to non-Chinese output; Chinese text should be output normally. For readable phone-check text, including titles, bodies, notes, comments, messages, inner thoughts, feelings, status text, Moments, posts, and feed bodies, non-Chinese content must use: complete original text|complete Simplified Chinese translation. For non-Chinese Moments/post/feed body text, keep the original and Chinese translation in the same field; do not put the Chinese translation in a separate paragraph or line without \"|\". Use \"|\" only as the whole-text bilingual separator; use colons, commas, or line breaks inside the text.";
-const DEFAULT_XIAOHONGSHU_BILINGUAL_PROMPT = [
-    "【小红书双语输出规则（仅非中文角色使用，中文角色忽略此规则）】",
-    "- 只对小红书角色生成内容生效，包括帖子标题、正文、评论、回复、图片描述、视频描述、私信正文等自然语言内容。",
-    "- 不要改动结构标签、块标题或字段名，例如 #评论1、#角色回复、[标题]、[正文]、[内容]、[图片描述]、[视频描述]。",
-    "- 如果某个字段内容使用非中文语言，字段值必须写成“完整原文|对应的简体中文译文”。",
-    "- 如果内容本来就是中文，正常输出中文，不要添加 |译文。",
-    "- 竖线 | 只作为完整原文和完整译文之间的分隔符，不要在原文或译文内部滥用。",
-].join("\n");
-const DEFAULT_CHAT_BILINGUAL_PROMPT = [
-    "【双语输出规则（仅非中文角色使用，中文角色忽略此规则)】",
-    "**双语输出作用范围**：聊天消息正文、[语音条:...]中的语音内容文字、[引用:原文片段]后面的回复内容、[内心]...[/内心]中的内心想法。当本轮回复使用非中文语言时，以上内容必须使用“原文|对应的简体中文译文”的格式输出",
-    "**格式要求**：",
-    "- 原文在前，简体中文译文在后，中间只使用一个竖线 |",
-    "- 如果内容本来就是中文，则不要添加 |译文",
-    "- 不要改动原有富媒体指令格式，只在其中的文本内容内部追加 |中文译文",
-    "- [引用:...] 中引用锚点(引用原文）保持原格式，不需要翻译；只翻译其后的回复内容",
-].join("\n");
-const DEFAULT_GROUP_CHAT_BILINGUAL_PROMPT = [
-    "【群聊双语规则（仅非中文角色使用，中文角色忽略此规则)】",
-    "不同角色这一轮可以使用不同语言，请对每个角色的每条发言分别判断。",
-    "要求：",
-    "- **中文正常输出**：如果该条发言是中文，直接正常输出，不要添加译文",
-    "- **非中文翻译格式要求**：如果该条发言使用非中文语言，则该条发言内容必须使用“原文|对应的简体中文译文”的格式输出，必须在原文和译文之间用|分割",
-    "- **不改变协议头**：只在 [角色名]: 后面的正文内部使用双语格式，不要改动 [角色名]: 前缀",
-].join("\n");
-const DEFAULT_OFFLINE_CHAT_BILINGUAL_PROMPT = [
-    "【线下双语规则（仅非中文角色对白使用，中文对白忽略此规则）】",
-    "- 只对 <content> 中角色直接说出口的对白生效。",
-    "- 旁白、动作描写、环境描写、事实陈述、心理/氛围陈述、摘要字段都不要双语，不要添加 |译文。",
-    "- 如果角色对白使用非中文语言，请把该对白单独成行，写成“完整原文|对应的简体中文译文”。",
-    "- 使用双语格式的对白必须作为独立段落输出，前后用空行与旁白隔开；不要把旁白和“原文|译文”混在同一段。",
-    "- 如果对白本来就是中文，正常输出中文，不要添加 |译文。",
-    "- 不要改动 <content>、摘要 XML 标签或其他结构标签。",
-].join("\n");
-const DEFAULT_GROUP_OFFLINE_CHAT_BILINGUAL_PROMPT = [
-    "【群聊线下双语规则（仅非中文角色对白使用，中文对白忽略此规则）】",
-    "- 只对 <content> 中群成员实际说出口的直接对白生效。",
-    "- 旁白、动作描写、环境描写、事实陈述、群体氛围陈述、摘要字段都不要双语，不要添加 |译文。",
-    "- 如果某个角色的对白使用非中文语言，请把该对白单独成行，写成“完整原文|对应的简体中文译文”。",
-    "- 使用双语格式的对白必须作为独立段落输出，前后用空行与旁白或其他动作隔开；不要把旁白和“原文|译文”混在同一段。",
-    "- 不要为了双语恢复 [角色名]: 群聊气泡格式；仍然遵守线下连续叙事和 XML 输出格式。",
-    "- 中文对白正常输出，不要添加 |译文；不要改动 XML 标签。",
-].join("\n");
-const DEFAULT_MOMENTS_BILINGUAL_PROMPT = [
-    "【朋友圈双语规则（仅非中文角色使用，中文角色忽略此规则)】",
-    "- **不改变协议头和结构标签**：只对你实际输出的正文内容使用双语格式，不要翻译或改动协议头和结构标签，不要改动 [回复 昵称]、[不回复]、[NPC点赞]、[NPC评论]、昵称、以及“昵称 回复 被回复者昵称:”这类结构。",
-    "- **中文正常输出无需译文**：如果正文是中文，直接正常输出，不要添加译文",
-    "- **非中文语言译文输出格式**：非中文语言，正文必须使用“原文|对应的简体中文译文”的格式输出，必须有|分割符号。",
-    "- **朋友圈正文双语补充**：如果朋友圈正文、评论正文或回复正文使用非中文，必须在同一段正文里写成“完整外文原文|完整简体中文译文”。",
-    "- **照片双语规则**：如果输出 [照片:使用参考图:描述] 或 [照片:不使用参考图:描述]，只允许描述部分使用双语格式，不要改动照片标签外层结构。",
-].join("\n");
-const DEFAULT_READING_BILINGUAL_PROMPT = [
-    "【阅读双语规则（仅非中文角色使用，中文角色忽略此规则)】",
-    "**作用范围**：对讨论正文（消息回复）和批注生效",
-    "**输出格式**：",
-    "- 中文正常输出无需译文：如果讨论正文/回复消息是中文，直接正常输出，不要添加译文",
-    "- 非中文情况下译文输出格式：如果讨论正文/回复消息使用非中文语言，则正文使用“原文|对应的简体中文译文”的格式输出",
-    "- 不要改变协议头，只对内容本身作用：只对内容本身输出译文，不要改变 [批注:N]...[/批注]、【新增批注 ...】、【删除批注 ...】、【修改批注 ...】这些结构",
-].join("\n");
-const DEFAULT_VN_BILINGUAL_PROMPT = [
-    "【对白双语规则（仅非中文角色使用，中文角色忽略此规则)】",
-    "- **只有对白需要双语**：只有对白需要判断是否双语，旁白、动作、环境描写一律正常输出，不要添加译文，只有角色名|\"台词\"里的台词部分允许使用双语格式",
-    "- **中文正常输出无需译文**：如果对白台词是中文，直接正常输出，不要添加译文",
-    "- **非中文译文输出规则**：如果对白台词使用非中文语言，则台词部分必须使用“原文|对应的简体中文译文”的格式输出，格式为：角色名|\"原文|对应的简体中文译文\"",
-    "- **不可改动协议头**：不要改动 <scene>、角色名|、引号、bg、sprite、<options> 等结构",
-].join("\n");
-const DEFAULT_ADVENTURE_BILINGUAL_PROMPT = [
-    "【角色双语规则（仅非中文角色使用，中文角色忽略此规则)】",
-    "- **只对speech字段生效**：只对你输出 JSON 中的 speech 字段生效。action、emotion、affinity 保持正常格式，不要翻译，不要双语",
-    "- **中文无需译文**：如果 speech 是中文，直接正常输出，不要添加译文。",
-    "- **非中文译文格式**：如果 speech 使用非中文语言，则 speech 使用“原文|对应的简体中文译文”的格式输出，必须有|分割。",
-    "- **json结构不变**：必须严格保持 JSON 结构和字段名不变",
-].join("\n");
-function resolveBilingualPrompt(enabled, customPrompt, defaultPrompt) {
-    if (!enabled)
-        return "";
-    const prompt = customPrompt?.trim();
-    return prompt || defaultPrompt;
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/xiaohongshu-types.ts
-// Forked from Float (AGPL-3.0-only), baseline da067218. See BASELINE.md.
+/***/ 947:
+/***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
+
+/* harmony export */ __webpack_require__.d(__webpack_exports__, {
+/* harmony export */   E9: () => (/* binding */ DEFAULT_XIAOHONGSHU_NPC_COMMENT_REPLY_PROMPT),
+/* harmony export */   Kv: () => (/* binding */ DEFAULT_XIAOHONGSHU_PROFILE),
+/* harmony export */   MP: () => (/* binding */ DEFAULT_XIAOHONGSHU_NPC_FEED_PROMPT),
+/* harmony export */   iK: () => (/* binding */ DEFAULT_XIAOHONGSHU_SETTINGS),
+/* harmony export */   kt: () => (/* binding */ DEFAULT_XIAOHONGSHU_NPC_USER_POST_REACTION_PROMPT),
+/* harmony export */   m6: () => (/* binding */ DEFAULT_XIAOHONGSHU_NPC_IDENTITY_GUARD_PROMPT),
+/* harmony export */   oZ: () => (/* binding */ DEFAULT_XIAOHONGSHU_NPC_DM_REPLY_PROMPT),
+/* harmony export */   sG: () => (/* binding */ DEFAULT_XIAOHONGSHU_NPC_MORE_COMMENTS_PROMPT)
+/* harmony export */ });
+/* harmony import */ var _bilingual_prompt_defaults__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(29);
 
 const DEFAULT_XIAOHONGSHU_PROFILE = {
     nickname: "我",
@@ -18287,10 +23515,10 @@ const DEFAULT_XIAOHONGSHU_NPC_DM_REPLY_PROMPT = [
     "#私信回复2",
     "[正文]第二条回复内容",
 ].join("\n");
-const xiaohongshu_types_DEFAULT_XIAOHONGSHU_SETTINGS = {
+const DEFAULT_XIAOHONGSHU_SETTINGS = {
     bilingualTranslationEnabled: true,
     collapseBilingualTranslation: true,
-    bilingualTranslationPrompt: DEFAULT_XIAOHONGSHU_BILINGUAL_PROMPT,
+    bilingualTranslationPrompt: _bilingual_prompt_defaults__WEBPACK_IMPORTED_MODULE_0__/* .DEFAULT_XIAOHONGSHU_BILINGUAL_PROMPT */ .tQ,
     npcIdentityGuardPrompt: DEFAULT_XIAOHONGSHU_NPC_IDENTITY_GUARD_PROMPT,
     npcFeedPrompt: DEFAULT_XIAOHONGSHU_NPC_FEED_PROMPT,
     npcUserPostReactionPrompt: DEFAULT_XIAOHONGSHU_NPC_USER_POST_REACTION_PROMPT,
@@ -18301,1874 +23529,135 @@ const xiaohongshu_types_DEFAULT_XIAOHONGSHU_SETTINGS = {
     sendToCharacterProbability: 60,
 };
 
-;// ./custom-apps/anonymous-xiaohongshu/src/baseline-storage.ts
-// Forked from Float (AGPL-3.0-only), baseline da067218. See BASELINE.md.
 
-const LEGACY_DEFAULT_NICKNAME = "我";
-const LEGACY_DEFAULT_GENDER = "未设置";
-function makeId(prefix) {
-    if (typeof crypto !== "undefined" && crypto.randomUUID)
-        return `${prefix}_${crypto.randomUUID()}`;
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-function cleanText(value, maxLength) {
-    return String(value ?? "")
-        .replace(/\u0000/g, "")
-        .trim()
-        .slice(0, maxLength);
-}
-function baseline_storage_hashString(value) {
-    let hash = 0;
-    for (let index = 0; index < value.length; index += 1) {
-        hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
-    }
-    return hash.toString(36);
-}
-function baseline_storage_makeXiaohongshuNpcId(name) {
-    const normalized = cleanText(name, 60) || "小红书用户";
-    return `npc_${baseline_storage_hashString(normalized)}`;
-}
-function cleanMultiline(value, maxLength) {
-    return cleanText(value, maxLength)
-        .replace(/\r\n?/g, "\n")
-        .replace(/\\n/g, "\n")
-        .replace(/\n{4,}/g, "\n\n\n");
-}
-function numberOr(value, fallback) {
-    if (typeof value === "number")
-        return Number.isFinite(value) ? Math.max(0, Math.round(value)) : fallback;
-    const normalized = String(value ?? "")
-        .trim()
-        .replace(/[,，\s]/g, "");
-    if (!normalized)
-        return fallback;
-    const tenThousandMatch = /^(-?\d+(?:\.\d+)?)[wW万](?:(\d+(?:\.\d+)?)(?:[kK千])?)?$/.exec(normalized);
-    if (tenThousandMatch) {
-        const main = Number(tenThousandMatch[1]);
-        const tail = tenThousandMatch[2] ? Number(tenThousandMatch[2]) : 0;
-        if (Number.isFinite(main) && Number.isFinite(tail)) {
-            return Math.max(0, Math.round(main * 10000 + tail * 1000));
-        }
-    }
-    const thousandMatch = /^(-?\d+(?:\.\d+)?)[kK千](?:(\d+(?:\.\d+)?)(?:百)?)?$/.exec(normalized);
-    if (thousandMatch) {
-        const main = Number(thousandMatch[1]);
-        const tail = thousandMatch[2] ? Number(thousandMatch[2]) : 0;
-        if (Number.isFinite(main) && Number.isFinite(tail)) {
-            return Math.max(0, Math.round(main * 1000 + tail * 100));
-        }
-    }
-    const parsed = Number(normalized.replace(/[^\d.-]/g, ""));
-    if (!Number.isFinite(parsed))
-        return fallback;
-    if (/[wW万]/.test(normalized))
-        return Math.max(0, Math.round(parsed * 10000));
-    if (/[kK千]/.test(normalized))
-        return Math.max(0, Math.round(parsed * 1000));
-    return Math.max(0, Math.round(parsed));
-}
-function optionalPositiveNumber(value) {
-    const parsed = numberOr(value, 0);
-    return parsed > 0 ? parsed : undefined;
-}
-function normalizeTags(value) {
-    const items = Array.isArray(value)
-        ? value
-        : typeof value === "string"
-            ? value.split(/[,，、#\s]+/)
-            : [];
-    return Array.from(new Set(items.map(item => cleanText(item, 18)).filter(Boolean))).slice(0, 6);
-}
-function normalizeNameList(value) {
-    const items = Array.isArray(value)
-        ? value
-        : typeof value === "string"
-            ? value.split(/[,，、\n]+/)
-            : [];
-    return Array.from(new Set(items.map(item => cleanText(item, 24)).filter(Boolean))).slice(0, 2);
-}
-function normalizeIdList(value) {
-    const items = Array.isArray(value)
-        ? value
-        : typeof value === "string"
-            ? value.split(/[,，、\n]+/)
-            : [];
-    return Array.from(new Set(items.map(item => cleanText(item, 180)).filter(Boolean)));
-}
-function parseNotificationCountFromText(text) {
-    const match = text.match(/等\s*([0-9][\d.,，]*(?:\.\d+)?\s*(?:[kKwW万千])?)\s*人/);
-    return match ? numberOr(match[1], 1) : 1;
-}
-function getDefaultXiaohongshuProfile() {
-    const identity = { name: "" };
-    return {
-        ...DEFAULT_XIAOHONGSHU_PROFILE,
-        nickname: cleanText(identity?.name, 40) || DEFAULT_XIAOHONGSHU_PROFILE.nickname,
-        gender: DEFAULT_XIAOHONGSHU_PROFILE.gender,
-    };
-}
-function normalizeXiaohongshuProfile(raw) {
-    const record = raw && typeof raw === "object" ? raw : {};
-    const defaults = getDefaultXiaohongshuProfile();
-    const nickname = cleanText(record.nickname, 40);
-    const gender = cleanText(record.gender, 20);
-    return {
-        nickname: !nickname || nickname === LEGACY_DEFAULT_NICKNAME ? defaults.nickname : nickname,
-        handle: cleanText(record.handle, 40) || defaults.handle,
-        ipLocation: cleanText(record.ipLocation ?? record.ip_location, 40) || defaults.ipLocation,
-        signature: cleanMultiline(record.signature ?? record.bio, 160) || defaults.signature,
-        gender: !gender || gender === LEGACY_DEFAULT_GENDER ? defaults.gender : gender,
-        followingCount: numberOr(record.followingCount ?? record.following_count, defaults.followingCount),
-        followerCount: numberOr(record.followerCount ?? record.follower_count, defaults.followerCount),
-        likedAndSavedCount: numberOr(record.likedAndSavedCount ?? record.liked_and_saved_count, defaults.likedAndSavedCount),
-        coverImageAssetId: cleanText(record.coverImageAssetId ?? record.cover_image_asset_id, 160) || defaults.coverImageAssetId,
-    };
-}
-function normalizeXiaohongshuSettings(raw) {
-    const record = raw && typeof raw === "object" ? raw : {};
-    const participantCharacterIds = Array.isArray(record.participantCharacterIds)
-        ? record.participantCharacterIds.map(id => cleanText(id, 120)).filter(Boolean)
-        : [];
-    const probability = numberOr(record.sendToCharacterProbability, DEFAULT_XIAOHONGSHU_SETTINGS.sendToCharacterProbability);
-    const npcFeedPrompt = cleanMultiline(record.npcFeedPrompt, 8000);
-    return {
-        bilingualTranslationEnabled: record.bilingualTranslationEnabled !== false,
-        collapseBilingualTranslation: record.collapseBilingualTranslation !== false,
-        bilingualTranslationPrompt: cleanMultiline(record.bilingualTranslationPrompt, 8000) || DEFAULT_XIAOHONGSHU_SETTINGS.bilingualTranslationPrompt,
-        npcIdentityGuardPrompt: cleanMultiline(record.npcIdentityGuardPrompt, 8000) || DEFAULT_XIAOHONGSHU_SETTINGS.npcIdentityGuardPrompt,
-        npcFeedPrompt: npcFeedPrompt && npcFeedPrompt.includes("#附近笔记") ? npcFeedPrompt : DEFAULT_XIAOHONGSHU_SETTINGS.npcFeedPrompt,
-        npcUserPostReactionPrompt: cleanMultiline(record.npcUserPostReactionPrompt, 8000) || DEFAULT_XIAOHONGSHU_SETTINGS.npcUserPostReactionPrompt,
-        npcCommentReplyPrompt: cleanMultiline(record.npcCommentReplyPrompt, 8000) || DEFAULT_XIAOHONGSHU_SETTINGS.npcCommentReplyPrompt,
-        npcMoreCommentsPrompt: cleanMultiline(record.npcMoreCommentsPrompt, 8000) || DEFAULT_XIAOHONGSHU_SETTINGS.npcMoreCommentsPrompt,
-        npcDmReplyPrompt: cleanMultiline(record.npcDmReplyPrompt, 8000) || DEFAULT_XIAOHONGSHU_SETTINGS.npcDmReplyPrompt,
-        participantCharacterIds: Array.from(new Set(participantCharacterIds)),
-        sendToCharacterProbability: Math.max(0, Math.min(100, probability)),
-    };
-}
-function normalizeXiaohongshuUserInteractions(raw) {
-    const record = raw && typeof raw === "object" ? raw : {};
-    return {
-        likedNoteIds: normalizeIdList(record.likedNoteIds ?? record.liked_note_ids),
-        savedNoteIds: normalizeIdList(record.savedNoteIds ?? record.saved_note_ids),
-        commentedNoteIds: normalizeIdList(record.commentedNoteIds ?? record.commented_note_ids),
-    };
-}
-function normalizeXiaohongshuAccount(raw) {
-    if (!raw || typeof raw !== "object")
-        return null;
-    const record = raw;
-    const type = record.type === "user" || record.type === "character" || record.type === "npc" ? record.type : "npc";
-    const name = cleanText(record.name ?? record.authorName ?? record.nickname, 60);
-    if (!name)
-        return null;
-    const id = cleanText(record.id ?? record.authorId ?? record.author_id, 120) || (type === "npc" ? baseline_storage_makeXiaohongshuNpcId(name) : type);
-    return {
-        type,
-        id,
-        name,
-        avatar: cleanText(record.avatar, 500) || undefined,
-        followedAt: typeof record.followedAt === "string" ? record.followedAt : new Date().toISOString(),
-    };
-}
-function dedupeAccounts(accounts) {
-    const seen = new Set();
-    return accounts.filter((account) => {
-        const key = `${account.type}:${account.id}`;
-        if (seen.has(key))
-            return false;
-        seen.add(key);
-        return true;
-    });
-}
-function normalizeXiaohongshuSocialGraph(raw) {
-    const record = raw && typeof raw === "object" ? raw : {};
-    const following = Array.isArray(record.following)
-        ? record.following.map(normalizeXiaohongshuAccount).filter((account) => Boolean(account))
-        : [];
-    const followers = Array.isArray(record.followers)
-        ? record.followers.map(normalizeXiaohongshuAccount).filter((account) => Boolean(account))
-        : [];
-    return {
-        following: dedupeAccounts(following),
-        followers: dedupeAccounts(followers),
-    };
-}
-function normalizeXiaohongshuComment(raw, fallbackNoteId = "") {
-    if (!raw || typeof raw !== "object")
-        return null;
-    const record = raw;
-    const noteId = cleanText(record.noteId ?? record.note_id, 160) || fallbackNoteId;
-    const text = cleanMultiline(record.text ?? record.content ?? record.body, 600);
-    const authorName = cleanText(record.authorName ?? record.author_name, 60);
-    if (!noteId || !text || !authorName)
-        return null;
-    const id = cleanText(record.id, 180) || makeId("xhs_comment");
-    const createdAt = typeof record.createdAt === "string" ? record.createdAt : new Date().toISOString();
-    return {
-        id,
-        noteId,
-        authorType: record.authorType === "user" || record.authorType === "character" ? record.authorType : "npc",
-        authorId: cleanText(record.authorId ?? record.author_id, 120) || baseline_storage_makeXiaohongshuNpcId(authorName),
-        authorName,
-        text,
-        replyTo: cleanText(record.replyTo ?? record.reply_to, 80) || undefined,
-        replyToCommentId: cleanText(record.replyToCommentId ?? record.reply_to_comment_id, 180) || undefined,
-        likeCount: numberOr(record.likeCount ?? record.like_count, 0),
-        dislikeCount: numberOr(record.dislikeCount ?? record.dislike_count, 0),
-        liked: record.liked === true,
-        disliked: record.disliked === true,
-        createdAt,
-        unread: record.unread === true,
-    };
-}
-function normalizeAssetIdList(value) {
-    if (!Array.isArray(value))
-        return undefined;
-    const ids = value.map(id => cleanText(id, 160)).filter(Boolean);
-    return ids.length > 0 ? ids : undefined;
-}
-function normalizeXiaohongshuNote(raw) {
-    if (!raw || typeof raw !== "object")
-        return null;
-    const record = raw;
-    const id = cleanText(record.id, 160) || makeId("xhs_note");
-    const title = cleanText(record.title, 80);
-    const body = cleanMultiline(record.body ?? record.content ?? record.text, 3000);
-    const authorName = cleanText(record.authorName ?? record.author_name, 60);
-    if (!title && !body)
-        return null;
-    const comments = Array.isArray(record.comments)
-        ? record.comments.map(comment => normalizeXiaohongshuComment(comment, id)).filter((comment) => Boolean(comment))
-        : [];
-    const createdAt = typeof record.createdAt === "string" ? record.createdAt : new Date().toISOString();
-    return {
-        id,
-        type: record.type === "video" ? "video" : "post",
-        feedScope: record.feedScope === "nearby" || record.feed_scope === "nearby" ? "nearby" : "discover",
-        source: record.source === "user" || record.source === "character" ? record.source : "npc",
-        authorId: cleanText(record.authorId ?? record.author_id, 120) || baseline_storage_makeXiaohongshuNpcId(authorName || "小红书用户"),
-        authorName: authorName || "小红书用户",
-        title: title || body.slice(0, 18) || "未命名笔记",
-        body,
-        videoDescription: cleanMultiline(record.videoDescription ?? record.video_description, 500) || undefined,
-        coverIcon: cleanText(record.coverIcon ?? record.cover_icon, 8) || "✦",
-        tone: record.tone === "mist" || record.tone === "blush" || record.tone === "graphite" ? record.tone : "ivory",
-        tags: normalizeTags(record.tags),
-        likeCount: numberOr(record.likeCount ?? record.like_count, 0),
-        saveCount: numberOr(record.saveCount ?? record.save_count, 0),
-        commentCount: numberOr(record.commentCount ?? record.comment_count, comments.length),
-        liked: record.liked === true,
-        saved: record.saved === true,
-        recentLikeNames: normalizeNameList(record.recentLikeNames ?? record.recent_like_names),
-        recentSaveNames: normalizeNameList(record.recentSaveNames ?? record.recent_save_names),
-        comments,
-        imageAssetId: cleanText(record.imageAssetId ?? record.image_asset_id, 160) || undefined,
-        imageAssetIds: normalizeAssetIdList(record.imageAssetIds ?? record.image_asset_ids),
-        imageDescription: cleanMultiline(record.imageDescription ?? record.image_description, 500) || undefined,
-        imageWidth: optionalPositiveNumber(record.imageWidth ?? record.image_width),
-        imageHeight: optionalPositiveNumber(record.imageHeight ?? record.image_height),
-        imageCompressedAt: typeof record.imageCompressedAt === "string" ? record.imageCompressedAt : undefined,
-        imageCleanedAt: typeof record.imageCleanedAt === "string" ? record.imageCleanedAt : undefined,
-        createdAt,
-        updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : createdAt,
-    };
-}
-function normalizeNotification(raw) {
-    if (!raw || typeof raw !== "object")
-        return null;
-    const record = raw;
-    const text = cleanMultiline(record.text, 600);
-    const actorName = cleanText(record.actorName ?? record.actor_name, 60);
-    if (!text || !actorName)
-        return null;
-    const type = record.type === "save" || record.type === "comment" || record.type === "dm" || record.type === "follow"
-        ? record.type
-        : "like";
-    const createdAt = typeof record.createdAt === "string" ? record.createdAt : new Date().toISOString();
-    const parsedCount = numberOr(record.count ?? record.actorCount ?? record.actor_count, type === "like" || type === "save" ? parseNotificationCountFromText(text) : 1);
-    return {
-        id: cleanText(record.id, 160) || makeId("xhs_notice"),
-        type,
-        noteId: cleanText(record.noteId ?? record.note_id, 160) || undefined,
-        actorName,
-        text,
-        count: type === "like" || type === "save" ? Math.max(1, Math.round(parsedCount)) : undefined,
-        thumbnailText: cleanText(record.thumbnailText ?? record.thumbnail_text, 80) || undefined,
-        direction: record.direction === "outgoing" ? "outgoing" : record.direction === "incoming" ? "incoming" : undefined,
-        threadId: cleanText(record.threadId ?? record.thread_id, 180) || undefined,
-        threadName: cleanText(record.threadName ?? record.thread_name, 60) || undefined,
-        unread: record.unread !== false,
-        createdAt,
-    };
-}
-function createDefaultXiaohongshuState() {
-    return {
-        profile: getDefaultXiaohongshuProfile(),
-        settings: { ...xiaohongshu_types_DEFAULT_XIAOHONGSHU_SETTINGS, participantCharacterIds: [] },
-        notes: [],
-        feedHiddenNoteIds: [],
-        notifications: [],
-        userInteractions: normalizeXiaohongshuUserInteractions(null),
-        socialGraph: normalizeXiaohongshuSocialGraph(null),
-        updatedAt: new Date().toISOString(),
-    };
-}
-function createUserXiaohongshuNote(input, profile) {
-    const now = new Date().toISOString();
-    const imageAssetIds = (input.images && input.images.length > 0)
-        ? input.images.map(img => img.assetId).filter((id) => Boolean(id))
-        : (input.image?.assetId ? [input.image.assetId] : undefined);
-    const primaryImage = input.images?.[0] || input.image;
-    return {
-        id: makeId("xhs_user_note"),
-        type: "post",
-        source: "user",
-        authorId: "user",
-        authorName: profile.nickname || "我",
-        title: cleanText(input.title, 80) || cleanMultiline(input.body, 120).slice(0, 24) || "新的笔记",
-        body: cleanMultiline(input.body, 3000),
-        coverIcon: (imageAssetIds && imageAssetIds.length > 0) || input.image?.assetId ? "▧" : "✎",
-        tone: "ivory",
-        tags: normalizeTags(input.tags),
-        likeCount: 0,
-        saveCount: 0,
-        commentCount: 0,
-        liked: false,
-        saved: false,
-        recentLikeNames: [],
-        recentSaveNames: [],
-        comments: [],
-        imageAssetId: primaryImage?.assetId,
-        imageAssetIds: imageAssetIds && imageAssetIds.length > 0 ? imageAssetIds : undefined,
-        imageDescription: cleanMultiline(primaryImage?.description, 500) || undefined,
-        imageWidth: optionalPositiveNumber(primaryImage?.width),
-        imageHeight: optionalPositiveNumber(primaryImage?.height),
-        createdAt: now,
-        updatedAt: now,
-    };
-}
-function baseline_storage_makeXiaohongshuComment(input) {
-    return {
-        id: makeId("xhs_comment"),
-        noteId: input.noteId,
-        authorType: input.authorType,
-        authorId: input.authorId || (input.authorType === "npc" ? baseline_storage_makeXiaohongshuNpcId(input.authorName) : input.authorType),
-        authorName: cleanText(input.authorName, 60) || "小红书用户",
-        text: cleanMultiline(input.text, 600),
-        replyTo: cleanText(input.replyTo, 80) || undefined,
-        replyToCommentId: cleanText(input.replyToCommentId, 180) || undefined,
-        likeCount: 0,
-        dislikeCount: 0,
-        liked: false,
-        disliked: false,
-        createdAt: new Date().toISOString(),
-        unread: input.unread === true,
-    };
-}
-function baseline_storage_makeXiaohongshuNotification(input) {
-    return {
-        ...input,
-        id: makeId("xhs_notice"),
-        createdAt: new Date().toISOString(),
-    };
-}
-function addNames(existing, names) {
-    return Array.from(new Set([...names, ...existing].map(name => cleanText(name, 24)).filter(Boolean))).slice(0, 2);
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/adapters/legacy-migration.ts
-
-
-async function migrateLegacy(s, accounts) {
-    if (!accounts.length)
-        return;
-    const api = host(), [bindings, posts] = await Promise.all([api.db.list('actor_bindings_private', { limit: 500 }), api.db.list('posts', { limit: 500 })]);
-    if ([accounts, bindings, posts].some(rows => rows.length >= 500))
-        throw Error('原型集合达到 500 条读取上限；为避免截断旧数据，迁移已停止。原集合未改动。');
-    for (const a of accounts)
-        s.accounts[a.id] = { accountId: a.id, displayName: a.displayName, aliases: (a.aliasHistory || []).map((x) => x.displayName).filter(Boolean), bio: a.bio || '' };
-    for (const b of bindings) {
-        if (!s.accounts[b.accountId])
-            throw Error('旧绑定缺少账号，未修改旧数据');
-        if (b.ownerKind === 'human_controller') {
-            s.userAccountId = b.accountId;
-            s.bindings.push({ accountId: b.accountId, ownerKind: 'user', ownerId: 'local-controller' });
-        }
-        else if (b.ownerKind === 'character')
-            s.bindings.push({ accountId: b.accountId, ownerKind: 'character', ownerId: b.ownerId });
-    }
-    if (s.userAccountId) {
-        const a = s.accounts[s.userAccountId];
-        s.platform.profile.nickname = a.displayName;
-        s.platform.profile.signature = a.bio || '';
-        s.platform.profile.handle = a.accountId.slice(-10);
-    }
-    for (const p of posts) {
-        const a = s.accounts[p.authorAccountId];
-        if (!a)
-            throw Error('旧帖子缺少作者账号，迁移已停止');
-        const binding = s.bindings.find(b => b.accountId === a.accountId);
-        const source = binding?.ownerKind || 'npc';
-        const note = { ...createUserXiaohongshuNote({ title: p.title, body: p.body, tags: p.tags || [] }, s.platform.profile), id: p.id, source, authorId: a.accountId, authorName: a.displayName, createdAt: p.createdAt, updatedAt: p.updatedAt || p.createdAt, liked: (p.likedByAccountIds || []).includes(s.userAccountId), saved: (p.savedByAccountIds || []).includes(s.userAccountId), likeCount: p.likedByAccountIds?.length || 0, saveCount: p.savedByAccountIds?.length || 0, comments: (p.comments || []).map((c) => { const author = s.accounts[c.authorAccountId]; if (!author)
-                throw Error('旧评论缺少作者账号'); return { ...baseline_storage_makeXiaohongshuComment({ noteId: p.id, authorType: s.bindings.find(b => b.accountId === author.accountId)?.ownerKind || 'npc', authorId: author.accountId, authorName: author.displayName, text: c.text, replyToCommentId: c.replyToCommentId }), id: c.id, createdAt: c.createdAt }; }) };
-        note.commentCount = note.comments.length;
-        if (p.imageRef) {
-            const media = await api.media.get({ ref: p.imageRef });
-            if (!media?.dataUrl)
-                throw Error('旧帖子图片无法读取；迁移停止且原数据保留');
-            const id = 'legacy_' + p.id;
-            await api.db.create('post_images', { id, dataUrl: media.dataUrl });
-            note.imageAssetId = id;
-            note.imageAssetIds = [id];
-            s.images[id] = media.dataUrl;
-        }
-        s.platform.notes.push(note);
-    }
-    s.migrationNotice = `已保留 accountId 迁移 ${accounts.length} 个账号与 ${posts.length} 篇帖子；旧集合未改动。旧版推断出的身份关系不作为证据，请按角色重新确认。角色头像改用角色卡，路人不再需要管理。`;
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/xiaohongshu-storage.ts
-
-
-
-const COLLECTION = 'phase1a_state';
-const persistedState = (s) => ({ ...s, images: {}, noteIds: s.platform.notes.map(n => n.id), platform: { ...s.platform, notes: [] } });
-function stateWrites(s, before) {
-    const prior = new Map(before?.platform.notes.map(n => [n.id, JSON.stringify(n)]));
-    return [
-        { collection: COLLECTION, id: 'state', operation: 'put', value: persistedState(s) },
-        ...s.platform.notes.filter(n => prior.get(n.id) !== JSON.stringify(n)).map(n => ({ collection: 'notes_v2', id: n.id, operation: 'put', value: { ...n } }))
-    ];
-}
-function emptyState() { return { id: 'state', version: 2, accounts: {}, bindings: [], disclosures: [], platform: createDefaultXiaohongshuState(), images: {}, jobs: [], outbox: [] }; }
-async function loadState() {
-    const api = host(), current = await api.db.get(COLLECTION, 'state');
-    if (current) {
-        const s = current;
-        if (s.noteIds) {
-            s.platform.notes = [];
-            for (let i = 0; i < s.noteIds.length; i += 25) {
-                const batch = await Promise.all(s.noteIds.slice(i, i + 25).map(id => api.db.get('notes_v2', id)));
-                if (batch.some(n => !n))
-                    throw Error('帖子索引缺少记录，已停止加载，原数据未修改');
-                s.platform.notes.push(...batch);
-            }
-        }
-        s.images = s.images || {};
-        const ids = new Set(s.platform.notes.flatMap(n => n.imageAssetIds || [n.imageAssetId]).filter(Boolean));
-        await Promise.all([...ids].map(async (id) => { if (!s.images[id]) {
-            const row = await api.db.get('post_images', id);
-            if (row?.dataUrl)
-                s.images[id] = row.dataUrl;
-        } }));
-        return s;
-    }
-    const s = emptyState();
-    // Never reinterpret the earlier prototype's inferred disclosures as verified evidence.
-    const legacy = await api.db.list('social_accounts', { limit: 500 });
-    await migrateLegacy(s, legacy);
-    for (const note of s.platform.notes)
-        await api.db.create('notes_v2', note);
-    await api.db.create(COLLECTION, persistedState(s));
-    return s;
-}
-async function saveState(s, before) { for (const w of stateWrites(s, before).slice(1)) {
-    const current = await host().db.get(w.collection, w.id);
-    if (current)
-        await host().db.update(w.collection, w.id, w.value);
-    else
-        await host().db.create(w.collection, w.value);
-} await host().db.update(COLLECTION, 'state', persistedState(s)); }
-
-;// ./custom-apps/anonymous-xiaohongshu/src/identity/accounts.ts
-const opaqueId = (prefix = 'acct') => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
-function publicAccount(a) { return { kind: 'social_account', accountId: a.accountId, displayName: a.displayName, previousDisplayNames: a.aliases }; }
-function validateName(s, name, characters, except) {
-    const n = name.trim(), key = n.normalize('NFKC').toLowerCase();
-    if (!n || n.length > 40 || /[\n\r<>\[\]{}|]/.test(n))
-        throw Error('昵称须为 1–40 个字符，不能含结构标记。');
-    if (['kk', 'chloe', 'user', '{{user}}', ...characters.map(c => c.name)].some(x => { const r = x.normalize('NFKC').toLowerCase(); return r && key.includes(r); }))
-        throw Error('昵称不能使用已知真实姓名或普通平台身份。');
-    if (Object.values(s.accounts).some(a => a.accountId !== except && [a.displayName, ...a.aliases].some(x => x.normalize('NFKC').toLowerCase() === key)))
-        throw Error('昵称与现有账号或历史昵称重复。');
-    return n;
-}
-function addAccount(s, displayName) { const a = { accountId: opaqueId(), displayName, aliases: [] }; s.accounts[a.accountId] = a; return a; }
-function rename(s, id, name, characters) { const a = s.accounts[id]; if (!a)
-    throw Error('账号不存在'); const next = validateName(s, name, characters, id); if (next !== a.displayName) {
-    a.aliases.push(a.displayName);
-    a.displayName = next;
-} }
-function resolveAuthor(s, name, characters) {
-    const existing = Object.values(s.accounts).find(a => a.displayName === name || a.aliases.includes(name));
-    if (existing)
-        return existing;
-    return addAccount(s, validateName(s, name, characters));
-}
-function validateGeneratedAuthors(s, names, characters, selfAccountId) {
-    for (const name of names.filter(Boolean)) {
-        const a = Object.values(s.accounts).find(a => a.displayName === name || a.aliases.includes(name));
-        if (a && s.bindings.some(b => b.accountId === a.accountId) && a.accountId !== selfAccountId)
-            throw Error('模型试图代替其他已有账号发言，结果未应用，请重试。');
-        if (!a)
-            validateName(s, name, characters);
-    }
-}
-function canonicalize(s, note, characters) {
-    const author = s.accounts[note.authorId] || resolveAuthor(s, note.authorName, characters);
-    return { ...note, authorId: author.accountId, authorName: author.displayName, comments: note.comments.map(c => { const a = s.accounts[c.authorId] || resolveAuthor(s, c.authorName, characters); return { ...c, authorId: a.accountId, authorName: a.displayName }; }) };
-}
-// This whitelist is the only route from private application records into model context.
-function projectNote(s, n) { return { noteId: n.id, author: publicAccount(s.accounts[n.authorId]), title: n.title, body: n.body, tags: n.tags, imageDescription: n.imageDescription, likeCount: n.likeCount, saveCount: n.saveCount, comments: n.comments.map(c => ({ commentId: c.id, author: publicAccount(s.accounts[c.authorId]), text: c.text, replyToCommentId: c.replyToCommentId })) }; }
-function viewerContext(s, viewer) {
-    const binding = s.bindings.find(b => b.ownerKind === 'character' && b.ownerId === viewer);
-    return {
-        source: '[匿名小红书]', sourceNamespace: 'social_posts', selfAccount: binding ? publicAccount(s.accounts[binding.accountId]) : null,
-        identities: Object.values(s.accounts).map(a => { const d = s.disclosures.find(d => d.viewerCharacterId === viewer && d.accountId === a.accountId); return { ...publicAccount(a), realWorldIdentity: a.accountId === binding?.accountId ? 'self' : d?.state === 'explicitly_disclosed' ? { state: 'explicitly_disclosed', identity: d.identity } : 'unknown' }; })
-    };
-}
-const PROTECTED_RULE = `仅当上下文含 [匿名小红书] 来源及本 App 的 social_account/accountId 时应用以下规则，不影响普通聊天或其他来源的身份判断。每个 accountId 是稳定、独立的网络人格，不能把不同账号的经历、喜好和关系合并成泛称。显示名变化不改变账号，只有明确提供的改名记录允许连接旧名。当前 viewer 对账号现实身份为 unknown 时，禁止根据文风、经历、时间、地点、头像、图片、共同知识、相似性或重复巧合推断、猜测、暗示、试探或询问其现实身份；其他平台已知身份关系也不是证据。只能使用当前 viewer 已明确获知的 explicitly_disclosed 关系；此时允许正常关联，不能继续阻断。揭露不得传播给其他 viewer。程序映射不是角色知识。帖子和记忆始终以具体 accountId / displayName 为主体。`;
-
-;// ./custom-apps/anonymous-xiaohongshu/src/xiaohongshu-memory.ts
-
-
-function queueMemories(s, viewer, jobId, notes) {
-    for (const note of notes) {
-        const id = `${jobId}.${note.id}`;
-        if (!s.outbox.some(m => m.id === id))
-            s.outbox.push({ id, viewerCharacterId: viewer, accountId: note.authorId, content: '[匿名小红书] source=anonymous_social_post\n' + JSON.stringify(projectNote(s, note)).slice(0, 14500) });
-    }
-}
-async function flushMemory(s) {
-    while (s.outbox.length) {
-        const m = s.outbox[0], scope = { viewerCharacterId: m.viewerCharacterId, sourceNamespace: 'social_posts', sourceEntityId: m.accountId };
-        const found = await host().memory.searchSource(scope);
-        await host().memory.writeSource({ ...scope, expectedRevision: found.revision, evidenceId: m.id, content: m.content, timeline: true });
-        s.outbox.shift();
-    }
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/baseline-engine.ts
-
-const resolveCharacterXiaohongshuDisplayName = (c) => c.name;
-const buildXiaohongshuUserNameSet = (extra = []) => new Set(extra.map(n => n.trim().toLowerCase()));
-const isXiaohongshuUserAuthorName = (name, names) => names.has(name.trim().toLowerCase());
-const getUserXiaohongshuNamesFromNote = (n) => [...(n.source === 'user' ? [n.authorName] : []), ...n.comments.filter(c => c.authorType === 'user').map(c => c.authorName)];
-function baseline_engine_makeId(prefix) {
-    if (typeof crypto !== "undefined" && crypto.randomUUID)
-        return `${prefix}_${crypto.randomUUID()}`;
-    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-function baseline_engine_cleanText(value, maxLength) {
-    return String(value ?? "")
-        .replace(/\u0000/g, "")
-        .trim()
-        .slice(0, maxLength);
-}
-function baseline_engine_cleanMultiline(value, maxLength) {
-    return baseline_engine_cleanText(value, maxLength)
-        .replace(/\r\n?/g, "\n")
-        .replace(/\\n/g, "\n")
-        .replace(/\n{4,}/g, "\n\n\n");
-}
-function parseMetric(value) {
-    if (typeof value === "number")
-        return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
-    const text = String(value ?? "")
-        .trim()
-        .replace(/[,，\s]/g, "");
-    if (!text)
-        return 0;
-    const tenThousandMatch = /^(-?\d+(?:\.\d+)?)[wW万](?:(\d+(?:\.\d+)?)(?:[kK千])?)?$/.exec(text);
-    if (tenThousandMatch) {
-        const main = Number(tenThousandMatch[1]);
-        const tail = tenThousandMatch[2] ? Number(tenThousandMatch[2]) : 0;
-        if (Number.isFinite(main) && Number.isFinite(tail)) {
-            return Math.max(0, Math.round(main * 10000 + tail * 1000));
-        }
-    }
-    const thousandMatch = /^(-?\d+(?:\.\d+)?)[kK千](?:(\d+(?:\.\d+)?)(?:百)?)?$/.exec(text);
-    if (thousandMatch) {
-        const main = Number(thousandMatch[1]);
-        const tail = thousandMatch[2] ? Number(thousandMatch[2]) : 0;
-        if (Number.isFinite(main) && Number.isFinite(tail)) {
-            return Math.max(0, Math.round(main * 1000 + tail * 100));
-        }
-    }
-    const numeric = Number(text.replace(/[^\d.-]/g, ""));
-    if (!Number.isFinite(numeric))
-        return 0;
-    if (/[wW万]/.test(text))
-        return Math.max(0, Math.round(numeric * 10000));
-    if (/[kK千]/.test(text))
-        return Math.max(0, Math.round(numeric * 1000));
-    return Math.max(0, Math.round(numeric));
-}
-function metricField(fields, names) {
-    if (!fields)
-        return undefined;
-    for (const name of names) {
-        if (fields[name] !== undefined)
-            return fields[name];
-    }
-    return undefined;
-}
-function parseMetricField(fields, names, fallback = 0) {
-    const value = metricField(fields, names);
-    return value === undefined || String(value).trim() === "" ? fallback : parseMetric(value);
-}
-function parseBoolean(value) {
-    const text = String(value ?? "").trim().toLowerCase();
-    return ["是", "yes", "true", "1", "y", "喜欢", "收藏"].includes(text);
-}
-function parseTags(value) {
-    return Array.from(new Set(String(value ?? "")
-        .split(/[,，、#\s]+/)
-        .map(tag => baseline_engine_cleanText(tag, 18))
-        .filter(Boolean))).slice(0, 6);
-}
-function stripFences(text) {
-    return text
-        .replace(/^```(?:text|json|markdown)?\s*/i, "")
-        .replace(/\s*```$/i, "")
-        .trim();
-}
-function parseBlocks(text) {
-    const blocks = [];
-    let current = null;
-    const lines = stripFences(text).split(/\r?\n/);
-    for (const rawLine of lines) {
-        const line = rawLine.trim();
-        if (!line)
-            continue;
-        const blockMatch = /^#\s*([^\d#\[]+?)(\d+)?\s*$/.exec(line);
-        if (blockMatch) {
-            if (current)
-                blocks.push(current);
-            current = {
-                title: blockMatch[1].trim(),
-                number: Number(blockMatch[2] || "1"),
-                fields: {},
-            };
-            continue;
-        }
-        if (!current) {
-            current = { title: "全局", number: 1, fields: {} };
-        }
-        const fieldMatch = /^\[([^\]]+)]\s*(.*)$/.exec(line);
-        if (fieldMatch) {
-            current.fields[fieldMatch[1].trim()] = fieldMatch[2].trim();
-        }
-    }
-    if (current)
-        blocks.push(current);
-    return blocks;
-}
-function parseBlockComments(fields, noteId, source = "npc") {
-    const numbers = Object.keys(fields)
-        .map(key => /^评论(\d+)作者$/.exec(key)?.[1])
-        .filter((value) => Boolean(value))
-        .map(Number)
-        .sort((a, b) => a - b);
-    const userNames = buildXiaohongshuUserNameSet();
-    const prunedNumbers = new Set();
-    const comments = [];
-    for (const number of numbers) {
-        const authorName = baseline_engine_cleanText(fields[`评论${number}作者`], 60) || "小红书用户";
-        const replyTarget = baseline_engine_cleanText(fields[`评论${number}回复对象`], 40);
-        const replyNumber = /^评论(\d+)$/.exec(replyTarget)?.[1];
-        if (isXiaohongshuUserAuthorName(authorName, userNames)) {
-            console.warn(`[Xiaohongshu] 剪掉冒用用户名的生成评论: "${authorName}"`);
-            prunedNumbers.add(number);
-            continue;
-        }
-        if (replyNumber && prunedNumbers.has(Number(replyNumber))) {
-            prunedNumbers.add(number);
-            continue;
-        }
-        const text = baseline_engine_cleanMultiline(fields[`评论${number}内容`], 600);
-        if (!text)
-            continue;
-        comments.push(baseline_storage_makeXiaohongshuComment({
-            noteId,
-            authorType: source,
-            authorId: source === "npc" ? baseline_storage_makeXiaohongshuNpcId(authorName) : source,
-            authorName,
-            text,
-            replyTo: replyNumber ? undefined : replyTarget || undefined,
-            replyToCommentId: replyNumber ? `${noteId}_comment_${replyNumber}` : undefined,
-            unread: source === "npc",
-        }));
-    }
-    return comments;
-}
-/**
- * 解析 [延伸N作者/回复对象/内容] 字段族为角色侧 thread 数组。
- * - 字段名兼容 "延伸N作者"/"延伸N回复对象"/"延伸N内容"
- * - 没有任何延伸字段时返回空数组（apply 端据此回退到"只保留主评论"）
- */
-function parseCharacterThreadFields(fields) {
-    const numbers = Object.keys(fields)
-        .map(key => /^延伸(\d+)作者$/.exec(key)?.[1])
-        .filter((value) => Boolean(value))
-        .map(Number)
-        .sort((a, b) => a - b);
-    return numbers.map((number) => {
-        const authorName = baseline_engine_cleanText(fields[`延伸${number}作者`], 60);
-        const replyTo = baseline_engine_cleanText(fields[`延伸${number}回复对象`], 60);
-        return {
-            number,
-            authorName,
-            text: baseline_engine_cleanMultiline(fields[`延伸${number}内容`], 600),
-            replyTo: replyTo || undefined,
-        };
-    }).filter(item => item.text && item.authorName).slice(0, 8);
-}
-function isCharacterXiaohongshuAuthor(authorName, characterDisplayName, characterName) {
-    const normalized = authorName.trim();
-    if (!normalized)
-        return false;
-    return [characterDisplayName.trim(), characterName.trim()].filter(Boolean).includes(normalized);
-}
-/**
- * 把角色侧 thread 评论按顺序追加到 note 上：
- * - "主评论" 或缺省 → replyToCommentId = mainCommentId
- * - "延伸N" → replyToCommentId 指向前面已生成的 thread comment
- * - 作者名匹配 character.name 或小红书显示名 → authorType="character"，否则 "npc"
- */
-function appendCharacterThreadToNote(args) {
-    const { note, characterDisplayName, characterName, characterId, thread, mainCommentId, shouldNotifyUser } = args;
-    const appended = [];
-    const numberToId = new Map();
-    const userNames = buildXiaohongshuUserNameSet(getUserXiaohongshuNamesFromNote(note));
-    const prunedNumbers = new Set();
-    thread.forEach((item) => {
-        const isCharacter = isCharacterXiaohongshuAuthor(item.authorName, characterDisplayName, characterName);
-        const replyTarget = (item.replyTo || "").trim();
-        const referenceMatch = /^延伸(\d+)$/.exec(replyTarget);
-        if (!isCharacter && isXiaohongshuUserAuthorName(item.authorName, userNames)) {
-            console.warn(`[Xiaohongshu] 剪掉冒用用户名的楼中楼评论: "${item.authorName}"`);
-            prunedNumbers.add(item.number);
-            return;
-        }
-        if (referenceMatch && prunedNumbers.has(Number(referenceMatch[1]))) {
-            prunedNumbers.add(item.number);
-            return;
-        }
-        const isMainReply = !replyTarget || /^主评论$/.test(replyTarget);
-        const replyToCommentId = isMainReply
-            ? mainCommentId
-            : referenceMatch
-                ? numberToId.get(Number(referenceMatch[1])) || mainCommentId
-                : mainCommentId;
-        const comment = baseline_storage_makeXiaohongshuComment({
-            noteId: note.id,
-            authorType: isCharacter ? "character" : "npc",
-            authorId: isCharacter ? characterId : baseline_storage_makeXiaohongshuNpcId(item.authorName),
-            authorName: isCharacter ? characterDisplayName : item.authorName,
-            text: item.text,
-            replyToCommentId,
-            unread: shouldNotifyUser,
-        });
-        appended.push(comment);
-        numberToId.set(item.number, comment.id);
-    });
-    const notifications = shouldNotifyUser
-        ? appended
-            .filter(comment => comment.authorType === "npc")
-            .map(comment => baseline_storage_makeXiaohongshuNotification({
-            type: "comment",
-            noteId: note.id,
-            actorName: comment.authorName,
-            text: comment.text,
-            thumbnailText: note.title,
-            unread: true,
-        }))
-        : [];
-    return {
-        note: {
-            ...note,
-            comments: [...note.comments, ...appended],
-            commentCount: note.commentCount + appended.length,
-            updatedAt: appended.length > 0 ? new Date().toISOString() : note.updatedAt,
-        },
-        appended,
-        notifications,
-    };
-}
-function parseNoteBlock(block, type, index, source = "npc", authorId = "npc", feedScope = "discover") {
-    const noteId = baseline_engine_makeId(type === "video" ? "xhs_video" : "xhs_note");
-    const body = baseline_engine_cleanMultiline(block.fields["正文"] ?? block.fields["内容"], 3000);
-    const title = baseline_engine_cleanText(block.fields["标题"], 80) || body.slice(0, 24);
-    if (!title && !body)
-        return null;
-    const comments = parseBlockComments(block.fields, noteId, source);
-    const authorName = baseline_engine_cleanText(block.fields["作者"] ?? block.fields["落款"], 60) || "小红书用户";
-    return {
-        id: noteId,
-        type,
-        feedScope,
-        source,
-        authorId: source === "npc" && authorId === "npc" ? baseline_storage_makeXiaohongshuNpcId(authorName) : authorId,
-        authorName,
-        title: title || "未命名笔记",
-        body,
-        videoDescription: baseline_engine_cleanMultiline(block.fields["视频描述"] ?? block.fields["画面描述"], 500) || undefined,
-        coverIcon: baseline_engine_cleanText(block.fields["图标"], 8) || (type === "video" ? "▶" : "✦"),
-        tone: index % 4 === 1 ? "mist" : index % 4 === 2 ? "blush" : index % 4 === 3 ? "graphite" : "ivory",
-        tags: parseTags(block.fields["标签"] ?? block.fields["TAG"]),
-        likeCount: parseMetricField(block.fields, ["点赞", "点赞数", "赞"]),
-        saveCount: parseMetricField(block.fields, ["收藏", "收藏数"]),
-        commentCount: parseMetricField(block.fields, ["评论数", "评论量", "评论"], comments.length),
-        liked: parseBoolean(block.fields["已赞"]),
-        saved: parseBoolean(block.fields["已收藏"]),
-        recentLikeNames: [block.fields["点赞用户1"], block.fields["点赞用户2"]].map(name => baseline_engine_cleanText(name, 24)).filter(Boolean),
-        recentSaveNames: [block.fields["收藏用户1"], block.fields["收藏用户2"]].map(name => baseline_engine_cleanText(name, 24)).filter(Boolean),
-        comments: comments.map((comment, idx) => ({ ...comment, id: `${noteId}_comment_${idx + 1}` })),
-        imageDescription: baseline_engine_cleanMultiline(block.fields["图片描述"] ?? block.fields["配图"], 500) || undefined,
-        createdAt: new Date(Date.now() - index * 1000 * 60 * 5).toISOString(),
-        updatedAt: new Date().toISOString(),
-    };
-}
-function parseXiaohongshuNpcFeed(raw) {
-    const blocks = parseBlocks(raw);
-    const nearbyNotes = blocks
-        .filter(block => /附近笔记|同城笔记|附近/.test(block.title) && !/视频/.test(block.title))
-        .slice(0, 4)
-        .map((block, index) => parseNoteBlock(block, "post", index + 12, "npc", "npc", "nearby"))
-        .filter((note) => Boolean(note));
-    const homeNotes = blocks
-        .filter(block => /首页笔记|图文笔记|笔记/.test(block.title) && !/视频|附近|同城/.test(block.title))
-        .slice(0, 6)
-        .map((block, index) => parseNoteBlock(block, "post", index, "npc"))
-        .filter((note) => Boolean(note));
-    const videoNotes = blocks
-        .filter(block => /视频/.test(block.title))
-        .slice(0, 6)
-        .map((block, index) => parseNoteBlock(block, "video", index + homeNotes.length, "npc"))
-        .filter((note) => Boolean(note));
-    return { homeNotes, videoNotes, nearbyNotes };
-}
-function parseXiaohongshuNpcReaction(raw, noteId) {
-    const blocks = parseBlocks(raw);
-    const interaction = blocks.find(block => /用户笔记互动|互动/.test(block.title)) ?? blocks[0];
-    const commentFields = blocks.reduce((acc, block) => ({ ...acc, ...block.fields }), {});
-    const comments = parseBlockComments(commentFields, noteId, "npc").map((comment) => ({
-        authorName: comment.authorName,
-        text: comment.text,
-        replyTo: comment.replyTo,
-        replyToCommentId: comment.replyToCommentId,
-    }));
-    const directMessages = blocks
-        .filter(block => /私信|消息/.test(block.title))
-        .map(block => ({
-        name: baseline_engine_cleanText(block.fields["名称"] ?? block.fields["作者"], 60) || "小红书用户",
-        text: baseline_engine_cleanMultiline(block.fields["正文"] ?? block.fields["内容"], 600),
-    }))
-        .filter(item => item.text)
-        .slice(0, 6);
-    const followerCount = parseMetric(metricField(interaction?.fields, ["新增关注", "关注", "粉丝"]));
-    const followerNames = Array.from(new Set([
-        interaction?.fields["关注用户1"],
-        interaction?.fields["关注用户2"],
-        interaction?.fields["关注用户3"],
-        ...Array.from({ length: Math.min(12, followerCount) }, (_, index) => interaction?.fields[`关注用户${index + 1}`]),
-    ].map(name => baseline_engine_cleanText(name, 60)).filter(Boolean))).slice(0, Math.max(2, followerCount || 0));
-    return {
-        likeCount: parseMetric(metricField(interaction?.fields, ["点赞", "点赞数", "赞"])),
-        saveCount: parseMetric(metricField(interaction?.fields, ["收藏", "收藏数"])),
-        recentLikeNames: [interaction?.fields["点赞用户1"], interaction?.fields["点赞用户2"]].map(name => baseline_engine_cleanText(name, 24)).filter(Boolean),
-        recentSaveNames: [interaction?.fields["收藏用户1"], interaction?.fields["收藏用户2"]].map(name => baseline_engine_cleanText(name, 24)).filter(Boolean),
-        comments,
-        directMessages,
-        followerNames,
-    };
-}
-function parseXiaohongshuNpcCommentReply(raw, noteId, fallbackReplyToCommentId) {
-    const blocks = parseBlocks(raw);
-    const fields = blocks.reduce((acc, block) => ({ ...acc, ...block.fields }), {});
-    const numbers = Object.keys(fields)
-        .map(key => /^评论(\d+)作者$/.exec(key)?.[1])
-        .filter((value) => Boolean(value))
-        .map(Number)
-        .sort((a, b) => a - b);
-    const userNames = buildXiaohongshuUserNameSet();
-    const prunedNumbers = new Set();
-    const comments = [];
-    for (const number of numbers) {
-        if (comments.length >= 4)
-            break;
-        const authorName = baseline_engine_cleanText(fields[`评论${number}作者`], 60) || "小红书用户";
-        const replyValue = baseline_engine_cleanText(fields[`评论${number}回复评论ID`] ?? fields[`评论${number}回复对象`], 180);
-        const replyNumber = /^评论(\d+)$/.exec(replyValue)?.[1];
-        if (isXiaohongshuUserAuthorName(authorName, userNames)) {
-            console.warn(`[Xiaohongshu] 剪掉冒用用户名的生成评论: "${authorName}"`);
-            prunedNumbers.add(number);
-            continue;
-        }
-        if (replyNumber && prunedNumbers.has(Number(replyNumber))) {
-            prunedNumbers.add(number);
-            continue;
-        }
-        const isEmptyReply = !replyValue || /^(无|none|null|-)$/.test(replyValue.toLowerCase()) || /被回复|候选|评论id/i.test(replyValue);
-        const replyToCommentId = replyNumber
-            ? `${noteId}_comment_${replyNumber}`
-            : !isEmptyReply
-                ? replyValue
-                : fallbackReplyToCommentId;
-        const text = baseline_engine_cleanMultiline(fields[`评论${number}内容`], 600);
-        if (!text)
-            continue;
-        comments.push({ authorName, text, replyToCommentId });
-    }
-    return { comments };
-}
-function parseXiaohongshuNpcMoreComments(raw) {
-    const blocks = parseBlocks(raw);
-    const fields = blocks.reduce((acc, block) => ({ ...acc, ...block.fields }), {});
-    const numbers = Object.keys(fields)
-        .map(key => /^评论(\d+)作者$/.exec(key)?.[1])
-        .filter((value) => Boolean(value))
-        .map(Number)
-        .sort((a, b) => a - b);
-    const userNames = buildXiaohongshuUserNameSet();
-    const prunedNumbers = new Set();
-    const comments = [];
-    for (const number of numbers) {
-        if (comments.length >= 8)
-            break;
-        const authorName = baseline_engine_cleanText(fields[`评论${number}作者`], 60) || "小红书用户";
-        const replyId = baseline_engine_cleanText(fields[`评论${number}回复评论ID`], 180);
-        const replyTarget = baseline_engine_cleanText(fields[`评论${number}回复对象`], 80);
-        const replyNumber = /^评论(\d+)$/.exec(replyTarget)?.[1];
-        if (isXiaohongshuUserAuthorName(authorName, userNames)) {
-            console.warn(`[Xiaohongshu] 剪掉冒用用户名的生成评论: "${authorName}"`);
-            prunedNumbers.add(number);
-            continue;
-        }
-        if (replyNumber && prunedNumbers.has(Number(replyNumber))) {
-            prunedNumbers.add(number);
-            continue;
-        }
-        const isEmptyReplyId = !replyId || /^(无|none|null|-)$/.test(replyId.toLowerCase()) || /从上下文|真实评论id|被回复|候选|评论id/i.test(replyId);
-        const text = baseline_engine_cleanMultiline(fields[`评论${number}内容`], 600);
-        if (!text)
-            continue;
-        comments.push({
-            authorName,
-            text,
-            replyTo: !replyNumber && replyTarget ? replyTarget : undefined,
-            replyToCommentId: !isEmptyReplyId
-                ? replyId
-                : replyNumber
-                    ? `__generated_comment_${replyNumber}`
-                    : undefined,
-        });
-    }
-    return { comments };
-}
-function parseXiaohongshuNpcDmReply(raw) {
-    const blocks = parseBlocks(raw).filter(block => /私信|回复|消息/.test(block.title));
-    const messages = blocks
-        .map(block => baseline_engine_cleanMultiline(block.fields["正文"] ?? block.fields["内容"] ?? block.fields["回复"], 600))
-        .filter(Boolean)
-        .slice(0, 4);
-    if (messages.length > 0)
-        return { messages };
-    const fallback = baseline_engine_cleanMultiline(raw.replace(/^#.*$/gm, "").replace(/^\[[^\]]+]\s*/gm, ""), 600);
-    return { messages: fallback ? [fallback] : [] };
-}
-function parseXiaohongshuCharacterActivity(raw, allowedNoteIds) {
-    const blocks = parseBlocks(raw);
-    const comments = blocks
-        .filter(block => /评论/.test(block.title))
-        .map(block => {
-        const thread = parseCharacterThreadFields(block.fields);
-        return {
-            noteId: baseline_engine_cleanText(block.fields["笔记ID"] ?? block.fields["noteId"], 180),
-            text: baseline_engine_cleanMultiline(block.fields["内容"] ?? block.fields["评论"], 600),
-            liked: parseBoolean(block.fields["点赞"]),
-            saved: parseBoolean(block.fields["收藏"]),
-            thread: thread.length > 0 ? thread : undefined,
-        };
-    })
-        .filter(item => item.noteId && item.text && allowedNoteIds.includes(item.noteId))
-        .slice(0, 3);
-    const postBlock = blocks.find(block => /发帖|笔记|视频/.test(block.title) && !/评论/.test(block.title));
-    const rawPostType = baseline_engine_cleanText(postBlock?.fields["类型"] ?? postBlock?.fields["格式"] ?? postBlock?.title, 40).toLowerCase();
-    const postType = /视频|video/.test(rawPostType) ? "video" : "post";
-    const post = postBlock
-        ? {
-            type: postType,
-            title: baseline_engine_cleanText(postBlock.fields["标题"], 80),
-            body: baseline_engine_cleanMultiline(postBlock.fields["正文"] ?? postBlock.fields["内容"], 3000),
-            coverIcon: baseline_engine_cleanText(postBlock.fields["图标"], 8) || (postType === "video" ? "▶" : "✦"),
-            tags: parseTags(postBlock.fields["标签"] ?? postBlock.fields["TAG"]),
-            likeCount: parseMetricField(postBlock.fields, ["点赞", "点赞数", "赞"]),
-            saveCount: parseMetricField(postBlock.fields, ["收藏", "收藏数"]),
-            commentCount: parseMetricField(postBlock.fields, ["评论数", "评论量", "评论"], parseBlockComments(postBlock.fields, "__character_post__", "npc").length),
-            recentLikeNames: [postBlock.fields["点赞用户1"], postBlock.fields["点赞用户2"]].map(name => baseline_engine_cleanText(name, 24)).filter(Boolean),
-            recentSaveNames: [postBlock.fields["收藏用户1"], postBlock.fields["收藏用户2"]].map(name => baseline_engine_cleanText(name, 24)).filter(Boolean),
-            imageDescription: postType === "post" ? baseline_engine_cleanMultiline(postBlock.fields["图片描述"] ?? postBlock.fields["配图"], 500) || undefined : undefined,
-            videoDescription: postType === "video"
-                ? baseline_engine_cleanMultiline(postBlock.fields["视频描述"] ?? postBlock.fields["视频画面"] ?? postBlock.fields["图片描述"] ?? postBlock.fields["配图"], 500) || undefined
-                : undefined,
-            comments: parseBlockComments(postBlock.fields, "__character_post__", "npc")
-                .map((comment) => ({
-                authorName: comment.authorName,
-                text: comment.text,
-                replyTo: comment.replyTo,
-                replyToCommentId: comment.replyToCommentId,
-            }))
-                .slice(0, 8),
-        }
-        : undefined;
-    return { comments, post: post && (post.title || post.body) ? post : undefined };
-}
-function parseXiaohongshuCharacterReaction(raw) {
-    const blocks = parseBlocks(raw);
-    const block = blocks.find(item => /角色互动|互动|评论|回复/.test(item.title)) ?? blocks[0];
-    const thread = block ? parseCharacterThreadFields(block.fields) : [];
-    return {
-        comment: baseline_engine_cleanMultiline(block?.fields["评论"] ?? block?.fields["内容"], 600),
-        liked: parseBoolean(block?.fields["点赞"]),
-        saved: parseBoolean(block?.fields["收藏"]),
-        followedAuthor: parseBoolean(block?.fields["关注作者"] ?? block?.fields["关注"]),
-        thread: thread.length > 0 ? thread : undefined,
-    };
-}
-function parseXiaohongshuCharacterMentionReply(raw) {
-    const blocks = parseBlocks(raw);
-    const block = blocks.find(item => /角色回复|回复|评论/.test(item.title)) ?? blocks[0];
-    const thread = block ? parseCharacterThreadFields(block.fields) : [];
-    return {
-        comment: baseline_engine_cleanMultiline(block?.fields["内容"] ?? block?.fields["评论"], 600),
-        thread: thread.length > 0 ? thread : undefined,
-    };
-}
-function applyNpcReaction(note, reaction) {
-    const shouldNotifyUser = note.source === "user";
-    const baseCommentIndex = note.comments.length;
-    const comments = reaction.comments
-        .filter(comment => comment.text)
-        .map((comment, index) => {
-        const parsedReplyIndex = /^.*_comment_(\d+)$/.exec(comment.replyToCommentId || "")?.[1];
-        const replyToCommentId = parsedReplyIndex
-            ? `${note.id}_comment_${baseCommentIndex + Number(parsedReplyIndex)}`
-            : comment.replyToCommentId;
-        return {
-            ...baseline_storage_makeXiaohongshuComment({
-                noteId: note.id,
-                authorType: "npc",
-                authorId: "npc",
-                authorName: comment.authorName,
-                text: comment.text,
-                replyTo: comment.replyTo,
-                replyToCommentId,
-                unread: true,
-            }),
-            id: `${note.id}_comment_${baseCommentIndex + index + 1}`,
-        };
-    });
-    const updated = {
-        ...note,
-        likeCount: note.likeCount + reaction.likeCount,
-        saveCount: note.saveCount + reaction.saveCount,
-        recentLikeNames: addNames(note.recentLikeNames, reaction.recentLikeNames),
-        recentSaveNames: addNames(note.recentSaveNames, reaction.recentSaveNames),
-        comments: [...note.comments, ...comments],
-        commentCount: note.commentCount + comments.length,
-        updatedAt: new Date().toISOString(),
-    };
-    const notifications = shouldNotifyUser ? [
-        reaction.likeCount > 0 ? baseline_storage_makeXiaohongshuNotification({
-            type: "like",
-            noteId: note.id,
-            actorName: reaction.recentLikeNames[0] || "小红书用户",
-            text: `${reaction.recentLikeNames.join("、") || "有人"}等${reaction.likeCount}人赞了你的笔记`,
-            count: reaction.likeCount,
-            thumbnailText: note.title,
-            unread: true,
-        }) : null,
-        reaction.saveCount > 0 ? baseline_storage_makeXiaohongshuNotification({
-            type: "save",
-            noteId: note.id,
-            actorName: reaction.recentSaveNames[0] || "小红书用户",
-            text: `${reaction.recentSaveNames.join("、") || "有人"}等${reaction.saveCount}人收藏了你的笔记`,
-            count: reaction.saveCount,
-            thumbnailText: note.title,
-            unread: true,
-        }) : null,
-        ...comments.map(comment => baseline_storage_makeXiaohongshuNotification({
-            type: "comment",
-            noteId: note.id,
-            actorName: comment.authorName,
-            text: comment.text,
-            thumbnailText: note.title,
-            unread: true,
-        })),
-        ...reaction.directMessages.map(message => baseline_storage_makeXiaohongshuNotification({
-            type: "dm",
-            noteId: note.id,
-            actorName: message.name,
-            text: message.text,
-            thumbnailText: note.title,
-            direction: "incoming",
-            threadId: `dm:${message.name}`,
-            threadName: message.name,
-            unread: true,
-        })),
-    ].filter((item) => Boolean(item)) : [];
-    return { note: updated, notifications };
-}
-function applyCharacterReaction(note, character, reaction) {
-    const shouldNotifyUser = note.source === "user";
-    const displayName = resolveCharacterXiaohongshuDisplayName(character);
-    const comment = baseline_storage_makeXiaohongshuComment({
-        noteId: note.id,
-        authorType: "character",
-        authorId: character.id,
-        authorName: displayName,
-        text: reaction.comment,
-        unread: shouldNotifyUser,
-    });
-    const likeIncrement = reaction.liked && !note.recentLikeNames.includes(displayName) ? 1 : 0;
-    const saveIncrement = reaction.saved && !note.recentSaveNames.includes(displayName) ? 1 : 0;
-    let updated = {
-        ...note,
-        likeCount: note.likeCount + likeIncrement,
-        saveCount: note.saveCount + saveIncrement,
-        recentLikeNames: reaction.liked ? addNames(note.recentLikeNames, [displayName]) : note.recentLikeNames,
-        recentSaveNames: reaction.saved ? addNames(note.recentSaveNames, [displayName]) : note.recentSaveNames,
-        comments: comment.text ? [...note.comments, comment] : note.comments,
-        commentCount: note.commentCount + (comment.text ? 1 : 0),
-        updatedAt: new Date().toISOString(),
-    };
-    let threadNotifications = [];
-    let threadComments = [];
-    if (comment.text && reaction.thread && reaction.thread.length > 0) {
-        const result = appendCharacterThreadToNote({
-            note: updated,
-            characterDisplayName: displayName,
-            characterName: character.name,
-            characterId: character.id,
-            thread: reaction.thread,
-            mainCommentId: comment.id,
-            shouldNotifyUser,
-        });
-        updated = result.note;
-        threadNotifications = result.notifications;
-        threadComments = result.appended;
-    }
-    const notifications = shouldNotifyUser ? [
-        reaction.liked ? baseline_storage_makeXiaohongshuNotification({
-            type: "like",
-            noteId: note.id,
-            actorName: displayName,
-            text: `${displayName} 赞了你的笔记`,
-            count: 1,
-            thumbnailText: note.title,
-            unread: true,
-        }) : null,
-        reaction.saved ? baseline_storage_makeXiaohongshuNotification({
-            type: "save",
-            noteId: note.id,
-            actorName: displayName,
-            text: `${displayName} 收藏了你的笔记`,
-            count: 1,
-            thumbnailText: note.title,
-            unread: true,
-        }) : null,
-        comment.text ? baseline_storage_makeXiaohongshuNotification({
-            type: "comment",
-            noteId: note.id,
-            actorName: displayName,
-            text: comment.text,
-            thumbnailText: note.title,
-            unread: true,
-        }) : null,
-    ].filter((item) => Boolean(item)) : [];
-    return { note: updated, notifications: [...notifications, ...threadNotifications], mainComment: comment, threadComments };
-}
-function applyNpcCommentReply(note, reaction, fallbackReplyToCommentId) {
-    const shouldNotifyUser = note.source === "user";
-    const comments = reaction.comments
-        .filter(comment => comment.text)
-        .map(comment => baseline_storage_makeXiaohongshuComment({
-        noteId: note.id,
-        authorType: "npc",
-        authorId: "npc",
-        authorName: comment.authorName,
-        text: comment.text,
-        replyTo: comment.replyTo,
-        replyToCommentId: comment.replyToCommentId || fallbackReplyToCommentId,
-        unread: true,
-    }));
-    const updated = {
-        ...note,
-        comments: [...note.comments, ...comments],
-        commentCount: note.commentCount + comments.length,
-        updatedAt: new Date().toISOString(),
-    };
-    const notifications = shouldNotifyUser ? comments.map(comment => baseline_storage_makeXiaohongshuNotification({
-        type: "comment",
-        noteId: note.id,
-        actorName: comment.authorName,
-        text: comment.text,
-        thumbnailText: note.title,
-        unread: true,
-    })) : [];
-    return { note: updated, notifications };
-}
-function applyNpcMoreComments(note, reaction) {
-    const baseCommentIndex = note.comments.length;
-    const comments = reaction.comments
-        .filter(comment => comment.text)
-        .map((comment, index) => {
-        const generatedReplyIndex = /^__generated_comment_(\d+)$/.exec(comment.replyToCommentId || "")?.[1];
-        return {
-            ...makeXiaohongshuComment({
-                noteId: note.id,
-                authorType: "npc",
-                authorId: makeXiaohongshuNpcId(comment.authorName),
-                authorName: comment.authorName,
-                text: comment.text,
-                replyTo: comment.replyTo,
-                replyToCommentId: generatedReplyIndex
-                    ? `${note.id}_comment_${baseCommentIndex + Number(generatedReplyIndex)}`
-                    : comment.replyToCommentId,
-            }),
-            id: `${note.id}_comment_${baseCommentIndex + index + 1}`,
-        };
-    });
-    return {
-        ...note,
-        comments: [...note.comments, ...comments],
-        commentCount: note.commentCount + comments.length,
-        updatedAt: new Date().toISOString(),
-    };
-}
-function applyCharacterCommentReply(note, character, reaction, replyToCommentId) {
-    const shouldNotifyUser = note.source === "user";
-    const displayName = resolveCharacterXiaohongshuDisplayName(character);
-    const comment = baseline_storage_makeXiaohongshuComment({
-        noteId: note.id,
-        authorType: "character",
-        authorId: character.id,
-        authorName: displayName,
-        text: reaction.comment,
-        replyToCommentId,
-        unread: shouldNotifyUser,
-    });
-    const likeIncrement = reaction.liked && !note.recentLikeNames.includes(displayName) ? 1 : 0;
-    const saveIncrement = reaction.saved && !note.recentSaveNames.includes(displayName) ? 1 : 0;
-    let updated = {
-        ...note,
-        likeCount: note.likeCount + likeIncrement,
-        saveCount: note.saveCount + saveIncrement,
-        recentLikeNames: reaction.liked ? addNames(note.recentLikeNames, [displayName]) : note.recentLikeNames,
-        recentSaveNames: reaction.saved ? addNames(note.recentSaveNames, [displayName]) : note.recentSaveNames,
-        comments: comment.text ? [...note.comments, comment] : note.comments,
-        commentCount: note.commentCount + (comment.text ? 1 : 0),
-        updatedAt: new Date().toISOString(),
-    };
-    let threadNotifications = [];
-    let threadComments = [];
-    if (comment.text && reaction.thread && reaction.thread.length > 0) {
-        const result = appendCharacterThreadToNote({
-            note: updated,
-            characterDisplayName: displayName,
-            characterName: character.name,
-            characterId: character.id,
-            thread: reaction.thread,
-            mainCommentId: comment.id,
-            shouldNotifyUser,
-        });
-        updated = result.note;
-        threadNotifications = result.notifications;
-        threadComments = result.appended;
-    }
-    const notifications = shouldNotifyUser ? [
-        reaction.liked ? baseline_storage_makeXiaohongshuNotification({
-            type: "like",
-            noteId: note.id,
-            actorName: displayName,
-            text: `${displayName} 赞了这篇笔记`,
-            count: 1,
-            thumbnailText: note.title,
-            unread: true,
-        }) : null,
-        reaction.saved ? baseline_storage_makeXiaohongshuNotification({
-            type: "save",
-            noteId: note.id,
-            actorName: displayName,
-            text: `${displayName} 收藏了这篇笔记`,
-            count: 1,
-            thumbnailText: note.title,
-            unread: true,
-        }) : null,
-        comment.text ? baseline_storage_makeXiaohongshuNotification({
-            type: "comment",
-            noteId: note.id,
-            actorName: displayName,
-            text: comment.text,
-            thumbnailText: note.title,
-            unread: true,
-        }) : null,
-    ].filter((item) => Boolean(item)) : [];
-    return { note: updated, notifications: [...notifications, ...threadNotifications], mainComment: comment, threadComments };
-}
-/**
- * 应用 Activity 里"角色评论别人帖子"的单条评论 + 可选延伸 thread。
- * - 主评论永远是角色本人评论
- * - 如果 thread 存在，把延伸评论按楼中楼关系挂在主评论下
- * - 返回新增的所有评论（主评论 + thread 评论）供调用方记录记忆/通知
- */
-function applyCharacterActivityComment(args) {
-    const { note, character, text, liked, saved, thread } = args;
-    const displayName = resolveCharacterXiaohongshuDisplayName(character);
-    const shouldNotifyUser = note.source === "user";
-    const mainComment = baseline_storage_makeXiaohongshuComment({
-        noteId: note.id,
-        authorType: "character",
-        authorId: character.id,
-        authorName: displayName,
-        text,
-        unread: shouldNotifyUser,
-    });
-    let updated = {
-        ...note,
-        likeCount: note.likeCount + (liked && !note.recentLikeNames.includes(displayName) ? 1 : 0),
-        saveCount: note.saveCount + (saved && !note.recentSaveNames.includes(displayName) ? 1 : 0),
-        recentLikeNames: liked ? addNames(note.recentLikeNames, [displayName]) : note.recentLikeNames,
-        recentSaveNames: saved ? addNames(note.recentSaveNames, [displayName]) : note.recentSaveNames,
-        comments: [...note.comments, mainComment],
-        commentCount: note.commentCount + 1,
-        updatedAt: new Date().toISOString(),
-    };
-    let threadComments = [];
-    let threadNotifications = [];
-    if (thread && thread.length > 0) {
-        const result = appendCharacterThreadToNote({
-            note: updated,
-            characterDisplayName: displayName,
-            characterName: character.name,
-            characterId: character.id,
-            thread,
-            mainCommentId: mainComment.id,
-            shouldNotifyUser,
-        });
-        updated = result.note;
-        threadComments = result.appended;
-        threadNotifications = result.notifications;
-    }
-    const mainNotifications = shouldNotifyUser ? [
-        liked && !note.recentLikeNames.includes(displayName) ? baseline_storage_makeXiaohongshuNotification({
-            type: "like",
-            noteId: note.id,
-            actorName: displayName,
-            text: `${displayName} 赞了你的笔记`,
-            count: 1,
-            thumbnailText: note.title,
-            unread: true,
-        }) : null,
-        saved && !note.recentSaveNames.includes(displayName) ? baseline_storage_makeXiaohongshuNotification({
-            type: "save",
-            noteId: note.id,
-            actorName: displayName,
-            text: `${displayName} 收藏了你的笔记`,
-            count: 1,
-            thumbnailText: note.title,
-            unread: true,
-        }) : null,
-        baseline_storage_makeXiaohongshuNotification({
-            type: "comment",
-            noteId: note.id,
-            actorName: displayName,
-            text,
-            thumbnailText: note.title,
-            unread: true,
-        }),
-    ].filter((item) => Boolean(item)) : [];
-    return {
-        note: updated,
-        mainComment,
-        threadComments,
-        notifications: [...mainNotifications, ...threadNotifications],
-    };
-}
-function applyCharacterMentionReply(note, character, reaction, replyToCommentId) {
-    const shouldNotifyUser = note.source === "user";
-    const displayName = resolveCharacterXiaohongshuDisplayName(character);
-    const comment = makeXiaohongshuComment({
-        noteId: note.id,
-        authorType: "character",
-        authorId: character.id,
-        authorName: displayName,
-        text: reaction.comment,
-        replyToCommentId,
-        unread: shouldNotifyUser,
-    });
-    let updated = {
-        ...note,
-        comments: comment.text ? [...note.comments, comment] : note.comments,
-        commentCount: note.commentCount + (comment.text ? 1 : 0),
-        updatedAt: new Date().toISOString(),
-    };
-    let threadNotifications = [];
-    let threadComments = [];
-    if (comment.text && reaction.thread && reaction.thread.length > 0) {
-        const result = appendCharacterThreadToNote({
-            note: updated,
-            characterDisplayName: displayName,
-            characterName: character.name,
-            characterId: character.id,
-            thread: reaction.thread,
-            mainCommentId: comment.id,
-            shouldNotifyUser,
-        });
-        updated = result.note;
-        threadNotifications = result.notifications;
-        threadComments = result.appended;
-    }
-    const notifications = shouldNotifyUser ? [
-        comment.text ? makeXiaohongshuNotification({
-            type: "comment",
-            noteId: note.id,
-            actorName: displayName,
-            text: comment.text,
-            thumbnailText: note.title,
-            unread: true,
-        }) : null,
-    ].filter((item) => Boolean(item)) : [];
-    return { note: updated, notifications: [...notifications, ...threadNotifications], mainComment: comment, threadComments };
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/baseline-prompts.ts
-// Forked from Float (AGPL-3.0-only), baseline da067218. See BASELINE.md.
-const NATIVE_CHARACTER_PROMPTS = {
-    "activity": "<xiaohongshu_character_activity_instruction>\n你正在以{{char}}的身份浏览小红书，并根据当前看到的公共内容进行自然互动。\n以下是小红书候选笔记、已有评论和点赞/收藏数量：\n{{xiaohongshuFeedContext}}\n\n内容要求：\n- 以碎片化、去精致化的日常分享为主，使用口语、网络黑话、表情等加强日常不经意感，*不煽情、不装逼。*\n- 可采用日常经历吐槽、疑问、分享技巧与心得等多种形式，标题和内容都应该口语化（除非是正式的技巧和心得的分享）。\n- 角色与评论区的互动，禁止世界以{{char}}为中心夸夸和吹捧，评论区可体现出不一样的观点，NPC不脸谱化，多种性格同时存在（比如尖锐的、温和的、挑事的、看戏的、蹲后续等等）\n- *绝对禁止在小红书讲大道理、爹味说教*，*绝对禁止强行把日常生活上升高度*，小红书必须是轻松、幽默、张力十足的，绝对禁止分享一些假大空道理，帖子与评论必须落于实际。\n- *绝对禁止评论的时候引用帖子/评论原文”，例如“XXXXX”这句太真实了——这种格式绝对禁止\n- 必须和{{char}}的性格相符，结合{{char}}的记忆和经历内容进行适度延展，从日常事件中提取主题，如有日程可联系日程。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 从候选笔记中选择 3 条进行评论；如果确实没有适合评论的内容，可以少于 3 条\n- 每条评论必须使用候选中的 [笔记ID]\n- 同时输出 1 条{{char}}自己发布的小红书内容；每次由{{char}}自行选择普通笔记或视频笔记，只输出其中一种\n- {{char}}自己发布的内容需要输出点赞数、收藏数、评论数和前两个点赞/收藏昵称，并附带 3 到 8 条评论；评论主要来自小红书路人，但可以有 1~2 条由{{char}}自己作为笔记作者出现来回应路人\n- 如果选择普通笔记，[类型]填 笔记，可以输出[图片描述]；如果选择视频笔记，[类型]填 视频，必须输出[视频描述]\n- Xiaohongshu comments must come from strangers. In most cases, these users have no way to know {{char}}'s private life unless {{char}} is a public figure; do not use acquaintances from Moments, group chats, or private chats.\n- [评论数] 是该笔记显示的总评论数，可以远高于实际输出的评论条数；输出的评论只是评论区样例，不代表全部评论\n- 发帖下的评论可以包含楼中楼；如需楼中楼，使用 [评论N回复对象]评论M，其中 M 必须是前面已经出现过的评论编号\n- 当{{char}}本人作为发帖下的评论作者出现时，[评论N作者] 直接填 {{char}}，并用 [评论N回复对象] 指向你回应的路人评论编号\n- 点赞、收藏由{{char}}自己判断，填 是 或 否\n- 评论要符合{{char}}的人设、性格、记忆、最近状态和与{{user}}的关系；不要像客服或机器总结\n- 如果回复已有评论，可以在评论正文里自然接话，但这里不需要输出楼中楼关系\n\n在每条 #评论N 下面，可以可选地输出 3~6 条「延伸互动」，模拟这条评论下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 {{char}} 自己接话（[延伸M作者] 直接填 {{char}}）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 楼中楼关系用 [延伸M回复对象] 表示，值为：主评论 或 延伸K（K 是同一条 #评论N 下前面已经出现过的延伸编号）\n- 如果你判断该评论不适合延伸，可以完全省略该评论的延伸段\n\n输出格式：\n#评论1\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n[延伸1作者]路人昵称 或 {{char}}\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 {{char}}\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n\n#评论2\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n\n#评论3\n[笔记ID]候选笔记ID\n[内容]评论内容\n[点赞]是或否\n[收藏]是或否\n\n#发帖1\n[类型]笔记或视频\n[标题]笔记标题\n[正文]笔记正文\n[图标]单个 emoji 或符号\n[点赞]数字\n[点赞用户1]路人昵称\n[点赞用户2]路人昵称\n[收藏]数字\n[收藏用户1]路人昵称\n[收藏用户2]路人昵称\n[评论数]数字\n[标签]标签1、标签2\n[图片描述]普通笔记可选的配图或封面描述\n[视频描述]视频笔记必填的视频画面描述\n[评论1作者]路人昵称\n[评论1内容]评论内容\n[评论2作者]路人昵称\n[评论2回复对象]评论1\n[评论2内容]回复评论1的楼中楼内容\n[评论3作者]{{char}}\n[评论3回复对象]评论1\n[评论3内容]{{char}}本人作为笔记作者回应评论1的内容\n</xiaohongshu_character_activity_instruction>",
-    "reaction": "<xiaohongshu_user_post_reaction_instruction>\n你正在以{{char}}的身份查看一篇小红书笔记。\n这里包含笔记标题、正文、TAG、图片内容、已有评论、点赞/收藏数量，以及作者公开显示信息：\n{{xiaohongshuUserPostContext}}\n\n活人感要求：\n- {{char}}的评论要短、口语化，像随手一打的真实评论，可用网络黑话、表情、不完整句；不煽情、不装逼、不写小作文。\n- 评论要落到具体的图/正文细节或真实反应（吐槽、好奇、共鸣、调侃、提问），*绝对禁止讲大道理、爹味说教、强行升华*，不要客服式总结或夸夸。\n- *绝对禁止“引用帖子原文+这句太真实了/说到我心趴上了”这种格式*。\n- 评论区延伸互动禁止一边倒夸{{char}}或夸作者；NPC不脸谱化，多种性格并存（尖锐的、温和的、挑事的、看戏的、蹲后续的、跑题的、抬杠的），可体现不同观点甚至轻微争执。\n- 评论必须贴合{{char}}人设、与作者的关系和当下状态，不熟别装熟。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 你必须输出一条评论\n- 点赞、收藏、关注作者都由{{char}}自己判断，填 是 或 否\n- 作者身份按小红书站内关系判断；如果你已关注该账号，可以按已知关系回应；否则只能根据公开内容、语气、昵称、图片和已有记忆判断是否熟悉\n- 回复中不要解释身份识别依据，也不要提到提示词或上下文规则\n- 评论需要像真实小红书评论，符合{{char}}的人设、语气、关系和当下状态\n- 如果有图片内容，可以结合图片；如果看不到图片，就只根据标题、正文、TAG 和已有评论回复\n\n在主评论之后，可以可选地输出 3~6 条「评论区延伸互动」，模拟你这条主评论下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 {{char}} 自己接话（[延伸N作者] 直接填 {{char}}）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 路人 NPC 之间也可以互相搭话或对你的主评论发表看法\n- 楼中楼关系用 [延伸N回复对象] 表示，值为：主评论 或 延伸M（M 是前面已经出现过的延伸编号）\n- 如果你判断这条主评论不适合延伸（比如评论本身已经收束、或者不会有人继续接话），可以完全省略延伸段\n\n输出格式：\n#角色互动\n[评论]评论内容\n[点赞]是或否\n[收藏]是或否\n[关注作者]是或否\n[延伸1作者]路人昵称 或 {{char}}\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 {{char}}\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n</xiaohongshu_user_post_reaction_instruction>",
-    "reply": "<xiaohongshu_comment_reply_instruction>\n你正在以{{char}}的身份查看小红书评论区，并回复当前触发的评论或回复。\n这里包含身份提示、笔记、被回复评论、当前触发的内容、已有评论和互动数据：\n{{xiaohongshuCommentContext}}\n\n活人感要求：\n- 回复要像真实评论区接话，短、口语化、就事论事，可用黑话/表情/梗；不写小作文、不煽情、不装逼。\n- 接住对方的具体那句话自然往下聊（调侃、反问、附和、轻怼、跑题都行），*绝对禁止说教、爹味、强行升华或客服式回应*。\n- *绝对禁止“引用对方原话+这句太真实了”这种格式*。\n- 延伸互动模拟真实楼中楼氛围：禁止集体夸{{char}}，NPC多种性格并存（尖锐/温和/挑事/看戏/蹲后续/抬杠），可互相搭话、有不同观点甚至拌嘴。\n- 回复贴合{{char}}人设、与评论者的关系和当下状态，不熟别装熟。\n\n输出规则：\n- 只输出块格式，不要输出 Markdown、解释、代码块、动作标签或闲聊内容\n- 你必须输出一条自然评论回复\n- 评论者身份按小红书站内关系判断；如果你已关注该账号，可以按已知关系回应；否则只能根据公开内容、语气、昵称、图片和已有记忆判断是否熟悉\n- 回复要像真实小红书评论区接话，符合{{char}}的人设、语气、关系和当下状态\n- 如果当前触发的评论是在回复你的评论，优先承接这条评论；如果是在评论你的笔记，就像笔记作者一样回复\n- 点赞和收藏由{{char}}自己判断，填 是 或 否\n\n在主回复之后，可以可选地输出 3~6 条「评论区延伸互动」，模拟你这条回复下方的真实小红书评论区氛围：\n- 其中 1~2 条延伸由 {{char}} 自己接话（[延伸N作者] 直接填 {{char}}）\n- 其余 2~4 条由路人 NPC 评论，作者昵称由你自创，每条不同，符合小红书路人风格\n- 路人 NPC 之间也可以互相搭话或对你的主回复发表看法\n- 楼中楼关系用 [延伸N回复对象] 表示，值为：主评论 或 延伸M（M 是前面已经出现过的延伸编号）\n- 如果你判断这条回复不适合延伸（比如内容已经收束、或者不会有人继续接话），可以完全省略延伸段\n\n输出格式：\n#角色回复\n[内容]回复内容\n[点赞]是或否\n[收藏]是或否\n[延伸1作者]路人昵称 或 {{char}}\n[延伸1回复对象]主评论\n[延伸1内容]延伸评论内容\n[延伸2作者]路人昵称 或 {{char}}\n[延伸2回复对象]主评论 或 延伸1\n[延伸2内容]延伸评论内容\n</xiaohongshu_comment_reply_instruction>"
-};
-
-;// ./custom-apps/anonymous-xiaohongshu/src/xiaohongshu-engine.ts
-
-
-
-
-
-
-
-
-class XiaohongshuEngine {
-    state;
-    characters = [];
-    avatars = [];
-    error = '';
-    running = false;
-    listeners = new Set();
-    serial = Promise.resolve();
-    knowledge(s, viewer) { return JSON.stringify(s.disclosures.filter(d => d.viewerCharacterId === viewer).map(d => ({ accountId: d.accountId, state: d.state, revision: d.revision })).sort((a, b) => a.accountId.localeCompare(b.accountId))); }
-    subscribe = (fn) => { this.listeners.add(fn); return () => { this.listeners.delete(fn); }; };
-    notify() { this.listeners.forEach(fn => fn()); }
-    async init() {
-        const api = host();
-        await api.app.setPolicy({ id: 'pseudonymous-identities', namespace: 'social_posts', text: PROTECTED_RULE });
-        [this.state, this.characters, this.avatars] = await Promise.all([loadState(), api.characters.list(), Promise.all(Array.from({ length: 6 }, (_, i) => api.app.getAssetUrl(`assets/avatars/default-0${i + 1}.png`)))]);
-        this.notify();
-        void this.drain();
-    }
-    async edit(fn) { const operation = this.serial.then(async () => { const next = structuredClone(this.state); await fn(next); await saveState(next, this.state); this.state = next; this.notify(); }); this.serial = operation.catch(() => { }); return operation; }
-    async atomic(fn) { const p = this.serial.then(fn); this.serial = p.catch(() => { }); return p; }
-    enqueue(s, kind, characterId, noteId, commentId) { s.jobs.push({ id: opaqueId('job'), kind, characterId, noteId, commentId, status: 'queued' }); }
-    participants(s, kind, noteId, commentId) {
-        if (!this.characters.length)
-            throw Error('请先在 Float 中创建角色并配置模型 API；无需设置角色网名。');
-        for (const c of this.characters) {
-            if (!s.bindings.some(b => b.ownerKind === 'character' && b.ownerId === c.id) && !s.jobs.some(j => j.kind === 'nickname' && j.characterId === c.id && ['queued', 'running'].includes(j.status)))
-                this.enqueue(s, 'nickname', c.id);
-            this.enqueue(s, kind, c.id, noteId, commentId);
-        }
-    }
-    async refresh() { await this.edit(s => { if (s.jobs.some(j => j.status === 'queued' || j.status === 'running'))
-        throw Error('已有生成任务，请等待完成。'); this.enqueue(s, 'feed'); this.participants(s, 'activity'); }); void this.drain(); }
-    async publish(input, images) { for (const [id, dataUrl] of Object.entries(images))
-        await host().db.create('post_images', { id, dataUrl }); await this.edit(s => { if (!s.userAccountId)
-        throw Error('请先创建匿名账号'); const n = createUserXiaohongshuNote(input, s.platform.profile); n.id = opaqueId('note'); n.authorId = s.userAccountId; n.authorName = s.accounts[n.authorId].displayName; s.platform.notes.unshift(n); Object.assign(s.images, images); this.enqueue(s, 'npc-reaction', undefined, n.id); this.participants(s, 'reaction', n.id); }); void this.drain(); }
-    async comment(noteId, text, replyToCommentId) { await this.edit(s => { if (!text.trim() || !s.userAccountId)
-        return; const n = s.platform.notes.find(n => n.id === noteId); if (!n)
-        throw Error('帖子不存在'); const c = baseline_storage_makeXiaohongshuComment({ noteId, authorId: s.userAccountId, authorType: 'user', authorName: s.accounts[s.userAccountId].displayName, text, replyToCommentId }); n.comments.push(c); n.commentCount++; this.enqueue(s, 'npc-reply', undefined, n.id, c.id); this.participants(s, 'reply', n.id, c.id); }); void this.drain(); }
-    async retry(id) { await this.edit(s => { const j = s.jobs.find(j => j.id === id); if (!j || j.status !== 'error')
-        return; s.jobs.push({ ...j, id: opaqueId('job'), request: undefined, taskId: undefined, status: 'queued', error: undefined }); j.status = 'done'; }); void this.drain(); }
-    avatar(accountId) { const s = this.state, a = s.accounts[accountId], b = s.bindings.find(b => b.accountId === accountId); if (b?.ownerKind === 'character') {
-        const url = this.characters.find(c => c.id === b.ownerId)?.avatar;
-        if (url)
-            return url;
-    } return a?.avatar || this.avatars[[...accountId].reduce((n, c) => n + c.charCodeAt(0), 0) % 6] || ''; }
-    async request(job) {
-        const s = this.state, characterId = job.characterId || this.characters[0]?.id;
-        if (!characterId)
-            throw Error('没有可用角色 API 配置');
-        const binding = s.bindings.find(b => b.ownerKind === 'character' && b.ownerId === job.characterId), self = binding ? s.accounts[binding.accountId] : undefined;
-        if (job.characterId && job.kind !== 'nickname' && !self)
-            throw Error('角色网名尚未生成，请先重试失败的网名任务。');
-        const notes = job.noteId ? s.platform.notes.filter(n => n.id === job.noteId) : s.platform.notes.slice(0, 24);
-        let prompt = '';
-        switch (job.kind) {
-            case 'nickname':
-                prompt = '根据你自己的静态人设生成一个适合小红书的固定网络昵称。不得使用真实姓名、姓氏、代号或现实身份。不介绍自己。不输出其他人的身份。只输出 JSON: {"displayName":"网络昵称"}。';
-                break;
-            case 'feed':
-                prompt = DEFAULT_XIAOHONGSHU_NPC_FEED_PROMPT;
-                break;
-            case 'npc-reaction':
-                prompt = DEFAULT_XIAOHONGSHU_NPC_USER_POST_REACTION_PROMPT;
-                break;
-            case 'npc-reply':
-                prompt = DEFAULT_XIAOHONGSHU_NPC_COMMENT_REPLY_PROMPT;
-                break;
-            default: prompt = NATIVE_CHARACTER_PROMPTS[job.kind === 'activity' ? 'activity' : job.kind === 'reply' ? 'reply' : 'reaction'];
-        }
-        // Port adaptation: native identity hints are replaced, not the native output protocol.
-        prompt = prompt.split('\n').filter(line => !line.includes('否则只能根据公开内容') && !line.includes('与{{user}}的关系')).join('\n')
-            .replaceAll('{{char}}', self?.displayName || '当前账号').replaceAll('{{user}}', s.accounts[s.userAccountId || '']?.displayName || '发言账号')
-            .replace(/\{\{xiaohongshu\w+\}\}/g, '见下方 App 公开上下文')
-            .replaceAll('用户刚发的', '该账号刚发的').replaceAll('用户发布', '该账号发布');
-        if (job.kind === 'activity')
-            prompt += '\n本阶段只生成普通图文笔记：[类型]笔记。';
-        prompt += '\n只能使用公开网络昵称作为作者；禁止输出真实姓名。不能替其他已存在账号发言。路人昵称自动生成，不复用已有账号昵称。本人回应只用自己的网络昵称。账号熟悉度不等于知道现实身份。';
-        const context = job.characterId ? viewerContext(s, job.characterId) : { source: '[匿名小红书]', accounts: Object.values(s.accounts).map(a => ({ kind: 'social_account', accountId: a.accountId, displayName: a.displayName })) };
-        const memories = [];
-        if (job.characterId && job.kind !== 'nickname')
-            for (const id of [...new Set(notes.map(n => n.authorId))]) {
-                const found = await host().memory.searchSource({ viewerCharacterId: job.characterId, sourceNamespace: 'social_posts', sourceEntityId: id });
-                memories.push(...found.entries.slice(-3).map(e => e.content));
-            }
-        const content = [{ type: 'text', text: `[ANON_TASK:${job.kind}]\n${prompt}` }];
-        if (job.noteId)
-            for (const id of (notes[0]?.imageAssetIds || [notes[0]?.imageAssetId]).filter(Boolean).slice(0, 4)) {
-                const url = s.images[id];
-                if (url)
-                    content.push({ type: 'image_url', image_url: { url } });
-            }
-        return { characterId, contextPolicy: { characterProfile: !!job.characterId, generationRules: !!job.characterId }, maxTokens: 6000, appContext: JSON.stringify({ platform: context, feed: notes.map(n => projectNote(s, n)), replyToCommentId: job.commentId, memories }), messages: [{ role: 'user', content }] };
-    }
-    reduce(s, job, raw) {
-        const binding = s.bindings.find(b => b.ownerKind === 'character' && b.ownerId === job.characterId), a = binding ? s.accounts[binding.accountId] : undefined;
-        const character = { id: a?.accountId || '', name: a?.displayName || '' };
-        const check = (names) => validateGeneratedAuthors(s, names, this.characters, a?.accountId);
-        const update = (note) => { s.platform.notes = s.platform.notes.map(n => n.id === note.id ? canonicalize(s, note, this.characters) : n); };
-        if (job.kind === 'nickname') {
-            const match = raw.replace(/^```(?:json)?\s*|\s*```$/g, '').trim();
-            const parsed = JSON.parse(match);
-            const name = validateName(s, String(parsed.displayName || ''), this.characters);
-            if (!binding) {
-                const account = addAccount(s, name);
-                s.bindings.push({ accountId: account.accountId, ownerKind: 'character', ownerId: job.characterId });
-            }
-            return;
-        }
-        if (job.kind === 'feed') {
-            const parsed = parseXiaohongshuNpcFeed(raw);
-            const notes = [...parsed.homeNotes, ...parsed.videoNotes, ...parsed.nearbyNotes];
-            if (!notes.length)
-                throw Error('模型没有返回有效笔记块，请重试。');
-            check(notes.flatMap(n => [n.authorName, ...n.comments.map(c => c.authorName)]));
-            s.platform.notes.unshift(...notes.map(n => canonicalize(s, n, this.characters)));
-            return;
-        }
-        if (job.kind === 'activity') {
-            const parsed = parseXiaohongshuCharacterActivity(raw, s.platform.notes.map(n => n.id));
-            if (!parsed.post && !parsed.comments.length)
-                throw Error('模型未返回有效互动');
-            check([...parsed.comments.flatMap(c => (c.thread || []).map(t => t.authorName)), ...(parsed.post?.comments || []).map(c => c.authorName)]);
-            for (const c of parsed.comments) {
-                const n = s.platform.notes.find(n => n.id === c.noteId);
-                update(applyCharacterActivityComment({ ...c, note: n, character }).note);
-            }
-            if (parsed.post) {
-                const p = parsed.post, id = opaqueId('note');
-                const n = { ...createUserXiaohongshuNote({ title: p.title, body: p.body, tags: p.tags }, s.platform.profile), ...p, id, source: 'character', authorId: character.id, authorName: character.name, tone: 'ivory', comments: p.comments.map((c, i) => ({ ...baseline_storage_makeXiaohongshuComment({ ...c, noteId: id, authorType: c.authorName === character.name ? 'character' : 'npc', authorId: c.authorName === character.name ? character.id : '', unread: false }), id: `${id}_comment_${i + 1}`, replyToCommentId: c.replyToCommentId?.replace('__character_post__', id) })) };
-                s.platform.notes.unshift(canonicalize(s, n, this.characters));
-            }
-        }
-        else {
-            const n = s.platform.notes.find(n => n.id === job.noteId);
-            if (!n)
-                throw Error('帖子已不存在');
-            if (job.kind === 'npc-reaction') {
-                const result = parseXiaohongshuNpcReaction(raw, n.id);
-                check(result.comments.map(c => c.authorName));
-                update(applyNpcReaction(n, result).note);
-            }
-            else if (job.kind === 'npc-reply') {
-                const result = parseXiaohongshuNpcCommentReply(raw, n.id, job.commentId);
-                check(result.comments.map(c => c.authorName));
-                update(applyNpcCommentReply(n, result, job.commentId).note);
-            }
-            else {
-                const reaction = parseXiaohongshuCharacterReaction(raw);
-                if (!reaction.comment)
-                    throw Error('模型没有返回有效评论');
-                check((reaction.thread || []).map(c => c.authorName));
-                update(job.kind === 'reply' ? applyCharacterCommentReply(n, character, reaction, job.commentId).note : applyCharacterReaction(n, character, reaction).note);
-            }
-        }
-        if (job.characterId) {
-            const seen = job.noteId ? s.platform.notes.filter(n => n.id === job.noteId) : s.platform.notes.slice(0, 24);
-            queueMemories(s, job.characterId, job.id, seen);
-        }
-    }
-    async drain() {
-        if (this.running || !this.state)
-            return;
-        this.running = true;
-        this.error = '';
-        this.notify();
-        try {
-            for (;;) {
-                const job = this.state.jobs.find(j => j.status === 'queued' || j.status === 'running');
-                if (!job)
-                    break;
-                try {
-                    if (!job.request) {
-                        const snapshot = this.knowledge(this.state, job.characterId), request = await this.request(job);
-                        await this.edit(s => { if (snapshot !== this.knowledge(s, job.characterId))
-                            throw Error('身份知识在准备请求时发生变化，请重试'); const j = s.jobs.find(j => j.id === job.id); j.request = request; j.knowledgeSnapshot = snapshot; });
-                    }
-                    const current = this.state.jobs.find(j => j.id === job.id);
-                    let task = current.taskId ? await host().ai.getTask({ taskId: current.taskId }) : await host().ai.startTask({ idempotencyKey: current.id, request: current.request });
-                    if (!task)
-                        throw Error('Host 任务不存在');
-                    await this.edit(s => { const j = s.jobs.find(j => j.id === job.id); j.taskId = task.taskId; j.status = 'running'; });
-                    while (task.status === 'running') {
-                        await new Promise(r => setTimeout(r, 700));
-                        task = await host().ai.getTask({ taskId: task.taskId });
-                        if (!task)
-                            throw Error('Host 任务丢失');
-                    }
-                    if (task.status !== 'completed')
-                        throw Error(task.error || `Host task: ${task.status}`);
-                    const completed = task;
-                    await this.atomic(async () => {
-                        const next = structuredClone(this.state), j = next.jobs.find(j => j.id === job.id);
-                        if (j.characterId && j.knowledgeSnapshot !== this.knowledge(next, j.characterId))
-                            throw Error('身份知识已变更，旧请求结果未应用，请重试');
-                        this.reduce(next, j, completed.result.content);
-                        j.status = 'done';
-                        delete j.request;
-                        const result = await host().ai.consumeTask({ taskId: completed.taskId, writes: stateWrites(next, this.state) });
-                        this.state = result.applied ? next : await loadState();
-                        this.notify();
-                    });
-                }
-                catch (e) {
-                    await this.edit(s => { const j = s.jobs.find(j => j.id === job.id); j.status = 'error'; j.error = String(e); });
-                }
-            }
-            await this.edit(s => flushMemory(s));
-        }
-        catch (e) {
-            this.error = String(e);
-        }
-        finally {
-            this.running = false;
-            this.notify();
-        }
-    }
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/adapters/images.ts
-async function readImage(file) {
-    if (!/^image\/(png|jpeg|webp|gif)$/.test(file.type))
-        throw Error('请选择 PNG、JPEG、WebP 或 GIF 图片。');
-    const url = URL.createObjectURL(file);
-    try {
-        const img = new Image();
-        await new Promise((resolve, reject) => { img.onload = () => resolve(); img.onerror = () => reject(Error('无法读取图片')); img.src = url; });
-        const canvas = document.createElement('canvas'), scale = Math.min(1, 1280 / Math.max(img.width, img.height));
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        return canvas.toDataURL('image/jpeg', 0.84);
-    }
-    finally {
-        URL.revokeObjectURL(url);
-    }
-}
-
-;// ./node_modules/lucide-react/dist/esm/icons/image-plus.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-
+/***/ }),
+
+/***/ 961:
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+
+
+function checkDCE() {
+  /* global __REACT_DEVTOOLS_GLOBAL_HOOK__ */
+  if (
+    typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ === 'undefined' ||
+    typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE !== 'function'
+  ) {
+    return;
+  }
+  if (false) {}
+  try {
+    // Verify that the code above has been dead code eliminated (DCE'd).
+    __REACT_DEVTOOLS_GLOBAL_HOOK__.checkDCE(checkDCE);
+  } catch (err) {
+    // DevTools shouldn't crash React, no matter what.
+    // We should still report in case we break this code.
+    console.error(err);
+  }
+}
+
+if (true) {
+  // DCE check should happen before ReactDOM bundle executes so that
+  // DevTools can report bad minification during injection.
+  checkDCE();
+  module.exports = __webpack_require__(221);
+} else {}
+
+
+/***/ }),
+
+/***/ 982:
+/***/ ((module, __unused_webpack_exports, __webpack_require__) => {
+
+
+
+if (true) {
+  module.exports = __webpack_require__(477);
+} else {}
+
+
+/***/ })
+
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/
+/******/ 	// The require function
+/******/ 	function __webpack_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/
+/******/ 		// Execute the module function
+/******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
+/******/
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/
+/************************************************************************/
+/******/ 	/* webpack/runtime/define property getters */
+/******/ 	(() => {
+/******/ 		// define getter functions for harmony exports
+/******/ 		__webpack_require__.d = (exports, definition) => {
+/******/ 			for(var key in definition) {
+/******/ 				if(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {
+/******/ 					Object.defineProperty(exports, key, { enumerable: true, get: definition[key] });
+/******/ 				}
+/******/ 			}
+/******/ 		};
+/******/ 	})();
+/******/
+/******/ 	/* webpack/runtime/hasOwnProperty shorthand */
+/******/ 	(() => {
+/******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
+/******/ 	})();
+/******/
+/************************************************************************/
+var __webpack_exports__ = {};
+/* harmony import */ var main_react_jsx_runtime_WEBPACK_IMPORTED_MODULE_0_ = __webpack_require__(848);
+/* harmony import */ var main_react_WEBPACK_IMPORTED_MODULE_1_ = __webpack_require__(540);
+/* harmony import */ var main_react_dom_client_WEBPACK_IMPORTED_MODULE_2_ = __webpack_require__(338);
+/* harmony import */ var main_adapters_host_WEBPACK_IMPORTED_MODULE_8_ = __webpack_require__(802);
+/* harmony import */ var main_adapters_storage_WEBPACK_IMPORTED_MODULE_3_ = __webpack_require__(923);
+/* harmony import */ var main_adapters_identity_WEBPACK_IMPORTED_MODULE_4_ = __webpack_require__(58);
+/* harmony import */ var main_adapters_characters_WEBPACK_IMPORTED_MODULE_5_ = __webpack_require__(588);
+/* harmony import */ var main_adapters_media_WEBPACK_IMPORTED_MODULE_6_ = __webpack_require__(502);
+/* harmony import */ var main_adapters_memory_WEBPACK_IMPORTED_MODULE_7_ = __webpack_require__(299);
 
 
-const image_plus_iconNode = [
-  ["path", { d: "M16 5h6", key: "1vod17" }],
-  ["path", { d: "M19 2v6", key: "4bpg5p" }],
-  ["path", { d: "M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5", key: "1ue2ih" }],
-  ["path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21", key: "1xmnt7" }],
-  ["circle", { cx: "9", cy: "9", r: "2", key: "af1f0g" }]
-];
-const ImagePlus = createLucideIcon("image-plus", image_plus_iconNode);
 
 
-//# sourceMappingURL=image-plus.js.map
 
-;// ./node_modules/lucide-react/dist/esm/icons/send.js
-/**
- * @license lucide-react v0.575.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
 
 
 
-const send_iconNode = [
-  [
-    "path",
-    {
-      d: "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z",
-      key: "1ffxy3"
-    }
-  ],
-  ["path", { d: "m21.854 2.147-10.94 10.939", key: "12cjpa" }]
-];
-const Send = createLucideIcon("send", send_iconNode);
 
-
-//# sourceMappingURL=send.js.map
-
-;// ./custom-apps/anonymous-xiaohongshu/src/baseline-publish.tsx
-
-// Direct fork of Float's original compose sheet, with iframe media/storage callbacks.
-
-
-
-function PublishSheet({ onClose, onPublish }) {
-    const [draft, setDraft] = (0,react.useState)({ title: '', body: '', tags: [], image: {} });
-    const [tagInput, setTagInput] = (0,react.useState)(''), [busy, setBusy] = (0,react.useState)('idle'), [error, setError] = (0,react.useState)('');
-    const fileRef = (0,react.useRef)(null);
-    const setComposeOpen = (_) => onClose();
-    async function handleImageChange(event) { try {
-        const files = [...event.target.files || []];
-        if (files.length + (draft.images?.length || 0) > 4)
-            throw Error('最多 4 张图片');
-        const added = await Promise.all(files.map(async (file) => ({ assetId: 'img_' + crypto.randomUUID().replaceAll('-', ''), dataUrl: await readImage(file) })));
-        setDraft(d => ({ ...d, images: [...d.images || [], ...added] }));
-    }
-    catch (e) {
-        setError(String(e));
-    } }
-    async function handlePublish() { setBusy('publish'); try {
-        await onPublish({ ...draft, tags: tagInput.split(/[,，\\s#]+/).filter(Boolean) }, Object.fromEntries((draft.images || []).map(i => [i.assetId, i.dataUrl])));
-        onClose();
-    }
-    catch (e) {
-        setError(String(e));
-    }
-    finally {
-        setBusy('idle');
-    } }
-    return (0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [error && (0,jsx_runtime.jsx)("div", { className: "anon-error", role: "alert", children: error }), (0,jsx_runtime.jsx)("div", { className: "xhs-modal-backdrop", onClick: () => setComposeOpen(false), children: (0,jsx_runtime.jsxs)("section", { className: "xhs-publish-sheet", onClick: event => event.stopPropagation(), children: [(0,jsx_runtime.jsxs)("header", { children: [(0,jsx_runtime.jsx)("strong", { children: "\u53D1\u5E03\u65B0\u7B14\u8BB0" }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-sheet-close-btn", onClick: () => setComposeOpen(false), "aria-label": "\u5173\u95ED", children: "\u00D7" })] }), (0,jsx_runtime.jsxs)("div", { className: "xhs-publish-content", children: [(0,jsx_runtime.jsx)("div", { className: "xhs-publish-left", children: ((draft.images && draft.images.length > 0) || draft.image?.dataUrl) ? ((0,jsx_runtime.jsxs)("div", { className: "xhs-publish-multi-images", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-publish-images-grid", children: [(draft.images || [draft.image]).map((img, idx) => ((0,jsx_runtime.jsxs)("div", { className: "xhs-publish-grid-item", children: [(0,jsx_runtime.jsx)("img", { src: img.dataUrl, alt: `Preview ${idx + 1}` }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-publish-img-remove", onClick: () => {
-                                                                    setDraft((prev) => {
-                                                                        const list = (prev.images || [prev.image]).filter((_, i) => i !== idx);
-                                                                        return {
-                                                                            ...prev,
-                                                                            image: list[0] || {},
-                                                                            images: list.length > 0 ? list : undefined,
-                                                                        };
-                                                                    });
-                                                                }, "aria-label": "\u5220\u9664\u56FE\u7247", children: "\u00D7" })] }, img.assetId || idx))), (0,jsx_runtime.jsxs)("button", { type: "button", className: "xhs-publish-grid-add", onClick: () => fileRef.current?.click(), "aria-label": "\u7EE7\u7EED\u6DFB\u52A0\u56FE\u7247", children: [(0,jsx_runtime.jsx)(Plus, { size: 24 }), (0,jsx_runtime.jsx)("span", { children: "\u6DFB\u52A0" })] })] }), (0,jsx_runtime.jsx)("input", { "aria-label": "\u5E16\u5B50\u56FE\u7247", ref: fileRef, type: "file", accept: "image/*", multiple: true, hidden: true, onChange: handleImageChange }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-upload-change-btn", onClick: () => setDraft(prev => ({ ...prev, image: {}, images: undefined })), children: "\u6E05\u7A7A\u6240\u6709\u56FE\u7247" })] })) : draft.image?.description === undefined ? ((0,jsx_runtime.jsxs)("div", { className: "xhs-image-upload-area", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-publish-placeholder", children: [(0,jsx_runtime.jsx)(ImagePlus, { size: 42, strokeWidth: 1.5, color: "#bbb" }), (0,jsx_runtime.jsxs)("div", { className: "xhs-placeholder-actions", children: [(0,jsx_runtime.jsx)("button", { type: "button", onClick: () => fileRef.current?.click(), children: "\u4E0A\u4F20\u56FE\u7247 (\u652F\u6301\u591A\u5F20)" }), (0,jsx_runtime.jsx)("button", { type: "button", onClick: () => setDraft(prev => ({ ...prev, image: { ...prev.image, description: "" } })), children: "\u63CF\u8FF0\u56FE\u7247" })] })] }), (0,jsx_runtime.jsx)("input", { "aria-label": "\u5E16\u5B50\u56FE\u7247", ref: fileRef, type: "file", accept: "image/*", multiple: true, hidden: true, onChange: handleImageChange })] })) : ((0,jsx_runtime.jsxs)(jsx_runtime.Fragment, { children: [(0,jsx_runtime.jsx)("div", { className: "xhs-image-upload-area is-text-mode", children: (0,jsx_runtime.jsx)("div", { className: "xhs-text-image-preview", children: draft.image.description?.trim() || "在此区域下方输入描述\n即可生成文字图片" }) }), (0,jsx_runtime.jsxs)("div", { className: "xhs-publish-field", children: [(0,jsx_runtime.jsx)("label", { children: "\u6587\u5B57\u56FE\u7247\u5185\u5BB9" }), (0,jsx_runtime.jsx)("textarea", { placeholder: "\u8F93\u5165\u6587\u5B57\u63CF\u8FF0...", value: draft.image.description || "", onChange: event => setDraft(prev => ({ ...prev, image: { ...prev.image, description: event.target.value } })), autoFocus: true })] }), (0,jsx_runtime.jsx)("button", { type: "button", className: "xhs-upload-change-btn", onClick: () => setDraft(prev => ({ ...prev, image: {} })), children: "\u53D6\u6D88\u5E76\u91CD\u65B0\u9009\u62E9" })] })) }), (0,jsx_runtime.jsxs)("div", { className: "xhs-publish-right", children: [(0,jsx_runtime.jsx)("input", { className: "xhs-publish-title-input", "aria-label": "\u7B14\u8BB0\u6807\u9898", placeholder: "\u586B\u5199\u6807\u9898\u4F1A\u6709\u66F4\u591A\u8D5E\u54E6~", value: draft.title, onChange: event => setDraft(prev => ({ ...prev, title: event.target.value })) }), (0,jsx_runtime.jsx)("textarea", { className: "xhs-publish-body-input", "aria-label": "\u7B14\u8BB0\u6B63\u6587", placeholder: "\u6DFB\u52A0\u6B63\u6587\uFF0C\u548C\u5927\u5BB6\u5206\u4EAB\u4F60\u7684\u89C1\u95FB...", value: draft.body, onChange: event => setDraft(prev => ({ ...prev, body: event.target.value })) }), (0,jsx_runtime.jsxs)("div", { className: "xhs-publish-tag-input", children: [(0,jsx_runtime.jsx)("span", { children: "#" }), (0,jsx_runtime.jsx)("input", { value: tagInput, onChange: event => setTagInput(event.target.value), placeholder: "\u6DFB\u52A0\u6807\u7B7E\uFF0C\u7528\u7A7A\u683C\u6216\u9017\u53F7\u5206\u9694" })] }), (0,jsx_runtime.jsx)("div", { className: "xhs-publish-actions", children: (0,jsx_runtime.jsxs)("button", { type: "button", className: "xhs-publish-submit-btn", onClick: handlePublish, disabled: busy !== "idle" || (!draft.title.trim() && !draft.body.trim()), children: [busy === "publish" ? (0,jsx_runtime.jsx)(LoaderCircle, { className: "cp-spin", size: 18 }) : (0,jsx_runtime.jsx)(Send, { size: 18 }), "\u53D1\u5E03\u7B14\u8BB0"] }) })] })] })] }) })] });
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/identity/disclosure.ts
-
-// No language-model inference or cross-viewer search. Only a user's explicit confirmation.
-async function confirmDisclosure(s, viewerCharacterId, accountId, identity) {
-    if (!s.accounts[accountId] || !identity.trim())
-        throw Error('请选择账号并填写已明确揭露的身份。');
-    const scope = { viewerCharacterId, sourceNamespace: 'identity_disclosure', sourceEntityId: accountId };
-    const { revision } = await host().memory.invalidateSource(scope);
-    s.disclosures = s.disclosures.filter(d => d.viewerCharacterId !== viewerCharacterId || d.accountId !== accountId);
-    s.disclosures.push({ viewerCharacterId, accountId, state: 'explicitly_disclosed', identity: identity.trim(), revision });
-}
-async function revokeDisclosure(s, viewerCharacterId, accountId) {
-    const { revision } = await host().memory.invalidateSource({ viewerCharacterId, sourceNamespace: 'identity_disclosure', sourceEntityId: accountId });
-    s.disclosures = s.disclosures.filter(d => d.viewerCharacterId !== viewerCharacterId || d.accountId !== accountId);
-    s.disclosures.push({ viewerCharacterId, accountId, state: 'unknown', revision });
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/identity/disclosure-settings.tsx
-
-
-
-function DisclosureSettings({ engine, act }) {
-    const [viewer, setViewer] = (0,react.useState)(''), [account, setAccount] = (0,react.useState)(''), [identity, setIdentity] = (0,react.useState)('');
-    const row = engine.state.disclosures.find(d => d.viewerCharacterId === viewer && d.accountId === account);
-    return (0,jsx_runtime.jsxs)("details", { children: [(0,jsx_runtime.jsx)("summary", { children: "\u6309\u89D2\u8272\u786E\u8BA4\u8EAB\u4EFD\u63ED\u9732\uFF08\u53EF\u9009\uFF09" }), (0,jsx_runtime.jsx)("p", { children: "\u4EC5\u5F53\u8FD9\u4E2A\u89D2\u8272\u5DF2\u88AB\u660E\u786E\u544A\u77E5\u5177\u4F53\u8EAB\u4EFD\u5173\u7CFB\u65F6\u786E\u8BA4\u3002\u4E0D\u4F1A\u63A8\u6D4B\u3001\u8BFB\u53D6\u5176\u4ED6\u89D2\u8272\u8BB0\u5FC6\u6216\u81EA\u52A8\u4F20\u64AD\u3002" }), (0,jsx_runtime.jsxs)("label", { children: ["\u77E5\u60C5\u89D2\u8272", (0,jsx_runtime.jsxs)("select", { "aria-label": "\u77E5\u60C5\u89D2\u8272", value: viewer, onChange: e => setViewer(e.target.value), children: [(0,jsx_runtime.jsx)("option", { value: "", children: "\u9009\u62E9\u89D2\u8272" }), engine.characters.map(c => (0,jsx_runtime.jsx)("option", { value: c.id, children: c.name }, c.id))] })] }), (0,jsx_runtime.jsxs)("label", { children: ["\u7F51\u7EDC\u8D26\u53F7", (0,jsx_runtime.jsxs)("select", { "aria-label": "\u63ED\u9732\u8D26\u53F7", value: account, onChange: e => setAccount(e.target.value), children: [(0,jsx_runtime.jsx)("option", { value: "", children: "\u9009\u62E9\u8D26\u53F7" }), Object.values(engine.state.accounts).map(a => (0,jsx_runtime.jsx)("option", { value: a.accountId, children: a.displayName }, a.accountId))] })] }), (0,jsx_runtime.jsxs)("label", { children: ["\u660E\u786E\u544A\u77E5\u7684\u73B0\u5B9E\u8EAB\u4EFD", (0,jsx_runtime.jsx)("input", { "aria-label": "\u63ED\u9732\u8EAB\u4EFD", value: identity, onChange: e => setIdentity(e.target.value) })] }), (0,jsx_runtime.jsxs)("p", { children: ["\u5F53\u524D\uFF1A", row?.state === 'explicitly_disclosed' ? row.identity : 'unknown'] }), (0,jsx_runtime.jsx)("button", { disabled: !viewer || !account || !identity.trim(), onClick: () => void act(() => engine.edit(s => confirmDisclosure(s, viewer, account, identity))), children: "\u786E\u8BA4\u4EC5\u8BE5\u89D2\u8272\u77E5\u60C5" }), (0,jsx_runtime.jsx)("button", { disabled: !viewer || !account, onClick: () => void act(() => engine.edit(s => revokeDisclosure(s, viewer, account))), children: "\u64A4\u9500\u8BE5\u89D2\u8272\u7684\u63ED\u9732" }), (0,jsx_runtime.jsx)("p", { children: "\u6B64\u7248\u672C\u7531\u7BA1\u7406\u9875\u786E\u8BA4\uFF1B\u4E0D\u4F1A\u4ECE\u8BED\u4E49\u76F8\u4F3C\u6216\u65E7\u8BB0\u5FC6\u81EA\u52A8\u6062\u590D\u5173\u7CFB\u3002" })] });
-}
-
-;// ./custom-apps/anonymous-xiaohongshu/src/xiaohongshu-app.tsx
-
-// Phase 1A controller around Float's original waterfall/card/detail/comment components.
-
-
-
-
-
-
-
-
-
-function XiaohongshuApp() {
-    const [engine] = (0,react.useState)(() => new XiaohongshuEngine()), [, render] = (0,react.useState)(0), [error, setError] = (0,react.useState)(''), [tab, setTab] = (0,react.useState)('home'), [selectedId, select] = (0,react.useState)(), [settings, setSettings] = (0,react.useState)(false);
-    const [nickname, setNickname] = (0,react.useState)(''), [bio, setBio] = (0,react.useState)(''), [avatar, setAvatar] = (0,react.useState)(''), [comment, setComment] = (0,react.useState)(''), [reply, setReply] = (0,react.useState)();
-    const act = async (fn) => { try {
-        setError('');
-        await fn();
-    }
-    catch (e) {
-        setError(String(e));
-    } };
-    (0,react.useEffect)(() => { const unsubscribe = engine.subscribe(() => render(n => n + 1)); void act(() => engine.init()); return unsubscribe; }, [engine]);
-    const s = engine.state;
-    if (!s)
-        return (0,jsx_runtime.jsx)("div", { className: "anon-loading", children: error || '正在连接 Float…' });
-    const own = s.accounts[s.userAccountId || ''];
-    const notes = s.platform.notes.map(n => ({ ...n, authorName: s.accounts[n.authorId]?.displayName || n.authorName, comments: n.comments.map(c => ({ ...c, authorName: s.accounts[c.authorId]?.displayName || c.authorName })) }));
-    const selected = notes.find(n => n.id === selectedId);
-    const shown = tab === 'profile' ? notes.filter(n => n.authorId === s.userAccountId) : notes.filter(n => n.type === 'post' && n.feedScope !== 'nearby');
-    const columns = [shown.filter((_, i) => i % 2 === 0), shown.filter((_, i) => i % 2 === 1)];
-    const editProfile = () => { setNickname(own?.displayName || ''); setBio(own?.bio || ''); setAvatar(own?.avatar || ''); setSettings(true); };
-    async function saveProfile() { await engine.edit(next => { const name = validateName(next, nickname, engine.characters, next.userAccountId); let a = next.accounts[next.userAccountId || '']; if (!a) {
-        a = addAccount(next, name);
-        next.userAccountId = a.accountId;
-        next.bindings.push({ accountId: a.accountId, ownerKind: 'user', ownerId: 'local-controller' });
-    }
-    else
-        rename(next, a.accountId, name, engine.characters); a.bio = bio; a.avatar = avatar; next.platform.profile.nickname = name; next.platform.profile.signature = bio; next.platform.profile.handle = a.accountId.slice(-10); }); setSettings(false); }
-    async function vote(kind) { if (!selected)
-        return; await engine.edit(next => { const n = next.platform.notes.find(n => n.id === selected.id); const count = kind === 'liked' ? 'likeCount' : 'saveCount'; n[count] = Math.max(0, n[count] + (n[kind] ? -1 : 1)); n[kind] = !n[kind]; }); }
-    const waterfall = (0,jsx_runtime.jsx)("div", { className: "cp-xhs-waterfall-grid", children: columns.map((column, i) => (0,jsx_runtime.jsx)("div", { className: "cp-xhs-waterfall-column", children: column.map(n => (0,jsx_runtime.jsx)(NoteCard, { note: n, imageMap: s.images, avatarSrc: engine.avatar(n.authorId), onOpen: () => select(n.id), collapseBilingualTranslation: true }, n.id)) }, i)) });
-    return (0,jsx_runtime.jsxs)("section", { className: "xhs-app cp-xhs-module", children: [!selected && (0,jsx_runtime.jsxs)("header", { className: "cp-xhs-appbar xhs-appbar", children: [(0,jsx_runtime.jsx)("button", { "aria-label": "\u8FD4\u56DE\u684C\u9762", className: "cp-float-back", onClick: () => void act(() => host().app.close()), children: (0,jsx_runtime.jsx)(ChevronLeft, { size: 24 }) }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-header-stack", children: (0,jsx_runtime.jsx)("button", { className: "cp-xhs-header-title is-active", onClick: () => setTab('home'), children: "\u53D1\u73B0" }) }), (0,jsx_runtime.jsxs)("div", { className: "cp-appbar-actions", children: [(0,jsx_runtime.jsx)("button", { "aria-label": "\u751F\u6210\u5C0F\u7EA2\u4E66\u5185\u5BB9", className: "cp-float-refresh xhs-icon-action--refresh", disabled: engine.running || !own, onClick: () => void act(() => engine.refresh()), children: (0,jsx_runtime.jsx)(RotateCw, { size: 18 }) }), (0,jsx_runtime.jsx)("button", { "aria-label": "\u8BBE\u7F6E", onClick: editProfile, children: (0,jsx_runtime.jsx)(Settings, { size: 18 }) })] })] }), (error || engine.error) && (0,jsx_runtime.jsxs)("div", { role: "alert", className: "anon-error", children: [error || engine.error, (0,jsx_runtime.jsx)("button", { onClick: () => void act(() => engine.drain()), children: "\u91CD\u8BD5\u540C\u6B65" })] }), s.migrationNotice && (0,jsx_runtime.jsx)("p", { className: "anon-error", children: s.migrationNotice }), engine.running && (0,jsx_runtime.jsxs)("div", { className: "cp-refresh-indicator cp-refresh-indicator--floating", children: [(0,jsx_runtime.jsx)(LoaderCircle, { size: 15, className: "cp-spin" }), "\u751F\u6210\u4E2D \u00B7 \u53EF\u4EE5\u5173\u95ED App\uFF0C\u91CD\u65B0\u8FDB\u5165\u540E\u63A5\u7EED"] }), s.jobs.filter(j => j.status === 'error').map(j => (0,jsx_runtime.jsxs)("div", { className: "anon-error", children: [j.kind, "\uFF1A", j.error, (0,jsx_runtime.jsx)("button", { onClick: () => void act(() => engine.retry(j.id)), children: "\u91CD\u8BD5" })] }, j.id)), (0,jsx_runtime.jsx)("main", { className: "cp-xhs-body", children: settings || !own ? (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-scroll anon-settings", children: [(0,jsx_runtime.jsx)("h2", { children: own ? '账号设置' : '创建你的匿名账号' }), (0,jsx_runtime.jsx)("p", { children: "\u666E\u901A\u5C0F\u7EA2\u4E66\u548C Float \u7528\u6237\u8D44\u6599\u4FDD\u6301\u4E0D\u53D8\u3002\u89D2\u8272\u4E0E\u8DEF\u4EBA\u4F1A\u81EA\u52A8\u53C2\u4E0E\u3002" }), (0,jsx_runtime.jsxs)("label", { children: ["\u533F\u540D\u6635\u79F0", (0,jsx_runtime.jsx)("input", { "aria-label": "\u533F\u540D\u6635\u79F0", value: nickname, onChange: e => setNickname(e.target.value), maxLength: 40 })] }), (0,jsx_runtime.jsxs)("label", { children: ["\u7B80\u4ECB", (0,jsx_runtime.jsx)("textarea", { "aria-label": "\u7B80\u4ECB", value: bio, onChange: e => setBio(e.target.value), maxLength: 160 })] }), (0,jsx_runtime.jsxs)("label", { children: ["\u5934\u50CF", (0,jsx_runtime.jsx)("input", { "aria-label": "\u7528\u6237\u5934\u50CF", type: "file", accept: "image/*", onChange: e => { const f = e.target.files?.[0]; if (f)
-                                        void act(async () => setAvatar(await readImage(f))); } })] }), avatar && (0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-profile-avatar", src: avatar, name: nickname }), (0,jsx_runtime.jsx)("button", { className: "xhs-empty-generate-btn", onClick: () => void act(saveProfile), children: "\u4FDD\u5B58\u533F\u540D\u8D26\u53F7" }), own && (0,jsx_runtime.jsx)("button", { onClick: () => setSettings(false), children: "\u8FD4\u56DE" }), (0,jsx_runtime.jsx)("h3", { children: "\u89D2\u8272\u7F51\u540D" }), (0,jsx_runtime.jsx)("p", { children: "\u9996\u6B21\u53C2\u4E0E\u540E\u81EA\u52A8\u751F\u6210\uFF1B\u6B64\u5904\u53EA\u4FEE\u6539\u5DF2\u751F\u6210\u8D26\u53F7\u3002\u771F\u5B9E\u89D2\u8272\u540D\u4EC5\u5728\u672C\u5730\u8BBE\u7F6E\u9875\u663E\u793A\u3002" }), s.bindings.filter(b => b.ownerKind === 'character').map(b => (0,jsx_runtime.jsx)(CharacterName, { name: engine.characters.find(c => c.id === b.ownerId)?.name || '已移除的角色', displayName: s.accounts[b.accountId].displayName, avatar: engine.avatar(b.accountId), save: name => act(() => engine.edit(next => rename(next, b.accountId, name, engine.characters))) }, b.accountId)), (0,jsx_runtime.jsx)(DisclosureSettings, { engine: engine, act: act }), (0,jsx_runtime.jsx)("p", { className: "anon-phase-note", children: "Phase 1A\uFF1A\u9644\u8FD1\u3001\u5B8C\u6574\u89C6\u9891\u3001\u79C1\u4FE1\u3001\u901A\u77E5\u4E2D\u5FC3\u548C\u5173\u6CE8\u7CFB\u7EDF\u7A0D\u540E\u5F00\u653E\u3002" })] }) : selected ? (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-scroll cp-xhs-scroll--detail xhs-detail-page", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-note-detail-header", children: [(0,jsx_runtime.jsx)("button", { className: "cp-xhs-detail-back", "aria-label": "\u8FD4\u56DE", onClick: () => select(undefined), children: (0,jsx_runtime.jsx)(ChevronLeft, { size: 24 }) }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-detail-author-info", children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-detail-avatar", src: engine.avatar(selected.authorId), name: selected.authorName }), (0,jsx_runtime.jsx)("span", { className: "cp-xhs-detail-name", children: selected.authorName })] })] }), (0,jsx_runtime.jsxs)("article", { className: "cp-xhs-note-detail xhs-note-detail-page", children: [(0,jsx_runtime.jsx)("div", { className: "xhs-note-detail-media", children: (0,jsx_runtime.jsx)(NoteImage, { note: selected, imageMap: s.images, collapseBilingualTranslation: true, isDetail: true }) }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-note-detail-card", children: [(0,jsx_runtime.jsx)("h3", { children: selected.title }), (0,jsx_runtime.jsx)("p", { className: "cp-xhs-note-detail-body", children: selected.body }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-note-detail-tags", children: selected.tags.map(t => (0,jsx_runtime.jsxs)("em", { children: ["#", t] }, t)) }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-note-detail-time", children: formatTime(selected.createdAt) })] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-comment-section xhs-detail-comment-section", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-comment-count", children: ["\u5171 ", formatCount(selected.commentCount), " \u6761\u8BC4\u8BBA"] }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-comment-list", children: (0,jsx_runtime.jsx)(CommentList, { comments: selected.comments, getAvatar: c => engine.avatar(c.authorId), onReply: setReply, collapseBilingualTranslation: true, onDeleteComment: c => void act(() => engine.edit(next => { if (c.authorId !== next.userAccountId)
-                                                    throw Error('只能删除自己的评论'); const n = next.platform.notes.find(n => n.id === c.noteId); n.comments = n.comments.filter(x => x.id !== c.id); n.commentCount = Math.max(0, n.commentCount - 1); })), onVoteComment: (c, v) => void act(() => engine.edit(next => { const row = next.platform.notes.find(n => n.id === c.noteId).comments.find(x => x.id === c.id); const k = v === 'like' ? 'liked' : 'disliked', count = v === 'like' ? 'likeCount' : 'dislikeCount'; row[count] = Math.max(0, row[count] + (row[k] ? -1 : 1)); row[k] = !row[k]; })) }) })] })] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-detail-bottom-bar xhs-detail-bottom-bar", children: [(0,jsx_runtime.jsxs)("div", { className: "xhs-detail-comment-stack", children: [reply && (0,jsx_runtime.jsxs)("div", { className: "xhs-reply-target", children: ["\u56DE\u590D ", reply.authorName, (0,jsx_runtime.jsx)("button", { onClick: () => setReply(undefined), children: "\u53D6\u6D88" })] }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-input-box xhs-detail-input-box", children: (0,jsx_runtime.jsx)("textarea", { "aria-label": "\u8BF4\u70B9\u4EC0\u4E48", placeholder: "\u8BF4\u70B9\u4EC0\u4E48...", value: comment, onChange: e => setComment(e.target.value) }) })] }), (0,jsx_runtime.jsx)("button", { className: "xhs-detail-send-btn", disabled: !comment.trim(), onClick: () => void act(async () => { await engine.comment(selected.id, comment, reply?.id); setComment(''); setReply(undefined); }), children: "\u53D1\u9001" }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-action-icons", children: [(0,jsx_runtime.jsxs)("button", { "aria-label": "\u70B9\u8D5E", className: `cp-xhs-action-btn ${selected.liked ? 'is-liked' : ''}`, onClick: () => void act(() => vote('liked')), children: [(0,jsx_runtime.jsx)(Heart, { size: 24 }), (0,jsx_runtime.jsx)("span", { children: formatCount(selected.likeCount) })] }), (0,jsx_runtime.jsx)("button", { "aria-label": "\u6536\u85CF", className: "cp-xhs-action-btn", onClick: () => void act(() => vote('saved')), children: (0,jsx_runtime.jsx)(Bookmark, { size: 24 }) })] })] })] }) : (0,jsx_runtime.jsxs)("div", { className: `cp-xhs-scroll ${tab === 'profile' ? 'cp-xhs-scroll--profile' : ''}`, children: [(tab === 'home' || tab === 'publish') && (0,jsx_runtime.jsx)("section", { className: "cp-xhs-home", children: shown.length ? waterfall : (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-status cp-empty-copy", children: [(0,jsx_runtime.jsx)("p", { children: "\u6682\u65E0\u5C0F\u7EA2\u4E66\u5185\u5BB9" }), (0,jsx_runtime.jsx)("span", { children: "\u751F\u6210\u9996\u9875\u548C\u89D2\u8272\u4E92\u52A8" }), (0,jsx_runtime.jsx)("button", { className: "xhs-empty-generate-btn", disabled: engine.running, onClick: () => void act(() => engine.refresh()), children: "\u751F\u6210\u5C0F\u7EA2\u4E66\u5185\u5BB9" })] }) }), tab === 'profile' && (0,jsx_runtime.jsxs)("section", { className: "cp-xhs-profile xhs-profile", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-hero", children: [(0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-main", children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-profile-avatar", src: engine.avatar(own.accountId), name: own.displayName }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-meta", children: [(0,jsx_runtime.jsx)("h3", { children: own.displayName }), (0,jsx_runtime.jsxs)("span", { children: ["\u5C0F\u7EA2\u4E66\u53F7\uFF1A", s.platform.profile.handle] })] })] }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-profile-bio", children: (0,jsx_runtime.jsx)("p", { children: own.bio }) }), (0,jsx_runtime.jsx)("div", { className: "cp-xhs-profile-actions", children: (0,jsx_runtime.jsx)("button", { className: "cp-xhs-profile-edit", onClick: editProfile, children: "\u7F16\u8F91\u8D44\u6599" }) })] }), (0,jsx_runtime.jsxs)("div", { className: "cp-xhs-profile-content", children: [(0,jsx_runtime.jsx)("div", { className: "cp-xhs-profile-tabs", children: (0,jsx_runtime.jsx)("button", { className: "is-active", children: "\u7B14\u8BB0" }) }), waterfall] })] })] }) }), tab === 'publish' && (0,jsx_runtime.jsx)(PublishSheet, { onClose: () => setTab('home'), onPublish: (input, media) => engine.publish(input, media) }), !selected && own && !settings && (0,jsx_runtime.jsx)("nav", { className: "cp-xhs-tabbar xhs-tabbar", children: [['home', '首页'], ['publish', '发布'], ['profile', '我']].map(([id, label]) => (0,jsx_runtime.jsx)("button", { "aria-label": label, className: id === 'publish' ? 'cp-xhs-tab-publish' : `cp-xhs-tab ${tab === id ? 'is-active' : ''}`, onClick: () => setTab(id), children: id === 'publish' ? (0,jsx_runtime.jsx)("div", { className: "cp-xhs-tab-publish-inner", children: (0,jsx_runtime.jsx)(Plus, { size: 20 }) }) : (0,jsx_runtime.jsx)("div", { className: "cp-xhs-tab-inner", children: (0,jsx_runtime.jsx)("span", { children: label }) }) }, id)) })] });
+const main_root = (0,main_react_dom_client_WEBPACK_IMPORTED_MODULE_2_.createRoot)(document.getElementById('root'));
+const main_close = () => { void (0,main_adapters_host_WEBPACK_IMPORTED_MODULE_8_/* .host */ .H)().app.close(); };
+main_root.render((0,main_react_jsx_runtime_WEBPACK_IMPORTED_MODULE_0_.jsx)("section", { className: "xhs-app cp-xhs-module", children: (0,main_react_jsx_runtime_WEBPACK_IMPORTED_MODULE_0_.jsx)("header", { className: "cp-xhs-appbar", children: (0,main_react_jsx_runtime_WEBPACK_IMPORTED_MODULE_0_.jsx)("button", { className: "cp-float-back", "aria-label": "\u8FD4\u56DE\u684C\u9762", onClick: main_close, children: "\u2039" }) }) }));
+async function main_start() {
+    await (0,main_adapters_storage_WEBPACK_IMPORTED_MODULE_3_/* .hydrate */ .Qv)();
+    (0,main_adapters_identity_WEBPACK_IMPORTED_MODULE_4_/* .initIdentity */ .zT)();
+    await Promise.all([(0,main_adapters_characters_WEBPACK_IMPORTED_MODULE_5_/* .initializeCharacters */ .nw)(), (0,main_adapters_media_WEBPACK_IMPORTED_MODULE_6_/* .initializeMedia */ .Fm)(), (0,main_adapters_host_WEBPACK_IMPORTED_MODULE_8_/* .host */ .H)().app.setPolicy({ id: 'pseudonymous-identities', namespace: 'social_posts', text: main_adapters_identity_WEBPACK_IMPORTED_MODULE_4_/* .PROTECTED_RULE */ ._A })]);
+    await (0,main_adapters_storage_WEBPACK_IMPORTED_MODULE_3_/* .flush */ .bX)();
+    // Dynamic import ensures packaged avatar URLs exist before evaluating native constants.
+    const { XiaohongshuApp } = await Promise.resolve(/* import() */).then(__webpack_require__.bind(__webpack_require__, 622));
+    main_root.render((0,main_react_jsx_runtime_WEBPACK_IMPORTED_MODULE_0_.jsx)(XiaohongshuApp, { onClose: main_close, onNotice: message => { void (0,main_adapters_host_WEBPACK_IMPORTED_MODULE_8_/* .host */ .H)().ui.toast(message); } }));
+    void (0,main_adapters_memory_WEBPACK_IMPORTED_MODULE_7_/* .flushMemories */ .yZ)().catch(() => { });
+    const { loadXiaohongshuState } = await Promise.resolve(/* import() */).then(__webpack_require__.bind(__webpack_require__, 575));
+    void (0,main_adapters_characters_WEBPACK_IMPORTED_MODULE_5_/* .initializeNicknames */ .QT)(loadXiaohongshuState().settings.participantCharacterIds);
 }
-function CharacterName({ name, displayName, avatar, save }) { const [value, setValue] = (0,react.useState)(displayName); return (0,jsx_runtime.jsxs)("div", { className: "anon-character-setting", children: [(0,jsx_runtime.jsx)(XhsAvatar, { className: "cp-xhs-comment-avatar", src: avatar, name: displayName }), (0,jsx_runtime.jsxs)("label", { children: [name, (0,jsx_runtime.jsx)("input", { "aria-label": `${name} 匿名昵称`, value: value, onChange: e => setValue(e.target.value) })] }), (0,jsx_runtime.jsx)("button", { onClick: () => void save(value), children: "\u4FEE\u6539" })] }); }
-
-;// ./custom-apps/anonymous-xiaohongshu/src/main.tsx
-
-
-
-
-(0,client.createRoot)(document.getElementById('root')).render((0,jsx_runtime.jsx)(XiaohongshuApp, {}));
+void main_start().catch(() => main_root.render((0,main_react_jsx_runtime_WEBPACK_IMPORTED_MODULE_0_.jsxs)("section", { className: "xhs-app cp-xhs-module", children: [(0,main_react_jsx_runtime_WEBPACK_IMPORTED_MODULE_0_.jsx)("button", { "aria-label": "\u8FD4\u56DE\u684C\u9762", onClick: main_close, children: "\u8FD4\u56DE" }), (0,main_react_jsx_runtime_WEBPACK_IMPORTED_MODULE_0_.jsx)("p", { children: "\u6682\u65F6\u65E0\u6CD5\u8BFB\u53D6\u5E94\u7528\u6570\u636E\uFF0C\u8BF7\u7A0D\u540E\u91CD\u65B0\u6253\u5F00\u3002" })] })));
 
 /******/ })()
 ;

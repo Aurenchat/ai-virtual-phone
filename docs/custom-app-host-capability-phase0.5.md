@@ -83,6 +83,8 @@ type ScopedContextPolicy = {
 
 支持 system/user/assistant 的字符串 content；user content 可以是真正的 `{type:'text',text}` 与 `{type:'image_url',image_url:{url}}` 数组。最多 4 张，单图 URL 字符串 ≤2,800,000 字符，只接受 HTTPS 或 PNG/JPEG/WebP/GIF data URL；文字总长 ≤200,000；appContext ≤100,000。绑定配置未开启视觉时直接拒绝，**不静默降级成“成功看图”**。模型实际是否支持视觉仍依赖 provider 配置和模型能力。
 
+无角色且未选择任何角色来源的 scoped 请求可以省略 `characterId`，API 配置按显式 `apiConfigId`、角色 Custom App/聊天绑定、全局默认、首个安全回退的顺序解析。选择全局 API 只选择 provider/model，不注入全局 prompt。请求错误以 `MULTIMODAL_UNSUPPORTED`、`PROVIDER_ERROR`、`TIMEOUT`、`CANCELLED`、`MALFORMED_REQUEST` 分类；durable task 在 `errorCode` 中保留分类。
+
 ### 2.2 Protected policies
 
 持久 key：`ai_phone_protected_policies_v1`。每条只有 `{appId,id,namespace,text,required:true}`。Host 不读取 ActorBinding、人物 owner 或 App 数据来生成规则。

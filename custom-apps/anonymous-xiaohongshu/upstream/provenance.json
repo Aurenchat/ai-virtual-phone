@@ -1,0 +1,102 @@
+{
+  "repository": "https://github.com/xiaolongbao0709/ai-virtual-phone",
+  "revision": "6cec66372457d3f8199f0d1a49d9fba94544e084",
+  "files": [
+    {
+      "path": "components/xiaohongshu/xiaohongshu-app.tsx",
+      "sha256": "bee0cd37509722fa18aa78ce6daee9b01c078c5ab70269be7549ced767873911"
+    },
+    {
+      "path": "lib/xiaohongshu-engine.ts",
+      "sha256": "a21c432e2a01203d29fd14582872b96eebc2c9f34f047672e0b1aa0b37f5a974"
+    },
+    {
+      "path": "lib/xiaohongshu-types.ts",
+      "sha256": "62277a94670281d5085cc05282c9a9bc3cd32d883a72838e56020d774d46f48a"
+    },
+    {
+      "path": "lib/xiaohongshu-storage.ts",
+      "sha256": "38db6d9826336cb6fefc39537c40cc562bd12dc9a99acf0b47f5b5824d1dca98"
+    },
+    {
+      "path": "lib/xiaohongshu-memory.ts",
+      "sha256": "41e7e996f1c4d1fc33e932e12b0b67892b1f7001a7ff39130cdf3a8bce94c1e0"
+    },
+    {
+      "path": "lib/xiaohongshu-character-profile.ts",
+      "sha256": "2ad9f01e18a7ea774d442763b175596dfda4e2ae68b48c7871e9ac6ad43db49c"
+    },
+    {
+      "path": "styles/xiaohongshu.css",
+      "sha256": "814b59ee2bfe94308f08c532145f480d1a41115ddf28210382111d91006786d8"
+    },
+    {
+      "path": "styles/checkphone.css",
+      "sha256": "87321445d4be7decabc7283796b25b5e3564b2b35872743e8761fdceace34e60"
+    },
+    {
+      "path": "lib/bilingual-text.ts",
+      "sha256": "bef891553284f8f52b84d03deb2bdcf0545bab6dc49551264543b63d87ee0a14"
+    },
+    {
+      "path": "lib/bilingual-prompt-defaults.ts",
+      "sha256": "462506760d50473c10d83815396e08bb19cb603e0088486fe25dcd36a2dbac97"
+    },
+    {
+      "path": "components/checkphone/checkphone-bilingual-text.tsx",
+      "sha256": "a85ee0874da33b7607a79548a690792b42449929461fe85013b6cb9b016e27fa"
+    },
+    {
+      "path": "components/checkphone/checkphone-debug-error-card.tsx",
+      "sha256": "3fc5c24c0daf6d738628df4a740ba5d3265eee9b0ec856fdb330b5559cc3a489"
+    },
+    {
+      "path": "components/ui/form.tsx",
+      "sha256": "c9b09f31a7353291d55b4a6617bd5440225d729892974d61ac1c681465fee02e"
+    },
+    {
+      "path": "lib/builtin-preset.ts",
+      "sha256": "80dfad2edcb93632046f4fc2e12b8c12383e816d2bcb242c0bf02e0865a8b979"
+    },
+    {
+      "path": "styles/tokens.css",
+      "sha256": "547ef4ac8f81c51f99f86d2f36e789c215e1dfef4be05e2fcaa99036399a2317"
+    },
+    {
+      "path": "styles/base.css",
+      "sha256": "803ad92449d430bcef02cf5fa6e410959306e09f47d68ed93185bd30a08e4ce9"
+    },
+    {
+      "path": "styles/components.css",
+      "sha256": "a4296f212afdc76f4d876804a3afa6f971de5ae0305b2f2081414f56ed975203"
+    },
+    {
+      "path": "styles/animations.css",
+      "sha256": "db02b585ed890583dc0a6b004904e535570ceaf9b603ecc3add4199957af7331"
+    },
+    {
+      "path": "public/xiaohongshu/avatars/default-01.png",
+      "sha256": "d167d2505f5f19f1fc0a8ed0dbbe4dc83fdaddb35d9fa519d52a1962413b7b04"
+    },
+    {
+      "path": "public/xiaohongshu/avatars/default-02.png",
+      "sha256": "8de1d2fa2a23204ffa31206fe01f5d6ab510354f5960a0e2f7a201fe865c0a96"
+    },
+    {
+      "path": "public/xiaohongshu/avatars/default-03.png",
+      "sha256": "03607779498f0131b063834c5f88bb14d3cf58ea79ec271d72e37f4851beabf7"
+    },
+    {
+      "path": "public/xiaohongshu/avatars/default-04.png",
+      "sha256": "3f39e10fa967fdcbf0f27570e128b09b91f1783f97a1ca909b40e8d71edf6182"
+    },
+    {
+      "path": "public/xiaohongshu/avatars/default-05.png",
+      "sha256": "ded1c573f80aa09784230ec896858c5f87ddae80e12cad5a366beef8395c9d77"
+    },
+    {
+      "path": "public/xiaohongshu/avatars/default-06.png",
+      "sha256": "4c310acf75294369aefb86c32066ac73cd73c606d2967aad083952d3dc0336ff"
+    }
+  ]
+}

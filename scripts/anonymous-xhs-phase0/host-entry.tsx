@@ -30,11 +30,12 @@ import * as transport from '../../lib/llm-http';
 import * as nativeSocial from '../../lib/xiaohongshu-engine';
 import {XiaohongshuApp} from '../../components/xiaohongshu/xiaohongshu-app';
 import * as nativeStorage from '../../lib/xiaohongshu-storage';
+import * as nativeMedia from '../../lib/chat-asset-storage';
 import { DEFAULT_XIAOHONGSHU_SETTINGS } from '../../lib/xiaohongshu-types';
 
 let root: ReturnType<typeof createRoot> | null = null;
 const probe = {
-  nativeSocial,nativeStorage, nativeSocialSettings: DEFAULT_XIAOHONGSHU_SETTINGS,
+  nativeSocial,nativeStorage,nativeMedia, nativeSocialSettings: DEFAULT_XIAOHONGSHU_SETTINGS,
   scoped, policy, sourceMemory, aiTasks, coreBuilder, provenance, provider, transport,
   host, kv, settings, chars, chat, engine, memory, apps, registration, hooks, shortTerm, summarizer, worlds, pluginLoader, pluginRuntime, pluginStorage,
   DEFAULT_MEMORY_CONFIG,

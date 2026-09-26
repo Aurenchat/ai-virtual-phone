@@ -1,0 +1,812 @@
+diff --git a/components/xiaohongshu/xiaohongshu-app.tsx b/src/fork/components/xiaohongshu/xiaohongshu-app.tsx
+index fe0a76d..4dc64d9 100644
+--- a/components/xiaohongshu/xiaohongshu-app.tsx
++++ b/src/fork/components/xiaohongshu/xiaohongshu-app.tsx
+@@ -1,4 +1,13 @@
++// CUSTOM-APP-ADAPTER: stable IDs/probability decisions when a durable action resumes.
++import { actionRandom, actionNow, actionUuid } from "../../../adapters/tasks";
++import { defaultAvatars } from "../../../adapters/media";
+ "use client";
++// CUSTOM-APP-ADAPTER: lifecycle and identity additions; all native page JSX remains.
++import { beginAction,finishAction,pendingAction } from "../../../adapters/tasks";
++import { hasUserProfile,setUserProfile,setUserAvatar } from "../../../adapters/identity";
++import { managementName,subscribeCharacters,initializeNicknames } from "../../../adapters/characters";
++import { NicknameSettings } from "../../../identity/nickname-settings";
++import { shareCard } from "../../../adapters/chat";
+
+ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ChangeEvent, type TouchEvent, type UIEvent, type WheelEvent } from "react";
+ import { ShareFat } from "@phosphor-icons/react";
+@@ -25,16 +34,16 @@ import {
+   UserRound,
+ } from "lucide-react";
+
+-import { getChatImageFromIndexedDB, saveChatImageToIndexedDB } from "@/lib/chat-asset-storage";
+-import { loadCharacters } from "@/lib/character-storage";
+-import type { Character } from "@/lib/character-types";
+-import { incrementEventCounter } from "@/lib/memory-storage";
+-import { maybeRunSummarization } from "@/lib/memory-summarizer";
+-import { resolveUserIdentity } from "@/lib/settings-storage";
+-import { Toggle } from "@/components/ui/form";
+-import { CheckPhoneBilingualText } from "@/components/checkphone/checkphone-bilingual-text";
+-import { normalizeBilingualTextInput, splitBilingualText } from "@/lib/bilingual-text";
+-import { DEFAULT_XIAOHONGSHU_BILINGUAL_PROMPT } from "@/lib/bilingual-prompt-defaults";
++import { getChatImageFromIndexedDB, saveChatImageToIndexedDB } from "../../../adapters/media";
++import { loadCharacters } from "../../../adapters/characters";
++import type { Character } from "../../../adapters/characters";
++import { incrementEventCounter } from "../../../adapters/memory";
++import { maybeRunSummarization } from "../../../adapters/memory";
++import { resolveUserIdentity } from "../../../adapters/settings";
++import { Toggle } from "../ui/form";
++import { CheckPhoneBilingualText } from "../checkphone/checkphone-bilingual-text";
++import { normalizeBilingualTextInput, splitBilingualText } from "../../lib/bilingual-text";
++import { DEFAULT_XIAOHONGSHU_BILINGUAL_PROMPT } from "../../lib/bilingual-prompt-defaults";
+ import {
+   applyCharacterActivityComment,
+   applyCharacterCommentReply,
+@@ -53,7 +62,7 @@ import {
+   generateXiaohongshuNpcReplyToUserComment,
+   generateXiaohongshuNpcReactionForUserPost,
+   XiaohongshuGenerationError,
+-} from "@/lib/xiaohongshu-engine";
++} from "../../lib/xiaohongshu-engine";
+ import {
+   createUserXiaohongshuNote,
+   loadXiaohongshuState,
+@@ -61,7 +70,7 @@ import {
+   makeXiaohongshuComment,
+   makeXiaohongshuNotification,
+   saveXiaohongshuState,
+-} from "@/lib/xiaohongshu-storage";
++} from "../../lib/xiaohongshu-storage";
+ import {
+   deleteXiaohongshuProjectionEventForComment,
+   deleteXiaohongshuProjectionEventsForNote,
+@@ -69,10 +78,10 @@ import {
+   recordXiaohongshuFollowUserEvent,
+   recordXiaohongshuPostEvent,
+   recordXiaohongshuReplyEvent,
+-} from "@/lib/xiaohongshu-memory";
+-import { resolveCharacterXiaohongshuDisplayName } from "@/lib/xiaohongshu-character-profile";
+-import type { ChatSharePayload } from "@/lib/chat-share";
+-import { CheckPhoneDebugErrorCard } from "@/components/checkphone/checkphone-debug-error-card";
++} from "../../lib/xiaohongshu-memory";
++import { resolveCharacterXiaohongshuDisplayName } from "../../lib/xiaohongshu-character-profile";
++import type { ChatSharePayload } from "../../../adapters/chat";
++import { CheckPhoneDebugErrorCard } from "../checkphone/checkphone-debug-error-card";
+ import {
+   DEFAULT_XIAOHONGSHU_SETTINGS,
+   type ParsedXiaohongshuCharacterActivity,
+@@ -85,7 +94,7 @@ import {
+   type XiaohongshuTabId,
+   type XiaohongshuUserPostInput,
+   type XiaohongshuDraftImage,
+-} from "@/lib/xiaohongshu-types";
++} from "../../lib/xiaohongshu-types";
+
+ type XiaohongshuAppProps = {
+   onClose: (isBusy?: boolean) => void;
+@@ -133,14 +142,8 @@ const HOME_FEED_TABS: Array<{ id: XiaohongshuHomeFeedTab; label: string }> = [
+   { id: "video", label: "视频" },
+ ];
+
+-const DEFAULT_XHS_AVATARS = [
+-  "/xiaohongshu/avatars/default-01.png",
+-  "/xiaohongshu/avatars/default-02.png",
+-  "/xiaohongshu/avatars/default-03.png",
+-  "/xiaohongshu/avatars/default-04.png",
+-  "/xiaohongshu/avatars/default-05.png",
+-  "/xiaohongshu/avatars/default-06.png",
+-];
++// CUSTOM-APP-ADAPTER: package asset URLs are hydrated before mount.
++const DEFAULT_XHS_AVATARS = defaultAvatars();
+
+ const XHS_DM_EMOJIS = ["😊", "😂", "🥺", "😭", "😳", "👍", "❤️", "✨", "🌸", "🍵", "🥰", "🤔", "😎", "🙌", "💌", "🫶"];
+
+@@ -187,7 +190,7 @@ function parseNotificationCountFromText(text: string): number {
+ function formatTime(value: string): string {
+   const date = new Date(value);
+   if (Number.isNaN(date.getTime())) return "";
+-  const diffMinutes = Math.max(1, Math.round((Date.now() - date.getTime()) / 60000));
++  const diffMinutes = Math.max(1, Math.round((actionNow() - date.getTime()) / 60000));
+   if (diffMinutes < 60) return `${diffMinutes}分钟前`;
+   if (diffMinutes < 1440) return `${Math.round(diffMinutes / 60)}小时前`;
+   return `${Math.round(diffMinutes / 1440)}天前`;
+@@ -360,7 +363,7 @@ function createCharacterPost(character: Character, activity: ParsedXiaohongshuCh
+   if (!activity.post) return null;
+   const now = new Date().toISOString();
+   const displayName = resolveCharacterXiaohongshuDisplayName(character);
+-  const noteId = `xhs_char_note_${character.id}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
++  const noteId = `xhs_char_note_${character.id}_${actionNow()}_${actionRandom().toString(36).slice(2, 7)}`;
+   const comments = activity.post.comments
+     .filter(comment => comment.text)
+     .map((comment, index) => {
+@@ -733,7 +736,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+   const [selectedTab, setSelectedTab] = useState<XiaohongshuTabId>("home");
+   const [homeFeedTab, setHomeFeedTab] = useState<XiaohongshuHomeFeedTab>("discover");
+   const [settingsOpen, setSettingsOpen] = useState(false);
+-  const [profileOpen, setProfileOpen] = useState(false);
++  const [profileOpen, setProfileOpen] = useState(!hasUserProfile());
+   const [composeOpen, setComposeOpen] = useState(false);
+   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+   const [busy, setBusy] = useState<BusyState>("idle");
+@@ -778,12 +781,14 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+   const [tagInput, setTagInput] = useState("");
+   const fileRef = useRef<HTMLInputElement | null>(null);
+   const profileCoverFileRef = useRef<HTMLInputElement | null>(null);
++  const profileAvatarFileRef = useRef<HTMLInputElement | null>(null); // ANON-FORK: independent local avatar.
+   const mainScrollRef = useRef<HTMLDivElement | null>(null);
+   const detailScrollRef = useRef<HTMLDivElement | null>(null);
+   const mainScrollTopRef = useRef(0);
+
+   const selectedNote = selectedNoteId ? state.notes.find(note => note.id === selectedNoteId) ?? null : null;
+-  const requestClose = () => onClose(busy !== "idle");
++  // CUSTOM-APP-ADAPTER: Host owns requests; closing is unconditional.
++  const requestClose = () => onClose(false);
+   const commentComposerExpanded = commentComposerFocused || Boolean(commentDraft.trim()) || Boolean(replyTarget) || commentEmojiOpen || commentMentionOpen;
+   const unreadCount = state.notifications.reduce((total, item) => total + notificationUnreadWeight(item), 0);
+   const engagementUnreadCount = state.notifications.reduce((total, item) => {
+@@ -887,7 +892,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+         pointerEvents: "none",
+       }
+     : null;
+-  const userIdentity = useMemo(() => resolveUserIdentity(undefined, "xiaohongshu") ?? resolveUserIdentity(), []);
++  const userIdentity = resolveUserIdentity(undefined, "xiaohongshu") ?? resolveUserIdentity();
+   const userAvatar = userIdentity?.avatarUrl || pickDefaultAvatar(`user:${userIdentity?.id || state.profile.nickname}`);
+   const profileCoverImage = state.profile.coverImageAssetId ? imageMap[state.profile.coverImageAssetId] : "";
+   const profileCoverStyle: CSSProperties | undefined = profileCoverImage
+@@ -1102,6 +1107,8 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+
+   async function handleGenerateDmReply(thread: XiaohongshuDmThread) {
+     if (busy !== "idle") return;
++    // CUSTOM-APP-ADAPTER: save the original handler input before the first await.
++    if (!(await beginAction("handleGenerateDmReply", {state,draft,tagInput,commentDraft,replyTarget,selectedNoteId,dmDraft,selectedDmThreadId}, [thread]))) return;
+     setBusy("dm-reply");
+     clearErrorState();
+     setDmEmojiOpen(false);
+@@ -1121,6 +1128,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+     const baseMessages = pendingMessage ? [...thread.notifications, pendingMessage] : thread.notifications;
+     const latestUserText = pendingMessage?.text ?? [...baseMessages].reverse().find(message => message.direction === "outgoing")?.text ?? "";
+     if (!latestUserText) {
++      await finishAction(); // CUSTOM-APP-ADAPTER: no request started.
+       setBusy("idle");
+       onNotice?.("请先发送一条私信");
+       return;
+@@ -1146,7 +1154,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+             threadName,
+             unread: selectedDmThreadId !== threadId,
+           }),
+-          createdAt: new Date(Date.now() + index + 1).toISOString(),
++          createdAt: new Date(actionNow() + index + 1).toISOString(),
+         }));
+       if (replies.length > 0) {
+         current = saveXiaohongshuState({
+@@ -1158,6 +1166,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+     } catch (err) {
+       handleGenerationError(err, "暂时无法生成私信回复。");
+     } finally {
++      await finishAction(); // CUSTOM-APP-ADAPTER: durable checkpoint.
+       setBusy("idle");
+     }
+   }
+@@ -1254,6 +1263,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+
+   useEffect(() => {
+     setCharacters(loadCharacters());
++    return subscribeCharacters(() => setCharacters(loadCharacters()));
+   }, []);
+
+   useEffect(() => {
+@@ -1368,6 +1378,23 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+     });
+   }, [state.notes, state.profile.coverImageAssetId, imageMap]);
+
++  // CUSTOM-APP-ADAPTER: restore original handler inputs after iframe destruction.
++  const [recoveryStep, setRecoveryStep] = useState(0);
++  useEffect(() => {
++    const pending = pendingAction(); if (!pending) return;
++    const v = pending.view;
++    setState(v.state); setDraft(v.draft); setTagInput(v.tagInput); setCommentDraft(v.commentDraft);
++    setReplyTarget(v.replyTarget); setSelectedNoteId(v.selectedNoteId); setDmDraft(v.dmDraft); setSelectedDmThreadId(v.selectedDmThreadId);
++    setRecoveryStep(1);
++  }, []);
++  useEffect(() => {
++    if (recoveryStep !== 1 || !characters.length) return;
++    setRecoveryStep(2);
++    const pending = pendingAction(); if (!pending) return;
++    const actions:Record<string,(...args:any[])=>Promise<void>>={handleGenerateHomeContent,handlePublish,submitUserComment,handleLoadMoreComments,handleGenerateDmReply};
++    void actions[pending.kind]?.(...pending.args);
++  }, [recoveryStep,characters]);
++
+   function persist(next: XiaohongshuState) {
+     const saved = saveXiaohongshuState(next);
+     setState(saved);
+@@ -1396,6 +1423,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+
+   async function generateCharacterActivityState(baseState: XiaohongshuState, activeSettings: XiaohongshuState["settings"]): Promise<XiaohongshuState> {
+     const ids = activeSettings.participantCharacterIds;
++    void initializeNicknames(ids); // ANON-FORK: one background batch, never awaited by feed.
+     let current = baseState;
+     if (ids.length === 0) return current;
+
+@@ -1475,9 +1503,12 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+
+   async function handleGenerateHomeContent() {
+     if (busy !== "idle") return;
++    // CUSTOM-APP-ADAPTER: save the original handler input before the first await.
++    if (!(await beginAction("handleGenerateHomeContent", {state,draft,tagInput,commentDraft,replyTarget,selectedNoteId,dmDraft,selectedDmThreadId}, []))) return;
+     clearErrorState();
+     try {
+       const activeSettings = state.settings;
++      void initializeNicknames(activeSettings.participantCharacterIds); // ANON-FORK: overlaps NPC generation.
+       setBusy("npc-feed");
+       const { state: withNpc } = await generateNpcFeedState(state, activeSettings);
+       setState(withNpc);
+@@ -1491,11 +1522,13 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+     } catch (err) {
+       handleGenerationError(err, "暂时无法刷新小红书内容。");
+     } finally {
++      await finishAction(); // CUSTOM-APP-ADAPTER: durable checkpoint.
+       setBusy("idle");
+     }
+   }
+
+   function handleSaveProfile() {
++    if (!setUserProfile(profileDraft.nickname)) return; // ANON-FORK: no global user profile.
+     persist({
+       ...state,
+       profile: {
+@@ -1597,6 +1630,13 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+     });
+   }
+
++  // ANON-FORK: reuse the native image processor for this App's own user avatar only.
++  async function handleProfileAvatarChange(event: ChangeEvent<HTMLInputElement>) {
++    const file=event.target.files?.[0];event.target.value="";if(!file)return;
++    const image=await processImageFile(file);if(!image?.assetId)return;
++    const dataUrl=await getChatImageFromIndexedDB(image.assetId);if(!dataUrl)return;
++    setUserAvatar(dataUrl);setState(loadXiaohongshuState());
++  }
+   async function handleProfileCoverChange(event: ChangeEvent<HTMLInputElement>) {
+     const file = event.target.files?.[0];
+     event.target.value = "";
+@@ -1644,6 +1684,8 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+
+   async function handlePublish() {
+     if (busy !== "idle" || (!draft.title.trim() && !draft.body.trim())) return;
++    // CUSTOM-APP-ADAPTER: save the original handler input before the first await.
++    if (!(await beginAction("handlePublish", {state,draft,tagInput,commentDraft,replyTarget,selectedNoteId,dmDraft,selectedDmThreadId}, []))) return;
+     setBusy("publish");
+     clearErrorState();
+     try {
+@@ -1671,8 +1713,9 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+       setState(current);
+
+       setBusy("character-reaction");
++      void initializeNicknames(current.settings.participantCharacterIds);
+       for (const characterId of current.settings.participantCharacterIds) {
+-        if (Math.random() * 100 > current.settings.sendToCharacterProbability) continue;
++        if (actionRandom() * 100 > current.settings.sendToCharacterProbability) continue;
+         const character = characters.find(item => item.id === characterId);
+         if (!character) continue;
+         const latestNote = current.notes.find(note => note.id === userNote.id) ?? userNote;
+@@ -1716,6 +1759,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+     } catch (err) {
+       handleGenerationError(err, "暂时无法发布小红书笔记。");
+     } finally {
++      await finishAction(); // CUSTOM-APP-ADAPTER: durable checkpoint.
+       setBusy("idle");
+     }
+   }
+@@ -1829,6 +1873,8 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+   async function submitUserComment(options: { mentionCharacter?: Character; textOverride?: string } = {}) {
+     const text = (options.textOverride ?? commentDraft).trim();
+     if (busy !== "idle" || !selectedNote || !text) return;
++    // CUSTOM-APP-ADAPTER: save the original handler input before the first await.
++    if (!(await beginAction("submitUserComment", {state,draft,tagInput,commentDraft,replyTarget,selectedNoteId,dmDraft,selectedDmThreadId}, [options]))) return;
+     const target = replyTarget && selectedNote.comments.some(comment => comment.id === replyTarget.id)
+       ? replyTarget
+       : undefined;
+@@ -1943,6 +1989,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+     } catch (err) {
+       handleGenerationError(err, mentionCharacter ? "暂时无法生成@回复。" : "暂时无法生成评论回复。");
+     } finally {
++      await finishAction(); // CUSTOM-APP-ADAPTER: durable checkpoint.
+       setBusy("idle");
+     }
+   }
+@@ -1953,6 +2000,8 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+
+   async function handleLoadMoreComments(note: XiaohongshuNote) {
+     if (busy !== "idle") return;
++    // CUSTOM-APP-ADAPTER: save the original handler input before the first await.
++    if (!(await beginAction("handleLoadMoreComments", {state,draft,tagInput,commentDraft,replyTarget,selectedNoteId,dmDraft,selectedDmThreadId}, [note]))) return;
+     const latestNote = state.notes.find(item => item.id === note.id) ?? note;
+     setBusy("more-comments");
+     clearErrorState();
+@@ -1969,6 +2018,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+     } catch (err) {
+       handleGenerationError(err, "暂时无法加载更多评论。");
+     } finally {
++      await finishAction(); // CUSTOM-APP-ADAPTER: durable checkpoint.
+       setBusy("idle");
+     }
+   }
+@@ -2215,7 +2265,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+       coverIcon: note.coverIcon,
+       tone: note.tone,
+     } satisfies ChatSharePayload;
+-    window.dispatchEvent(new CustomEvent("open-mini-chat", { detail: { share } }));
++    void shareCard(share); // CUSTOM-APP-ADAPTER: existing Host chat.sendCard boundary.
+     onNotice?.("选择聊天对象后发送小红书帖子");
+   }
+
+@@ -2254,7 +2304,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+     const absY = Math.abs(event.deltaY);
+     if (absY < 42 || absY < Math.abs(event.deltaX)) return;
+     event.preventDefault();
+-    const now = Date.now();
++    const now = actionNow();
+     if (now - videoLastWheelAtRef.current < 520) return;
+     videoLastWheelAtRef.current = now;
+     animateSiblingVideo(event.deltaY > 0 ? "next" : "previous");
+@@ -3015,7 +3065,9 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+                   onChange={handleProfileCoverChange}
+                 />
+                 <div className="cp-xhs-profile-main">
+-                  <div className="cp-xhs-profile-avatar-wrap">
++                  {/* ANON-FORK: same avatar presentation, independently editable, never global profile. */}
++                  <input ref={profileAvatarFileRef} type="file" accept="image/*" hidden onChange={handleProfileAvatarChange} />
++                  <div className="cp-xhs-profile-avatar-wrap" role="button" tabIndex={0} aria-label="修改匿名头像" onClick={() => profileAvatarFileRef.current?.click()} onKeyDown={event => { if(event.key === "Enter") profileAvatarFileRef.current?.click(); }}>
+                     <XhsAvatar className="cp-xhs-profile-avatar" src={userAvatar} name={state.profile.nickname} />
+                   </div>
+                   <div className="cp-xhs-profile-meta">
+@@ -3286,7 +3338,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+                           }))}
+                         >
+                           <span>{character.avatar ? <img src={character.avatar} alt="" /> : character.name.slice(0, 1)}</span>
+-                          <em>{character.name}</em>
++                          <em>{managementName(character.id)}</em>
+                         </button>
+                       );
+                     })
+@@ -3294,6 +3346,8 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
+                 </div>
+               </div>
+
++              {/* ANON-FORK: only additional settings control: edit already-created social names. */}
++              <NicknameSettings onChange={() => { setCharacters(loadCharacters()); setState(loadXiaohongshuState()); }} />
+               <div className="xhs-profile-edit-field">
+                 <span className="xhs-profile-edit-section-title">PROMPTS <em>提示词</em></span>
+                 {[
+diff --git a/lib/xiaohongshu-engine.ts b/src/fork/lib/xiaohongshu-engine.ts
+index 176ab48..f57211d 100644
+--- a/lib/xiaohongshu-engine.ts
++++ b/src/fork/lib/xiaohongshu-engine.ts
+@@ -1,13 +1,13 @@
+-import { getChatImageFromIndexedDB } from "./chat-asset-storage";
+-import { ChatEngineError, previewMessagesForApi, sendLLMRequest } from "./chat-engine";
+-import { loadCharacters } from "./character-storage";
+-import type { Character } from "./character-types";
+-import { assemblePromptPayload, type AssemblerInput, type LLMContentPart, type LLMMessage } from "./llm-prompt-assembler";
++// CUSTOM-APP-ADAPTER: stable IDs/probability decisions when a durable action resumes.
++import { actionRandom, actionNow, actionUuid } from "../../adapters/tasks";
++// ANON-FORK: append stable public account references in DM input, never owner metadata.
++import { accountByName } from "../../adapters/identity";
++import { getChatImageFromIndexedDB } from "../../adapters/media";
++import { ChatEngineError, previewMessagesForApi, sendLLMRequest } from "../../adapters/ai";
++import { loadCharacters } from "../../adapters/characters";
++import type { Character } from "../../adapters/characters";
++import { assemblePromptPayload, type AssemblerInput, type LLMContentPart, type LLMMessage } from "../../adapters/ai";
+ import { DEFAULT_XIAOHONGSHU_BILINGUAL_PROMPT, resolveBilingualPrompt } from "./bilingual-prompt-defaults";
+-import { formatCoreMemories, formatLongTermMemories } from "./memory-injector";
+-import { loadMemoryConfig } from "./memory-storage";
+-import { retrieveCoreMemoriesForPrompt, retrieveMemoriesForPrompt } from "./memory-service";
+-import { prepareShortTermContext } from "./short-term-assembler";
+ import {
+   loadApiConfigs,
+   loadBindingConfig,
+@@ -16,8 +16,8 @@ import {
+   loadWorldBooks,
+   resolveBinding,
+   resolveUserIdentity,
+-} from "./settings-storage";
+-import type { ApiConfig, PresetConfig, RegexConfig } from "./settings-types";
++} from "../../adapters/settings";
++import type { ApiConfig, PresetConfig, RegexConfig } from "../../adapters/ai";
+ import {
+   addNames,
+   loadXiaohongshuState,
+@@ -198,8 +198,8 @@ function parseWithDebug<T>(raw: string, parser: (raw: string) => T, fallbackMess
+ }
+
+ function makeId(prefix: string): string {
+-  if (typeof crypto !== "undefined" && crypto.randomUUID) return `${prefix}_${crypto.randomUUID()}`;
+-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
++  if (typeof crypto !== "undefined") return `${prefix}_${actionUuid()}`;
++  return `${prefix}_${actionNow()}_${actionRandom().toString(36).slice(2, 8)}`;
+ }
+
+ function cleanText(value: unknown, maxLength: number): string {
+@@ -488,7 +488,7 @@ function parseNoteBlock(
+     recentSaveNames: [block.fields["收藏用户1"], block.fields["收藏用户2"]].map(name => cleanText(name, 24)).filter(Boolean),
+     comments: comments.map((comment, idx) => ({ ...comment, id: `${noteId}_comment_${idx + 1}` })),
+     imageDescription: cleanMultiline(block.fields["图片描述"] ?? block.fields["配图"], 500) || undefined,
+-    createdAt: new Date(Date.now() - index * 1000 * 60 * 5).toISOString(),
++    createdAt: new Date(actionNow() - index * 1000 * 60 * 5).toISOString(),
+     updatedAt: new Date().toISOString(),
+   };
+ }
+@@ -758,39 +758,8 @@ function hasCharacterFollowedUser(characterId: string): boolean {
+   );
+ }
+
+-function buildXiaohongshuUserIdentityHint(input: {
+-  characterId: string;
+-  userName?: string;
+-  xiaohongshuNames?: string[];
+-}): string {
+-  const userName = cleanText(input.userName, 80)
+-    || cleanText(resolveUserIdentity(input.characterId, "chat")?.name, 80)
+-    || cleanText(resolveUserIdentity()?.name, 80)
+-    || "用户";
+-  const names = collectCleanNames([
+-    ...(input.xiaohongshuNames ?? []),
+-    getXiaohongshuUserProfileName(),
+-  ]);
+-  const xiaohongshuNameText = names.length > 0 ? names.join("、") : "未知";
+-  const followed = hasCharacterFollowedUser(input.characterId);
+-  const body = followed
+-    ? [
+-        "你已关注用户的小红书账号，可以明确识别该账号与用户本人的关系。",
+-        `用户真实身份：${userName}`,
+-        `用户小红书昵称/马甲：${xiaohongshuNameText}`,
+-        "当作者或评论者显示为上述昵称时，按用户本人处理；回复时保持自然，不要生硬暴露系统说明。",
+-      ]
+-    : [
+-        "你当前没有关注该小红书账号。",
+-        "当前作者或评论者只对你显示为公开小红书昵称；可以根据公开内容、语气、昵称、图片和已有记忆自行判断作者是否熟悉。",
+-        "不要直接断定对方的现实身份；如果判断不出熟悉关系，就按陌生小红书用户自然回应。",
+-      ];
+-  return [
+-    "<xiaohongshu_user_identity_hint>",
+-    ...body,
+-    "</xiaohongshu_user_identity_hint>",
+-  ].join("\n");
+-}
++// ANON-FORK: following an account never establishes its real-world owner.
++function buildXiaohongshuUserIdentityHint(_input:{characterId:string;userName?:string;xiaohongshuNames?:string[]}):string{return "[匿名小红书] 所有发言者为独立 social_account。身份以当前 viewer 的明确揭露为准，关注关系不构成身份揭露。";}
+
+ function prependXiaohongshuUserIdentityHint(context: string, hint: string): string {
+   return [hint.trim(), context.trim()].filter(Boolean).join("\n\n");
+@@ -822,6 +791,10 @@ function stripVisionParts(messages: LLMMessage[]): LLMMessage[] {
+ }
+
+ function isVisionUnsupportedError(error: unknown): boolean {
++  // CUSTOM-APP-ADAPTER: Host preserves provider semantics; only this stable code permits the native text-only retry.
++  const code = error && typeof error === "object" ? String((error as { code?: unknown }).code ?? "") : "";
++  if (code === "MULTIMODAL_UNSUPPORTED") return true;
++  if (code) return false;
+   const message = error instanceof Error ? error.message : String(error ?? "");
+   const lower = message.toLowerCase();
+   const statusLooksRelevant = /api error\s+(400|413|415|422)/i.test(message)
+@@ -925,13 +898,13 @@ export function formatXiaohongshuFeedContext(notes: XiaohongshuNote[]): string {
+           : comment.replyTo
+             ? ` 回复${comment.replyTo}`
+             : "";
+-        return `  [评论${index + 1}] ${comment.authorName}${reply}：${comment.text}`;
++        return `  [评论${index + 1}] ${comment.authorName} [accountId]${comment.authorId}${reply}：${comment.text}`;
+       });
+       return [
+         `#笔记`,
+         `[笔记ID]${note.id}`,
+         `[类型]${note.type === "video" ? "视频" : "图文"}`,
+-        `[作者]${note.authorName}`,
++        `[作者]${note.authorName} [accountId]${note.authorId}`,
+         `[标题]${note.title}`,
+         `[正文]${note.body}`,
+         note.imageDescription ? `[图片内容]${note.imageDescription}` : note.imageAssetId ? "[图片内容]有真实图片" : "",
+@@ -955,7 +928,7 @@ function formatCommentLine(comment: XiaohongshuComment, comments: XiaohongshuCom
+     ? comments.find(item => item.id === comment.replyToCommentId)?.authorName
+     : comment.replyTo;
+   const reply = targetName ? ` 回复${targetName}` : "";
+-  return `[评论ID]${comment.id} [作者]${comment.authorName}${reply}：[内容]${comment.text}`;
++  return `[评论ID]${comment.id} [作者]${comment.authorName} [accountId]${comment.authorId}${reply}：[内容]${comment.text}`;
+ }
+
+ export function formatXiaohongshuCommentContext(
+@@ -970,7 +943,7 @@ export function formatXiaohongshuCommentContext(
+     "#笔记",
+     `[笔记ID]${note.id}`,
+     `[类型]${note.type === "video" ? "视频" : "图文"}`,
+-    `[作者]${note.authorName}`,
++    `[作者]${note.authorName} [accountId]${note.authorId}`,
+     `[标题]${note.title}`,
+     `[正文]${note.body}`,
+     note.imageDescription ? `[图片内容]${note.imageDescription}` : note.imageAssetId ? "[图片内容]有真实图片" : "",
+@@ -1011,8 +984,8 @@ export function formatXiaohongshuNoteCommentContext(note: XiaohongshuNote): stri
+     "#笔记",
+     `[笔记ID]${note.id}`,
+     `[类型]${note.type === "video" ? "视频" : "图文"}`,
+-    `[来源]${note.source === "user" ? "用户笔记" : note.source === "character" ? "角色笔记" : "NPC笔记"}`,
+-    `[作者]${note.authorName}`,
++    "[来源][匿名小红书] social_account",
++    `[作者]${note.authorName} [accountId]${note.authorId}`,
+     `[标题]${note.title}`,
+     `[正文]${note.body}`,
+     note.videoDescription ? `[视频内容]${note.videoDescription}` : "",
+@@ -1037,10 +1010,10 @@ export function formatXiaohongshuDmContext(input: {
+     .slice(-20)
+     .map((message) => {
+       const speaker = message.direction === "outgoing" ? input.userName : input.threadName;
+-      return `[${speaker}] ${message.text}`;
++      return `[${speaker}] [accountId]${accountByName(speaker)?.accountId || "unknown"} ${message.text}`;
+     });
+   return [
+-    `[对话对象]${input.threadName}`,
++    `[对话对象]${input.threadName} [accountId]${accountByName(input.threadName)?.accountId || "unknown"}`,
+     `[用户昵称]${input.userName}`,
+     "",
+     "#用户刚发送的私信",
+@@ -1051,61 +1024,11 @@ export function formatXiaohongshuDmContext(input: {
+   ].join("\n");
+ }
+
+-async function resolveCharacterAssemblerInput(
+-  characterId: string,
+-  appTags: string[],
+-  context: {
+-    feedContext?: string;
+-    userPostContext?: string;
+-    commentContext?: string;
+-    mentionContext?: string;
+-  },
+-  settings?: XiaohongshuSettings,
+-): Promise<AssemblerResult | null> {
+-  const character = loadCharacters().find(item => item.id === characterId);
+-  if (!character) return null;
+-  const bindings = loadBindingConfig();
+-  const activeSlot = resolveBinding(bindings, characterId, "xiaohongshu");
+-  const apiConfig = activeSlot.apiConfigId
+-    ? loadApiConfigs().find(config => config.id === activeSlot.apiConfigId) ?? null
+-    : null;
+-  const presets = loadPresets();
+-  let preset = activeSlot.presetId ? presets.find(item => item.id === activeSlot.presetId) ?? null : null;
+-  if (!preset) preset = presets.find(item => item.builtIn) ?? null;
+-  const worldBooks = (activeSlot.worldBookIds || [])
+-    .map(id => loadWorldBooks().find(book => book.id === id))
+-    .filter(Boolean) as ReturnType<typeof loadWorldBooks>;
+-  const regexes = (activeSlot.regexIds || [])
+-    .map(id => loadRegexes().find(regex => regex.id === id))
+-    .filter(Boolean) as RegexConfig[];
+-  const userIdentity = resolveUserIdentity(characterId, "chat");
+-  const prepared = prepareShortTermContext(characterId, "xiaohongshu");
+-  const memConfig = loadMemoryConfig();
+-  const [memories, coreMemories] = await Promise.all([
+-    retrieveMemoriesForPrompt(characterId, prepared.wbActivationContext, memConfig).catch(() => []),
+-    retrieveCoreMemoriesForPrompt(characterId, memConfig).catch(() => []),
+-  ]);
+-  const input: AssemblerInput = {
+-    character,
+-    history: [],
+-    preset,
+-    worldBooks,
+-    regexes,
+-    userIdentity,
+-    appId: "xiaohongshu",
+-    appTags,
+-    longTermMemories: formatLongTermMemories(memories),
+-    coreMemories: formatCoreMemories(coreMemories),
+-    worldBookActivationContext: prepared.wbActivationContext,
+-    recentBlocks: prepared.recentBlocks,
+-    unifiedRecentItems: prepared.unifiedRecentItems,
+-    xiaohongshuBilingualInstruction: buildXiaohongshuBilingualInstruction(settings),
+-    xiaohongshuFeedContext: context.feedContext ?? "",
+-    xiaohongshuUserPostContext: context.userPostContext ?? "",
+-    xiaohongshuCommentContext: context.commentContext ?? "",
+-    xiaohongshuMentionContext: context.mentionContext ?? "",
+-  };
+-  return { character, apiConfig, preset, regexes, input };
++// CUSTOM-APP-ADAPTER: source-scoped character configuration; no native RP memory assembly.
++async function resolveCharacterAssemblerInput(characterId: string, appTags: string[], context: {feedContext?:string;userPostContext?:string;commentContext?:string;mentionContext?:string}, settings?:XiaohongshuSettings):Promise<AssemblerResult|null>{
++ const character=loadCharacters().find(c=>c.id===characterId);if(!character)return null;
++ const input:AssemblerInput={character,appTags,...context,xiaohongshuBilingualInstruction:buildXiaohongshuBilingualInstruction(settings)};
++ return {character,apiConfig:{id:character.id,enableImageRecognition:true,defaultModel:""},preset:null,regexes:[],input};
+ }
+
+ export async function generateXiaohongshuNpcFeed(
+@@ -1457,7 +1380,7 @@ export async function previewXiaohongshuPromptPayload(
+   return {
+     messages: previewMessagesForApi(resolved.apiConfig, resolved.preset, messages),
+     characterName: `小红书:${resolved.character.name}`,
+-    model: resolved.apiConfig.defaultModel,
++    model: resolved.apiConfig.defaultModel ?? "",
+     presetName: resolved.preset?.name ?? "默认预设",
+   };
+ }
+diff --git a/lib/xiaohongshu-storage.ts b/src/fork/lib/xiaohongshu-storage.ts
+index 14efa4b..b627c26 100644
+--- a/lib/xiaohongshu-storage.ts
++++ b/src/fork/lib/xiaohongshu-storage.ts
+@@ -1,5 +1,9 @@
+-import { kvGet, kvSet, registerKvMigration } from "./kv-db";
+-import { resolveUserIdentity } from "./settings-storage";
++// CUSTOM-APP-ADAPTER: stable IDs/probability decisions when a durable action resumes.
++import { actionRandom, actionNow, actionUuid } from "../../adapters/tasks";
++// ANON-FORK: canonical public author IDs at the local persistence boundary.
++import { canonicalPlatform } from "../../adapters/identity";
++import { kvGet, kvSet, registerKvMigration } from "../../adapters/storage";
++import { resolveUserIdentity } from "../../adapters/settings";
+ import {
+   DEFAULT_XIAOHONGSHU_PROFILE,
+   DEFAULT_XIAOHONGSHU_SETTINGS,
+@@ -22,8 +26,8 @@ const LEGACY_DEFAULT_GENDER = "未设置";
+ registerKvMigration(XHS_STATE_KEY);
+
+ function makeId(prefix: string): string {
+-  if (typeof crypto !== "undefined" && crypto.randomUUID) return `${prefix}_${crypto.randomUUID()}`;
+-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
++  if (typeof crypto !== "undefined") return `${prefix}_${actionUuid()}`;
++  return `${prefix}_${actionNow()}_${actionRandom().toString(36).slice(2, 8)}`;
+ }
+
+ function cleanText(value: unknown, maxLength: number): string {
+@@ -381,7 +385,7 @@ export function loadXiaohongshuState(): XiaohongshuState {
+ }
+
+ export function saveXiaohongshuState(state: XiaohongshuState): XiaohongshuState {
+-  const next = { ...state, updatedAt: new Date().toISOString() };
++  const next = canonicalPlatform({ ...state, updatedAt: new Date().toISOString() });
+   kvSet(XHS_STATE_KEY, JSON.stringify(next));
+   return next;
+ }
+diff --git a/lib/xiaohongshu-memory.ts b/src/fork/lib/xiaohongshu-memory.ts
+index f915daf..55000fb 100644
+--- a/lib/xiaohongshu-memory.ts
++++ b/src/fork/lib/xiaohongshu-memory.ts
+@@ -1,5 +1,8 @@
+-import { kvGet, kvKeysWithPrefix, kvRemove, kvSet, registerDynamicPrefix } from "./kv-db";
+-import { formatChatTimestamp } from "./llm-prompt-assembler";
++// CUSTOM-APP-ADAPTER: preserve native event builders; explicit subjects and source invalidation.
++import { publishEventProjection, removeEventProjections } from "../../adapters/memory";
++import { subjectAccount } from "../../adapters/identity";
++import { kvGet, kvKeysWithPrefix, kvRemove, kvSet, registerDynamicPrefix } from "../../adapters/storage";
++import { formatChatTimestamp } from "../../adapters/ai";
+ import type { XiaohongshuComment, XiaohongshuNote } from "./xiaohongshu-types";
+
+ const XIAOHONGSHU_EVENT_PREFIX = "ai_phone_xiaohongshu_events_";
+@@ -13,6 +16,7 @@ export type XiaohongshuProjectionEntry = {
+   content: string;
+   noteId?: string;
+   commentId?: string;
++  subjectIds?: string[]; // ANON-FORK: stable subjects, never inferred from prose.
+ };
+
+ type RecordXiaohongshuPostEventInput = {
+@@ -63,7 +67,7 @@ function formatAuthorLabel(
+   fallback: string,
+ ): string {
+   const name = cleanEventText(value, 80) || fallback;
+-  return authorType === "user" ? `“${name}”（用户的小红书账号）` : `“${name}”`;
++  return `“${name}”`;
+ }
+
+ function loadEventsByKey(key: string): XiaohongshuProjectionEntry[] {
+@@ -107,6 +111,7 @@ function upsertEvent(characterId: string, entry: XiaohongshuProjectionEntry): vo
+   const next = events.filter(item => item.id !== entry.id);
+   next.push(entry);
+   saveEvents(characterId, next);
++  publishEventProjection(characterId, entry);
+ }
+
+ function noteTitle(note: XiaohongshuNote): string {
+@@ -136,10 +141,11 @@ export function recordXiaohongshuPostEvent(input: RecordXiaohongshuPostEventInpu
+   const image = imageText(input.note);
+
+   upsertEvent(input.characterId, {
++    subjectIds: [input.characterId, subjectAccount(input.note.authorId,input.note.authorName,input.note.source).accountId],
+     id: `xiaohongshu_post_${input.note.id}`,
+     noteId: input.note.id,
+     timestamp,
+-    content: `[小红书 ${time}] ${characterName}在小红书发布了一篇笔记，标题：“${title}”。正文：“${body}”。图片：“${image}”。`,
++    content: `[匿名小红书 ${time}] ${characterName}在小红书发布了一篇笔记，标题：“${title}”。正文：“${body}”。图片：“${image}”。`,
+   });
+ }
+
+@@ -153,11 +159,12 @@ export function recordXiaohongshuCommentEvent(input: RecordXiaohongshuCommentEve
+   const body = cleanEventText(input.comment.text, 360);
+
+   upsertEvent(input.characterId, {
++    subjectIds: [input.characterId, subjectAccount(input.note.authorId,input.note.authorName,input.note.source).accountId],
+     id: `xiaohongshu_comment_${input.comment.id}`,
+     noteId: input.note.id,
+     commentId: input.comment.id,
+     timestamp,
+-    content: `[小红书 ${time}] ${characterName}在小红书评论了${authorLabel}的笔记《${title}》，评论：“${body}”。点赞：${input.liked ? "是" : "否"}，收藏：${input.saved ? "是" : "否"}。`,
++    content: `[匿名小红书 ${time}] ${characterName}在小红书评论了${authorLabel}的笔记《${title}》，评论：“${body}”。点赞：${input.liked ? "是" : "否"}，收藏：${input.saved ? "是" : "否"}。`,
+   });
+ }
+
+@@ -174,11 +181,12 @@ export function recordXiaohongshuReplyEvent(input: RecordXiaohongshuReplyEventIn
+   const body = cleanEventText(input.comment.text, 360);
+
+   upsertEvent(input.characterId, {
++    subjectIds: [input.characterId, ...(input.targetComment ? [subjectAccount(input.targetComment.authorId,input.targetComment.authorName,input.targetComment.authorType).accountId] : [])],
+     id: `xiaohongshu_reply_${input.comment.id}`,
+     noteId: input.note.id,
+     commentId: input.comment.id,
+     timestamp,
+-    content: `[小红书 ${time}] ${characterName}在小红书回复了${targetLabel}在笔记《${title}》下的评论${targetBody ? `，${targetLabel}评论：“${targetBody}”` : ""}，回复：“${body}”。`,
++    content: `[匿名小红书 ${time}] ${characterName}在小红书回复了${targetLabel}在笔记《${title}》下的评论${targetBody ? `，${targetLabel}评论：“${targetBody}”` : ""}，回复：“${body}”。`,
+   });
+ }
+
+@@ -189,14 +197,16 @@ export function recordXiaohongshuFollowUserEvent(input: RecordXiaohongshuFollowU
+   const userDisplayName = cleanEventText(input.userDisplayName, 80) || "小红书用户";
+
+   upsertEvent(input.characterId, {
++    subjectIds: [input.characterId, subjectAccount("",input.userDisplayName,"user").accountId],
+     id: "xiaohongshu_follow_user",
+     timestamp,
+-    content: `[小红书 ${time}] ${characterName}关注了“${userDisplayName}”（用户的小红书账号）。`,
++    content: `[匿名小红书 ${time}] ${characterName}关注了“${userDisplayName}”。`,
+   });
+ }
+
+ export function deleteXiaohongshuProjectionEventsForNote(noteId: string): void {
+   if (!noteId || typeof window === "undefined") return;
++  removeEventProjections({noteId}); // CUSTOM-APP-ADAPTER: also invalidate Host evidence.
+   for (const key of kvKeysWithPrefix(XIAOHONGSHU_EVENT_PREFIX)) {
+     const events = loadEventsByKey(key);
+     const next = events.filter(entry => !belongsToNote(entry, noteId));
+@@ -208,6 +218,7 @@ export function deleteXiaohongshuProjectionEventsForNote(noteId: string): void {
+
+ export function deleteXiaohongshuProjectionEventForComment(commentId: string): void {
+   if (!commentId || typeof window === "undefined") return;
++  removeEventProjections({commentId});
+   for (const key of kvKeysWithPrefix(XIAOHONGSHU_EVENT_PREFIX)) {
+     const events = loadEventsByKey(key);
+     const next = events.filter(entry =>
+@@ -222,6 +233,7 @@ export function deleteXiaohongshuProjectionEventForComment(commentId: string): v
+ }
+
+ export function clearXiaohongshuProjectionEvents(): void {
++  removeEventProjections({all:true});
+   if (typeof window === "undefined") return;
+   for (const key of kvKeysWithPrefix(XIAOHONGSHU_EVENT_PREFIX)) {
+     kvRemove(key);
+diff --git a/lib/xiaohongshu-character-profile.ts b/src/fork/lib/xiaohongshu-character-profile.ts
+index d534e02..1560898 100644
+--- a/lib/xiaohongshu-character-profile.ts
++++ b/src/fork/lib/xiaohongshu-character-profile.ts
+@@ -1,9 +1,4 @@
+-import type { Character } from "./character-types";
+-import type { CheckPhoneXiaohongshuPayload } from "./checkphone-config";
+-import { readPhoneSnapshotCache } from "./checkphone-storage";
++import type { Character } from "../../adapters/characters";
+
+-export function resolveCharacterXiaohongshuDisplayName(character: Pick<Character, "id" | "name">): string {
+-  const snapshot = readPhoneSnapshotCache<CheckPhoneXiaohongshuPayload>(character.id, "xiaohongshu");
+-  const profileName = snapshot?.payload?.profile?.name?.trim();
+-  return profileName || character.name;
+-}
++// ANON-FORK: Character is already a public account projection; never read the native phone snapshot.
++export function resolveCharacterXiaohongshuDisplayName(character:Pick<Character,"id"|"name">):string{return character.name;}
+diff --git a/components/checkphone/checkphone-bilingual-text.tsx b/src/fork/components/checkphone/checkphone-bilingual-text.tsx
+index b991465..bfcb3f3 100644
+--- a/components/checkphone/checkphone-bilingual-text.tsx
++++ b/src/fork/components/checkphone/checkphone-bilingual-text.tsx
+@@ -1,12 +1,12 @@
+ "use client";
+
+ import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
+-import { normalizeBilingualTextInput, splitBilingualText } from "@/lib/bilingual-text";
++import { normalizeBilingualTextInput, splitBilingualText } from "../../lib/bilingual-text";
+ import {
+   CHECKPHONE_SETTINGS_CHANGED_EVENT,
+   loadCheckPhoneSettings,
+   type CheckPhoneSettings,
+-} from "@/lib/checkphone-settings";
++} from "../../../adapters/settings";
+
+ export type CheckPhoneBilingualTone =
+   | "default"

@@ -1,5 +1,5 @@
 "use client";
-import { generateScoped, type ScopedGenerationRequest } from "@/lib/custom-app-scoped-generation";
+import { generateScoped, getScopedGenerationErrorCode, type ScopedGenerationRequest } from "@/lib/custom-app-scoped-generation";
 import { setProtectedPolicy } from "@/lib/custom-app-protected-policy";
 import { startAiTask, getAiTasks, consumeAiTask, cancelAiTask } from "@/lib/custom-app-ai-tasks";
 import { searchSourceMemory, writeSourceMemory, revokeSourceMemory } from "@/lib/custom-app-source-memory";
@@ -318,7 +318,11 @@ html, body { min-height: 100%; }
     if (!item) return;
     delete pending[data.requestId];
     if (data.ok) item.resolve(data.result);
-    else item.reject(new Error(data.error || 'AiPhone request failed'));
+    else {
+      var requestError = new Error(data.error || 'AiPhone request failed');
+      if (data.errorCode) requestError.code = data.errorCode;
+      item.reject(requestError);
+    }
   });
   function onEvent(eventName, handler){
     var key = String(eventName || '').trim();
@@ -965,7 +969,7 @@ export function CustomAppRunner({
     }
   }, [app, onNotice, updating]);
 
-  const postResponse = useCallback((requestId: string, ok: boolean, result?: BridgeResult, error?: string) => {
+  const postResponse = useCallback((requestId: string, ok: boolean, result?: BridgeResult, error?: string, errorCode?: string) => {
     iframeRef.current?.contentWindow?.postMessage({
       source: "ai-phone-custom-app-host",
       type: "response",
@@ -974,6 +978,7 @@ export function CustomAppRunner({
       ok,
       result,
       error,
+      errorCode,
     }, "*");
   }, [frameId]);
 
@@ -2030,7 +2035,7 @@ export function CustomAppRunner({
       if (!requestId || !action) return;
       void Promise.resolve(handleBridgeRequest(action, record.payload))
         .then(result => postResponse(requestId, true, result))
-        .catch(err => postResponse(requestId, false, undefined, err instanceof Error ? err.message : String(err)));
+        .catch(err => postResponse(requestId, false, undefined, err instanceof Error ? err.message : String(err), getScopedGenerationErrorCode(err)));
     };
     window.addEventListener("message", handleMessage);
     setBridgeReady(true);

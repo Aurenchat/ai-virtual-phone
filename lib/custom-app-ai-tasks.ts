@@ -1,5 +1,5 @@
 import type { InstalledCustomApp } from "./custom-app-types";
-import { generateScoped, type ScopedGenerationRequest } from "./custom-app-scoped-generation";
+import { generateScoped, getScopedGenerationErrorCode, type ScopedGenerationErrorCode, type ScopedGenerationRequest } from "./custom-app-scoped-generation";
 import { requireAppCapability } from "./custom-app-protected-policy";
 import { hydrateKvDb, kvReadFresh, kvUpdateAtomic, kvUpdateManyAtomic } from "./kv-db";
 import { customAppCollectionKey, customAppLegacyDataKey, loadInstalledCustomApps } from "./custom-app-storage";
@@ -9,7 +9,7 @@ const REMOVED_TASK_APPS_KEY = "ai_phone_custom_app_ai_removed_v1";
 export type DurableAiTask = {
     taskId: string; appId: string; idempotencyKey: string; requestFingerprint: string;
     status: "running" | "completed" | "failed" | "cancelled" | "consumed";
-    result?: Awaited<ReturnType<typeof generateScoped>>; error?: string;
+    result?: Awaited<ReturnType<typeof generateScoped>>; error?: string; errorCode?: ScopedGenerationErrorCode | "HOST_INTERRUPTED";
     createdAt: string; completedAt?: string; consumedAt?: string;
 };
 export type TaskWrite = { collection: string; id: string; operation: "put" | "delete"; value?: Record<string, unknown> };
@@ -68,7 +68,7 @@ export async function startAiTask(app: InstalledCustomApp, input: { idempotencyK
                     if (JSON.stringify(result).length > 4000000) throw new Error("Task result exceeds 4 MB");
                     await change(taskId, row => { if (row.status === "running") { row.result = result; row.status = "completed"; row.completedAt = new Date().toISOString(); } });
                 } catch (e) {
-                    await change(taskId, row => { if (row.status === "running") { row.status = controller.signal.aborted ? "cancelled" : "failed"; row.error = String(e); row.completedAt = new Date().toISOString(); } });
+                    await change(taskId, row => { if (row.status === "running") { row.status = controller.signal.aborted ? "cancelled" : "failed"; row.error = e instanceof Error ? e.message : String(e); row.errorCode = controller.signal.aborted ? "CANCELLED" : getScopedGenerationErrorCode(e) ?? "PROVIDER_ERROR"; row.completedAt = new Date().toISOString(); } });
                 }
             } catch (e) { reject(e); console.error("Durable AI task storage failure", e); }
             finally { active.delete(taskId); }
@@ -83,7 +83,7 @@ export async function getAiTasks(app: InstalledCustomApp, taskId?: string) {
     for (const row of rows) if (row.status === "running" && !active.has(row.taskId)) {
         if (!navigator.locks) throw new Error("Task recovery requires Web Locks");
         await navigator.locks.request(lockName(row.taskId), { ifAvailable: true }, async lock => {
-            if (lock) await change(row.taskId, t => { if (t.status === "running") { t.status = "failed"; t.error = "HOST_INTERRUPTED: execution owner closed; no automatic retry"; t.completedAt = new Date().toISOString(); } });
+            if (lock) await change(row.taskId, t => { if (t.status === "running") { t.status = "failed"; t.error = "HOST_INTERRUPTED: execution owner closed; no automatic retry"; t.errorCode = "HOST_INTERRUPTED"; t.completedAt = new Date().toISOString(); } });
         });
     }
     rows = decode(await kvReadFresh(AI_TASKS_KEY)).filter(t => t.appId === app.id && (!taskId || t.taskId === taskId));
@@ -93,7 +93,7 @@ export async function cancelAiTask(app: InstalledCustomApp, taskId: string) {
     check(app); await hydrateKvDb();
     const row = await change(taskId, t => {
         if (t.appId !== app.id) throw new Error("Task not owned by App");
-        if (t.status === "running") { t.status = "cancelled"; t.completedAt = new Date().toISOString(); }
+        if (t.status === "running") { t.status = "cancelled"; t.error = "Scoped provider request cancelled"; t.errorCode = "CANCELLED"; t.completedAt = new Date().toISOString(); }
     });
     if (row?.status === "cancelled") active.get(taskId)?.abort();
     return row;

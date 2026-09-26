@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小红书源码 Fork — 本地视觉验收</title>
+<style>
+  body { max-width: 1040px; margin: 32px auto; padding: 0 16px; font: 16px/1.6 system-ui, sans-serif; color: #222; background: #f6f6f6; }
+  h1 { font-size: 26px; } h2 { margin-top: 40px; font-size: 21px; }
+  nav { display: flex; flex-wrap: wrap; gap: 12px; } a { color: #a42446; }
+  img { display: block; max-width: 100%; height: auto; border: 1px solid #ddd; background: white; }
+  .settings { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  .settings figure { margin: 0; flex: 1 1 360px; max-width: 490px; }
+  figcaption { margin-bottom: 8px; }
+</style>
+<h1>内置小红书 / 匿名源码 Fork</h1>
+<p>下方对照图均为：左侧内置版，右侧 Custom App Fork；同一 390 × 844 视口及同一测试内容。内置源码未修改；仅比较夹具中的显示身份保持一致。</p>
+<p>浏览器运行使用真实 Host / SDK / HTTP 请求链路，模型回复来自本地确定性夹具，不代表真实模型行为验收。全设置长图仅为截图临时展开滚动区域。</p>
+<nav>
+  <a href="#discover">发现</a><a href="#following">关注</a><a href="#video">视频</a><a href="#nearby">附近</a><a href="#profile">主页</a><a href="#settings">设置</a><a href="#detail">详情</a><a href="#comments">评论</a><a href="#loading">加载</a><a href="#full-settings">完整设置</a>
+</nav>
+<h2 id="discover">发现 Feed / 底部导航</h2><img src="comparison-discover.png" alt="发现 Feed：左内置，右 Fork">
+<h2 id="following">关注</h2><img loading="lazy" src="comparison-following.png" alt="关注：左内置，右 Fork">
+<h2 id="video">视频</h2><img loading="lazy" src="comparison-video.png" alt="视频：左内置，右 Fork">
+<h2 id="nearby">附近</h2><img loading="lazy" src="comparison-nearby.png" alt="附近：左内置，右 Fork">
+<h2 id="profile">个人主页</h2><img loading="lazy" src="comparison-profile.png" alt="主页：左内置，右 Fork">
+<h2 id="settings">设置面板</h2><img loading="lazy" src="comparison-settings.png" alt="设置：左内置，右 Fork">
+<h2 id="detail">帖子详情</h2><img loading="lazy" src="comparison-detail.png" alt="详情：左内置，右 Fork">
+<h2 id="comments">评论面板</h2><img loading="lazy" src="comparison-comment-sheet.png" alt="评论：左内置，右 Fork">
+<h2 id="loading">加载状态</h2><img loading="lazy" src="comparison-loading.png" alt="加载：左内置，右 Fork">
+<h2 id="full-settings">完整设置长图</h2>
+<div class="settings">
+  <figure><figcaption>内置版</figcaption><img loading="lazy" src="native-settings-full.png" alt="内置版全部设置"></figure>
+  <figure><figcaption>Fork：唯一新增设置为已生成角色网名编辑</figcaption><img loading="lazy" src="fork-settings-full.png" alt="Fork 全部设置"></figure>
+</div>
+<p><a href="results.json">浏览器验收结果</a> · <a href="unit-results.json">63 项自动检查</a> · <a href="anonymous-provider-payloads.json">16 次匿名 App 最终请求</a></p>
+</html>

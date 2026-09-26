@@ -1,0 +1,156 @@
+{
+  "origin": "http://127.0.0.1:61081",
+  "browser": "153.0.4234.48",
+  "fixtureOnly": true,
+  "endpoint": "local HTTP recording server with deterministic response; no real model inference",
+  "results": [
+    {
+      "name": "mount-local-source-build-in-real-host",
+      "completed": true,
+      "value": {
+        "releaseZipCreated": false
+      }
+    },
+    {
+      "name": "full-settings-and-original-model",
+      "completed": true,
+      "value": {
+        "participants": 2,
+        "promptEdited": true
+      }
+    },
+    {
+      "name": "full-feed-call-count-names-collisions",
+      "completed": true,
+      "value": {
+        "calls": 4,
+        "names": [
+          "夜航频道",
+          "夜航频道_2"
+        ],
+        "notes": 18
+      }
+    },
+    {
+      "name": "card-avatars-and-independent-user-avatar",
+      "completed": true,
+      "value": {
+        "characterAvatars": 2,
+        "independentUserAvatar": true
+      }
+    },
+    {
+      "name": "native-tabs-nearby-profile",
+      "completed": true,
+      "value": {
+        "accountId": "acct_dffaee441b6b466ea49ccf25f4c95d87"
+      }
+    },
+    {
+      "name": "post-with-image-close-while-generating-replay",
+      "completed": true,
+      "value": {
+        "noteId": "xhs_user_note_e4525d5e-00fb-4c3a-b3d9-2282aebfba56_0",
+        "comments": 3,
+        "providerCalls": 3
+      }
+    },
+    {
+      "name": "comments-follow-more-comments-and-translation",
+      "completed": true,
+      "value": {
+        "comments": 7
+      }
+    },
+    {
+      "name": "dm-notifications-native-generation",
+      "completed": true,
+      "value": {
+        "notifications": 17
+      }
+    },
+    {
+      "name": "native-follow-like-save-mention-character-reply-share",
+      "completed": true,
+      "value": {
+        "ownerReplyCalls": 2,
+        "mentionProviderCalls": 2,
+        "mentionFallbacks": 1,
+        "ordinaryProviderCalls": 1,
+        "ordinaryFallbacks": 0,
+        "publicAuthorId": "acct_dffaee441b6b466ea49ccf25f4c95d87",
+        "shared": true
+      }
+    },
+    {
+      "name": "native-delete-invalidates-source-evidence",
+      "completed": true,
+      "value": {
+        "beforeEntries": 4,
+        "revision": 1,
+        "deletedEvidenceAbsent": true
+      }
+    },
+    {
+      "name": "warm-feed-native-call-count-and-always-close",
+      "completed": true,
+      "value": {
+        "upstreamExpected": 3,
+        "fork": 3,
+        "nicknameRequests": 0
+      }
+    },
+    {
+      "name": "final-provider-payload-source-and-identity",
+      "completed": true,
+      "value": {
+        "requests": 18
+      }
+    },
+    {
+      "name": "reload-persists-accounts-notes-settings",
+      "completed": true,
+      "value": {
+        "notes": 36
+      }
+    },
+    {
+      "name": "same-viewport-native-visual-comparison",
+      "completed": true,
+      "value": {
+        "viewport": "390x844",
+        "left": "built-in",
+        "right": "source fork",
+        "nativeFeedRequests": 3
+      }
+    },
+    {
+      "name": "host-blockers-fixed-zero-character-and-structured-errors",
+      "completed": true,
+      "value": {
+        "zeroCharacter": {
+          "model": "fixture",
+          "providerCalls": 1,
+          "leakage": false
+        },
+        "errors": {
+          "multimodal": "MULTIMODAL_UNSUPPORTED",
+          "provider": "PROVIDER_ERROR",
+          "timeout": "TIMEOUT",
+          "cancellation": "CANCELLED",
+          "malformed": "MALFORMED_REQUEST"
+        },
+        "coreChanges": 2
+      }
+    },
+    {
+      "name": "final-provider-payload-all-app-requests",
+      "completed": true,
+      "value": {
+        "requests": 21,
+        "leakage": false
+      }
+    }
+  ],
+  "browserErrors": []
+}

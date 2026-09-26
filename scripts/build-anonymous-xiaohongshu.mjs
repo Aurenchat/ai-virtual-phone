@@ -16,13 +16,20 @@ await new Promise((resolve,reject)=>webpack({mode:'production',target:'web',devt
   entry:path.join(appRoot,'src/main.tsx'),output:{path:path.join(appRoot,'assets'),filename:'app.js'},
   resolve:{extensions:['.tsx','.ts','.js']},optimization:{minimize:false},
   module:{rules:[{test:/\.tsx?$/,exclude:/node_modules/,use:path.join(repoRoot,'scripts/anonymous-xhs-phase0/ts-loader.cjs')}]},
-  plugins:[new webpack.DefinePlugin({'process.env.NODE_ENV':JSON.stringify('production')})],
+  plugins:[new webpack.DefinePlugin({'process.env.NODE_ENV':JSON.stringify('production')}),new webpack.optimize.LimitChunkCountPlugin({maxChunks:1})],
 },(error,stats)=>error||stats.hasErrors()?reject(error||Error(stats.toString({all:false,errors:true}))):resolve()));
-const css=await Promise.all(['checkphone.css','xiaohongshu.css','iframe.css'].map(file=>fs.readFile(path.join(appRoot,'src/styles',file),'utf8')));
+const css=await Promise.all(['tailwind-preflight.css','tokens.css','base.css','components.css','animations.css','checkphone.css','xiaohongshu.css'].map(file=>fs.readFile(path.join(appRoot,'src/fork/styles',file),'utf8')));
+css.push(await fs.readFile(path.join(appRoot,'src/styles/iframe.css'),'utf8'));
 const normalizeGeneratedText = (value) => value.replace(/[ \t]+$/gm, "").replace(/\n+$/, "\n");
 const generatedJsPath = path.join(appRoot, "assets", "app.js");
 await fs.writeFile(generatedJsPath, normalizeGeneratedText(await fs.readFile(generatedJsPath, "utf8")));
 await fs.writeFile(path.join(appRoot,'assets/app.css'),normalizeGeneratedText(css.join('\n')));
+
+// Local source/visual acceptance must never create a release archive implicitly.
+if (!process.argv.includes('--package')) {
+  console.log('Built local app.js and app.css. No ZIP created.');
+  process.exit(0);
+}
 
 async function addDirectory(directory, relative = "") {
   const entries = await fs.readdir(directory, { withFileTypes: true });

@@ -1,0 +1,97 @@
+[
+  {
+    "index": 21,
+    "label": "host-blockers-fixed-zero-character-and-structured-errors",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=anonymous.xiaohongshu; namespace=social_posts]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\n仅当上下文含 [匿名小红书] 来源及本 App 的 social_account/accountId 时应用以下规则，不影响普通聊天或其他来源的身份判断。每个 accountId 是稳定、独立的网络人格，不能把不同账号的经历、喜好和关系合并成泛称。显示名变化不改变账号，只有明确提供的改名记录允许连接旧名。当前 viewer 对账号现实身份为 unknown 时，禁止根据文风、经历、时间、地点、头像、图片、共同知识、相似性或重复巧合推断、猜测、暗示、试探或询问其现实身份；其他平台已知身份关系也不是证据。只能使用当前 viewer 已明确获知的 explicitly_disclosed 关系；此时允许正常关联，不能继续阻断。揭露不得传播给其他 viewer。程序映射不是角色知识。帖子和记忆始终以具体 accountId / displayName 为主体。"
+        },
+        {
+          "role": "system",
+          "content": "[匿名小红书] ZERO_CHARACTER_APP_CONTEXT"
+        },
+        {
+          "role": "user",
+          "content": "ZERO_CHARACTER_BACKGROUND_FEED"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-26T16:46:52.861Z",
+    "respondedAt": "2026-09-26T16:46:52.862Z"
+  },
+  {
+    "index": 22,
+    "label": "host-blockers-fixed-zero-character-and-structured-errors",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=anonymous.xiaohongshu; namespace=social_posts]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\n仅当上下文含 [匿名小红书] 来源及本 App 的 social_account/accountId 时应用以下规则，不影响普通聊天或其他来源的身份判断。每个 accountId 是稳定、独立的网络人格，不能把不同账号的经历、喜好和关系合并成泛称。显示名变化不改变账号，只有明确提供的改名记录允许连接旧名。当前 viewer 对账号现实身份为 unknown 时，禁止根据文风、经历、时间、地点、头像、图片、共同知识、相似性或重复巧合推断、猜测、暗示、试探或询问其现实身份；其他平台已知身份关系也不是证据。只能使用当前 viewer 已明确获知的 explicitly_disclosed 关系；此时允许正常关联，不能继续阻断。揭露不得传播给其他 viewer。程序映射不是角色知识。帖子和记忆始终以具体 accountId / displayName 为主体。"
+        },
+        {
+          "role": "system",
+          "content": "[匿名小红书]"
+        },
+        {
+          "role": "user",
+          "content": "SOURCE_EXPECTED_PROVIDER_FAILURE"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-26T16:46:52.866Z",
+    "fixtureProviderError": {
+      "error": {
+        "message": "upstream service unavailable",
+        "code": "server_error"
+      }
+    },
+    "respondedAt": "2026-09-26T16:46:52.866Z"
+  },
+  {
+    "index": 23,
+    "label": "host-blockers-fixed-zero-character-and-structured-errors",
+    "method": "POST",
+    "url": "/v1/chat/completions",
+    "contentType": "application/json",
+    "body": {
+      "model": "fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "[Host required policy; sourceAppId=anonymous.xiaohongshu; namespace=social_posts]\nScope: only entities and evidence from this source/namespace. Do not extend this policy to unrelated sources.\n仅当上下文含 [匿名小红书] 来源及本 App 的 social_account/accountId 时应用以下规则，不影响普通聊天或其他来源的身份判断。每个 accountId 是稳定、独立的网络人格，不能把不同账号的经历、喜好和关系合并成泛称。显示名变化不改变账号，只有明确提供的改名记录允许连接旧名。当前 viewer 对账号现实身份为 unknown 时，禁止根据文风、经历、时间、地点、头像、图片、共同知识、相似性或重复巧合推断、猜测、暗示、试探或询问其现实身份；其他平台已知身份关系也不是证据。只能使用当前 viewer 已明确获知的 explicitly_disclosed 关系；此时允许正常关联，不能继续阻断。揭露不得传播给其他 viewer。程序映射不是角色知识。帖子和记忆始终以具体 accountId / displayName 为主体。"
+        },
+        {
+          "role": "system",
+          "content": "[匿名小红书]"
+        },
+        {
+          "role": "user",
+          "content": "TIMEOUT_CLASSIFICATION"
+        }
+      ],
+      "temperature": 0.8,
+      "top_p": 1,
+      "frequency_penalty": 0,
+      "presence_penalty": 0
+    },
+    "receivedAt": "2026-09-26T16:46:52.871Z"
+  }
+]

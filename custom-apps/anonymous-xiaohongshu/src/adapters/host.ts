@@ -1,9 +1,11 @@
 import type { ScopedGenerationRequest } from '../../../../lib/custom-app-scoped-generation';
 export type { ScopedGenerationRequest };
-export type Character = { id:string; name:string; avatar?:string; description?:string; persona?:string };
-export type Task = {taskId:string;status:'running'|'completed'|'failed'|'cancelled'|'consumed';result?:{content:string};error?:string};
+export type Character = { id:string; name:string; avatar?:string; description?:string; persona?:string; personality?:string };
+export type AiErrorCode='MULTIMODAL_UNSUPPORTED'|'PROVIDER_ERROR'|'TIMEOUT'|'CANCELLED'|'MALFORMED_REQUEST'|'HOST_INTERRUPTED';
+export type Task = {taskId:string;status:'running'|'completed'|'failed'|'cancelled'|'consumed';result?:{content:string};error?:string;errorCode?:AiErrorCode};
 type Row = Record<string,unknown>;
 export interface Host {
+  ui:{toast(message:string):Promise<unknown>};
   media:{get(input:{ref:string}):Promise<{dataUrl?:string}>};
   characters:{list():Promise<Character[]>};
   app:{close():Promise<unknown>;setPolicy(input:{id:string;namespace:string;text:string}):Promise<unknown>;getAssetUrl(path:string):Promise<string>};
