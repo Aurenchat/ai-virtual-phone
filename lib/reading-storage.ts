@@ -4,6 +4,7 @@ import Dexie from "dexie";
 import type { Book, BookChapter, ReadingProgress, ReadingAnnotation } from "./reading-types";
 import { kvGet, kvSet, registerKvMigration } from "./kv-db";
 import { DEFAULT_READING_BILINGUAL_PROMPT } from "./bilingual-prompt-defaults";
+import type { ReadingTtsPreferences } from "./reading-tts";
 
 // ── Database ──
 
@@ -59,6 +60,8 @@ export type ReadingParagraphMode = "auto" | "blank" | "indent" | "line";
 export type ReadingViewMode = "page" | "scroll";
 
 export type ReadingInteractionConfig = {
+    /** Reader-only runtime voice overrides; never rewrite saved voice configs or bindings. */
+    readAloud?: ReadingTtsPreferences;
     bilingualTranslationEnabled: boolean;
     collapseBilingualTranslation: boolean;
     bilingualTranslationPrompt: string;

@@ -11,6 +11,7 @@ import type { RecentBlock, UnifiedRecentItem } from "./short-term-assembler";
 import { readDwellingLayoutCache } from "./dwelling-storage";
 import { formatDwellingContext } from "./dwelling-engine";
 import { matchesActiveTags } from "./content-tag-utils";
+import { formatReadingQuoteContent } from "./reading-quote";
 import { formatXiaohongshuShareForPrompt } from "./chat-share";
 import { stripStateAndInnerForPrompt } from "./prompt-sanitizer";
 import { formatPromptTimestamp, getPromptTimestampOptionsForTimeContext, resolvePromptTimeAware, type PromptTimestampOptions } from "./prompt-time";
@@ -1144,6 +1145,8 @@ export function assemblePromptPayload(input: AssemblerInput): LLMMessage[] {
 export function formatRichMediaForHistory(msg: ChatMessage, userName: string, charName: string, isGroup?: boolean, options?: { shoppingPurchaseToolAvailable?: boolean }): string {
     const d = msg.mediaData;
     switch (msg.mediaType) {
+        case "reading_discuss":
+            return formatReadingQuoteContent(msg);
         case "red_packet": {
             const cnt = d?.count;
             return isGroup && cnt && cnt > 1

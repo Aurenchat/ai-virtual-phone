@@ -22,7 +22,14 @@ import { loadChatMessages, pushChatMessage, deleteChatMessage, editChatMessage, 
 import type { ChatMessage, ChatSession } from "@/lib/chat-storage";
 import { loadCharacters } from "@/lib/character-storage";
 import { parseAIResponse } from "@/lib/rich-message-parser";
-import { MessageBubble } from "@/components/chat/message-bubble";
+import { MessageBubble, ReadingQuotePreview } from "@/components/chat/message-bubble";
+import type { ReadingQuote } from "@/lib/reading-quote";
+import { useReadingSelection } from "./use-reading-selection";
+import { useReadingTts } from "./use-reading-tts";
+import { useReadingTtsFollow } from "./use-reading-tts-follow";
+import { ReadingTtsControls } from "./reading-tts-controls";
+import { currentReadingAnchor, nearestPdfParagraph, type ReadingAnchor } from "@/lib/reading-tts-location";
+import type { ReadingTtsPosition, ReadingTtsPreferences } from "@/lib/reading-tts";
 import { ContentDialog } from "@/components/ui/modal";
 import { Toggle } from "@/components/ui/form";
 import { PdfPageRenderer } from "./reading-pdf-viewer";
@@ -229,9 +236,10 @@ function ReadingAnnotationContent({
 type Props = {
     book: Book;
     onBack: () => void;
+    active?: boolean;
 };
 
-export function ReadingViewer({ book, onBack }: Props) {
+export function ReadingViewer({ book, onBack, active = true }: Props) {
     const isPdf = book.format === "pdf";
     const [readingConfig, setReadingConfig] = useState(() => loadReadingInteractionConfig());
     // 阅读器保持挂载（返回书架不卸载），书架设置页保存后通过事件同步最新配置
@@ -273,6 +281,7 @@ export function ReadingViewer({ book, onBack }: Props) {
     });
     const [isDragging, setIsDragging] = useState(false);
     const [chatInput, setChatInput] = useState("");
+    const [pendingQuote, setPendingQuote] = useState<ReadingQuote | null>(null);
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatting, setChatting] = useState(false);
     const [autoAnnotate, setAutoAnnotate] = useState(false);
@@ -303,7 +312,16 @@ export function ReadingViewer({ book, onBack }: Props) {
     const readingMessagePressStartRef = useRef<{ x: number; y: number } | null>(null);
     const chatDragRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
     const chatMovedRef = useRef(false);
+    const chatCloseTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const viewerRef = useRef<HTMLDivElement>(null);
+    const ttsSelectionAnchor = useRef<ReadingAnchor>({});
+    const parsedPdfChunks = useRef(new Map<number, BookChapter>());
+    const parsingPdfChunks = useRef(new Map<number, Promise<BookChapter | undefined>>());
+    const pendingProgress = useRef<ReadingProgress | null>(null);
+    useEffect(() => () => { if (pendingProgress.current) void saveProgress(pendingProgress.current).catch(console.error); }, []);
+    const readingSelection = useReadingSelection(scrollRef, viewerRef, book.title, `${book.id}:${chapterIndex}:${txtPage}:${readingConfig.readingMode}`);
+    const { hasSelection: hasReadingSelection } = readingSelection;
     const chatListRef = useRef<HTMLDivElement>(null); // 共读讨论悬浮窗消息列表（滚动容器）
     const txtMeasureLineRef = useRef<HTMLParagraphElement>(null);
     const txtMeasureGapRef = useRef<HTMLDivElement>(null);
@@ -402,7 +420,7 @@ export function ReadingViewer({ book, onBack }: Props) {
                         ? <div key={i} className="reading-line-gap" />
                         : item.kind === "annotation"
                             ? renderAnnotationItem(item.annotation)
-                            : <p key={i} className={`reading-line${item.indent ? " reading-line-indent" : ""}${item.segEnd ? " reading-line-seg-end" : ""}`}>{item.text}</p>
+                            : <p key={i} data-reading-text="true" data-reading-chapter={item.chapterIndex} data-reading-paragraph={item.paragraphIndex} data-reading-tts-active={isTtsParagraph(item.chapterIndex, item.paragraphIndex) || undefined} className={`reading-line${item.indent ? " reading-line-indent" : ""}${item.segEnd ? " reading-line-seg-end" : ""}`}>{item.text}</p>
                 ))}
             </div>
         );
@@ -415,7 +433,9 @@ export function ReadingViewer({ book, onBack }: Props) {
             className="reading-annotation reading-annotation-interactive"
             data-no-nav="true"
             onPointerDown={() => {
+                if (hasReadingSelection()) return;
                 longPressTimer.current = setTimeout(() => {
+                    if (hasReadingSelection()) return;
                     setActiveMessageId(null);
                     setActiveAnnotationId(annotation.id);
                 }, 500);
@@ -734,13 +754,65 @@ export function ReadingViewer({ book, onBack }: Props) {
         });
 
         await saveChapters(book.id, updates);
-        const merged = chapters.map((chapter) => {
-            const replacement = updates.find((item) => item.index === chapter.index);
-            return replacement || chapter;
-        });
+        // Another lazy consumer may have parsed an adjacent chunk while this one was loading.
+        const merged = await loadChapters(book.id);
         setChapters(merged);
         return merged;
-    }, [book.id, chapters, isPdf]);
+    }, [book.id, book.title, chapters, isPdf]);
+
+    const getTtsChapter = useCallback(async (index: number, signal: AbortSignal) => {
+        signal.throwIfAborted();
+        const chapter = chapters[index];
+        if (!isPdf || !chapter || chapter.paragraphs.length) return chapter;
+        // Parsing can finish before React commits setChapters; return the actual parsed chunk
+        // to the immediately following seek/prefetch instead of the old empty skeleton.
+        const parsed = parsedPdfChunks.current.get(index);
+        if (parsed) return parsed;
+        let pending = parsingPdfChunks.current.get(index);
+        if (!pending) {
+            pending = ensurePdfPageRangeParsed(chapter.pageStart ?? index * PDF_PAGES_PER_CHAPTER + 1,
+                chapter.pageEnd ?? Math.min(pdfTotalPages || Infinity, (index + 1) * PDF_PAGES_PER_CHAPTER))
+                .then(merged => { if (merged[index]) parsedPdfChunks.current.set(index, merged[index]); return merged[index]; })
+                .finally(() => { parsingPdfChunks.current.delete(index); });
+            parsingPdfChunks.current.set(index, pending);
+        }
+        const result = await pending;
+        signal.throwIfAborted();
+        return result;
+    }, [chapters, ensurePdfPageRangeParsed, isPdf, pdfTotalPages]);
+    const tts = useReadingTts({ bookId: book.id, characterId: companionId ?? undefined,
+        preferences: readingConfig.readAloud ?? {}, chapterCount: chapters.length, getChapter: getTtsChapter, active });
+    const ttsPages = useMemo(() => txtPages.map(items => items.filter(item => item.kind === "line")), [txtPages]);
+    const ttsFollow = useReadingTtsFollow({ bodyRef: scrollRef, position: tts.activePosition, chapterIndex,
+        setChapterIndex, isPdf, isScrollMode, pages: ttsPages, pageIndex: txtPage, setPageIndex: setTxtPage,
+        paragraphs: paragraphRefs, hasSelection: hasReadingSelection });
+    const isTtsParagraph = (chapter: number, paragraph: number) =>
+        tts.activePosition?.chapterIndex === chapter && tts.activePosition.paragraphIndex === paragraph;
+    const resolveTtsAnchor = async (anchor: ReadingAnchor, signal: AbortSignal): Promise<ReadingTtsPosition> => {
+        const index = anchor.chapterIndex ?? (isPdf ? Math.floor(((anchor.pageNum ?? pdfCurrentPage) - 1) / PDF_PAGES_PER_CHAPTER) : chapterIndex);
+        const chapter = await getTtsChapter(index, signal);
+        const refs = chapter ? buildParagraphRefsFromChapters([chapter]) : [];
+        const paragraph = anchor.paragraphIndex ?? (isPdf
+            ? nearestPdfParagraph(refs, anchor.pageNum ?? pdfCurrentPage, anchor.yRatio ?? 0)?.paragraphIndex
+            : txtPages[txtPage]?.find(item => item.kind === "line")?.paragraphIndex);
+        // PDF pages without text must advance to the next text block, never rewind to page one.
+        const nextPdf = isPdf && paragraph === undefined ? refs.find(item => (item.pageNum ?? 1) >= (anchor.pageNum ?? pdfCurrentPage)) : undefined;
+        return { bookId: book.id, chapterIndex: index, paragraphIndex: paragraph ?? nextPdf?.paragraphIndex ?? (isPdf ? chapter?.paragraphs.length ?? 0 : 0) };
+    };
+    const startTtsHere = (anchor: ReadingAnchor) => {
+        ttsFollow.follow();
+        tts.start(signal => resolveTtsAnchor(anchor, signal));
+    };
+    const playTts = () => {
+        if (tts.state.status === "paused") { tts.controller.resume(); return; }
+        if (tts.state.status === "error" && tts.state.position) { tts.controller.retry(); return; }
+        startTtsHere(scrollRef.current ? currentReadingAnchor(scrollRef.current) : {});
+    };
+    const updateTtsPreferences = (preferences: ReadingTtsPreferences) => {
+        const updated = { ...readingConfig, readAloud: preferences };
+        setReadingConfig(updated);
+        saveReadingInteractionConfig(updated);
+    };
 
     const buildTxtBatchRequest = useCallback((size: number, mode: AnnotationBatchMode): AnnotationBatchRequest | null => {
         let minParagraphIndex: number;
@@ -1108,6 +1180,8 @@ export function ReadingViewer({ book, onBack }: Props) {
     }, []);
 
     const handleNavChapterClick = (index: number) => {
+        ttsFollow.suspend();
+        if (tts.activePosition) tts.controller.start({ bookId: book.id, chapterIndex: index, paragraphIndex: 0 }, { paused: tts.state.status === "paused" });
         if (isPdf) {
             const chapter = chapters[index];
             const firstPage = chapter?.pageStart ?? chapter?.paragraphPages?.[0] ?? 1;
@@ -1120,8 +1194,12 @@ export function ReadingViewer({ book, onBack }: Props) {
     };
 
     const handleNavPageSlider = (value: number) => {
+        ttsFollow.suspend();
         if (isPdf) {
             setPdfJumpPage(value);
+            if (tts.activePosition && Math.floor((value - 1) / PDF_PAGES_PER_CHAPTER) !== tts.activePosition.chapterIndex) {
+                tts.start(signal => resolveTtsAnchor({ pageNum: value, yRatio: 0 }, signal));
+            }
         } else {
             if (chapters.length === 0) return;
 
@@ -1139,6 +1217,8 @@ export function ReadingViewer({ book, onBack }: Props) {
                     setTxtPage(Math.round(pageFraction * Math.max(0, txtTotalPages - 1)));
                 }
             } else {
+                if (tts.activePosition) tts.controller.start({ bookId: book.id, chapterIndex: targetChapterIndex,
+                    paragraphIndex: Math.floor(pageFraction * Math.max(0, (chapters[targetChapterIndex]?.paragraphs.length ?? 1) - 1)) }, { paused: tts.state.status === "paused" });
                 pendingTxtPageFractionRef.current = pageFraction;
                 pendingScrollFractionRef.current = pageFraction;
                 setChapterIndex(targetChapterIndex);
@@ -1148,6 +1228,7 @@ export function ReadingViewer({ book, onBack }: Props) {
     };
 
     const handleReadingSurfaceClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (readingSelection.suppressNavigation()) return;
         const target = e.target as HTMLElement | null;
         if (!target) return;
         if (target.closest("button, input, select, textarea, a, [data-no-nav='true']")) return;
@@ -1407,7 +1488,6 @@ export function ReadingViewer({ book, onBack }: Props) {
     const handleSend = async () => {
         if (!chatInput.trim() || !companionId || chatting) return;
         const text = chatInput.trim();
-        setChatInput("");
 
         const session = getSession();
         if (!session) return;
@@ -1418,8 +1498,11 @@ export function ReadingViewer({ book, onBack }: Props) {
             role: "user",
             content: text,
             origin: "reading_discuss",
-            mediaData: { readingBookTitle: book.title },
+            mediaType: pendingQuote ? "reading_discuss" : undefined,
+            mediaData: { readingBookTitle: book.title, ...(pendingQuote ? { readingQuote: pendingQuote } : {}) },
         });
+        setChatInput("");
+        setPendingQuote(null);
         setChatMessages(prev => [...prev, userMsg]);
 
         setChatting(true);
@@ -1514,9 +1597,16 @@ export function ReadingViewer({ book, onBack }: Props) {
         setAnnotations(nextAnnotations);
     }, [annotations, book.id, chapterIndex, companion, companionId, currentChapter]);
 
-    const handleOpenChat = () => {
+    useEffect(() => () => {
+        clearTimeout(chatCloseTimerRef.current);
+        clearTimeout(longPressTimer.current);
+    }, []);
+
+    const handleOpenChat = (expanded = false) => {
+        clearTimeout(chatCloseTimerRef.current);
+        setChatClosing(false);
         setShowChat(true);
-        setChatExpanded(false);
+        setChatExpanded(expanded);
         closeCharPicker();
     };
 
@@ -1524,7 +1614,7 @@ export function ReadingViewer({ book, onBack }: Props) {
     const handleCloseChat = () => {
         if (chatClosing) return;
         setChatClosing(true);
-        setTimeout(() => {
+        chatCloseTimerRef.current = setTimeout(() => {
             setShowChat(false);
             setChatExpanded(false);
             setChatClosing(false);
@@ -1910,6 +2000,7 @@ export function ReadingViewer({ book, onBack }: Props) {
         const progress: ReadingProgress = {
             bookId: book.id,
             chapterIndex,
+            paragraphIndex: tts.state.position?.chapterIndex === chapterIndex ? tts.state.position.paragraphIndex : undefined,
             scrollPosition,
             companionCharacterId: companionId || undefined,
             progressFraction,
@@ -1919,8 +2010,10 @@ export function ReadingViewer({ book, onBack }: Props) {
             readingMode: isPdf ? undefined : (isScrollMode ? "scroll" : "page"),
             lastReadAt: new Date().toISOString(),
         };
-        saveProgress(progress);
-    }, [book.id, chapterIndex, chapters.length, chaptersLoaded, companionId, isPdf, isScrollMode, pdfCurrentPage, pdfTotalPages, scrollFraction, txtPage, txtTotalPages]);
+        pendingProgress.current = progress;
+        const timer = setTimeout(() => { void saveProgress(progress).catch(console.error); pendingProgress.current = null; }, 180);
+        return () => clearTimeout(timer);
+    }, [book.id, chapterIndex, chapters.length, chaptersLoaded, companionId, isPdf, isScrollMode, pdfCurrentPage, pdfTotalPages, scrollFraction, txtPage, txtTotalPages, tts.state.position]);
 
     useEffect(() => {
         setTxtPage((prev) => Math.min(prev, Math.max(0, txtTotalPages - 1)));
@@ -1960,6 +2053,9 @@ export function ReadingViewer({ book, onBack }: Props) {
                 setScrollFraction(fraction);
                 if (!metrics) return;
 
+                // Keep selected DOM nodes mounted while native selection handles are moving.
+                if (hasReadingSelection()) return;
+
                 // 离开顶部后解除平移冷却
                 if (body.scrollTop > 2) shiftCooldownRef.current = false;
 
@@ -1993,7 +2089,7 @@ export function ReadingViewer({ book, onBack }: Props) {
             body.removeEventListener("scroll", onScroll);
             if (rafId) window.cancelAnimationFrame(rafId);
         };
-    }, [isScrollMode]);
+    }, [isScrollMode, hasReadingSelection]);
 
     // 滚动模式：渲染后测量各章块位置，并应用窗口平移补偿 / 显式定位（useLayoutEffect 保证在绘制前执行，无闪跳）
     useLayoutEffect(() => {
@@ -2050,6 +2146,7 @@ export function ReadingViewer({ book, onBack }: Props) {
     };
 
     const handleTouchEnd = (e: React.TouchEvent) => {
+        if (readingSelection.suppressNavigation() || (e.target as Element).closest('[data-no-nav="true"]')) return;
         const dx = e.changedTouches[0].clientX - touchStartRef.current.x;
         const dy = e.changedTouches[0].clientY - touchStartRef.current.y;
         if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
@@ -2083,7 +2180,7 @@ export function ReadingViewer({ book, onBack }: Props) {
     };
 
     return (
-        <div className="reading-app-surface absolute inset-0 z-[100] flex flex-col bg-[var(--c-page-body-bg)]" data-immersive={immersive} style={{ paddingTop: "var(--page-header-safe-top, 48px)" }}>
+        <div ref={viewerRef} className="reading-app-surface absolute inset-0 z-[100] flex flex-col bg-[var(--c-page-body-bg)]" data-immersive={immersive} style={{ paddingTop: "var(--page-header-safe-top, 48px)" }}>
             {/* Page flip overlay */}
             {flipAnim && (
                 <>
@@ -2102,7 +2199,7 @@ export function ReadingViewer({ book, onBack }: Props) {
             {/* Header — chapter name + page info */}
             <header className={`reading-header ${immersive ? "reading-header--immersive" : "reading-header--revealed"}`} data-ui="header">
                 <div className="reading-header-top">
-                    <button onClick={onBack} className="page-back-btn reading-header-back">
+                    <button onClick={() => { readingSelection.clear(); tts.controller.stop(); onBack(); }} className="page-back-btn reading-header-back">
                         <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="15 18 9 12 15 6" />
                         </svg>
@@ -2160,12 +2257,21 @@ export function ReadingViewer({ book, onBack }: Props) {
                 </div>
             )}
 
+            <ReadingTtsControls state={tts.state} preferences={readingConfig.readAloud ?? {}} voices={tts.voices} voice={tts.voice}
+                following={ttsFollow.following} onPreferences={updateTtsPreferences} onPlay={playTts}
+                onPause={() => tts.controller.pause()} onStop={() => tts.controller.stop()}
+                onMove={direction => { ttsFollow.follow(); tts.controller.move(direction); }} onFollow={ttsFollow.follow}
+                onRetry={playTts} />
+
             {/* Reading content */}
             <div
                 ref={scrollRef}
                 className={`relative flex-1 min-h-0 px-4 pt-1 pb-3 ${(isPdf || isScrollMode) ? "overflow-auto" : "overflow-hidden"}`}
                 data-ui="body"
                 onClick={handleReadingSurfaceClick}
+                onWheelCapture={ttsFollow.suspend}
+                onPointerDownCapture={ttsFollow.suspend}
+                onKeyDownCapture={event => { if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) ttsFollow.suspend(); }}
             >
                 {isPdf ? (
                     <>
@@ -2173,6 +2279,8 @@ export function ReadingViewer({ book, onBack }: Props) {
                         <PdfPageRenderer
                             bookId={book.id}
                             chapter={pdfAnnotationChapter}
+                            paragraphLocations={paragraphRefs}
+                            activePosition={tts.activePosition}
                             annotations={pdfRenderAnnotations}
                             bilingualTranslationEnabled={bilingualTranslationEnabled}
                             collapseBilingualTranslation={readingConfig.collapseBilingualTranslation === true}
@@ -2221,6 +2329,10 @@ export function ReadingViewer({ book, onBack }: Props) {
                                             {paragraph.split("\n").map((segment, sIndex) => (
                                                 <p
                                                     key={sIndex}
+                                                    data-reading-text="true"
+                                                    data-reading-chapter={chapter.index}
+                                                    data-reading-paragraph={pIndex}
+                                                    data-reading-tts-active={isTtsParagraph(chapter.index, pIndex) || undefined}
                                                     className={`reading-line reading-line-indent${sIndex === segmentCount - 1 ? " reading-line-seg-end" : ""}`}
                                                 >
                                                     {segment}
@@ -2263,6 +2375,37 @@ export function ReadingViewer({ book, onBack }: Props) {
 
                 {isPdf && <div className="h-[88px]" />}
             </div>
+
+            {readingSelection.action && (
+                <div className="reading-selection-actions" data-no-nav="true"
+                    style={{ left: Math.min(readingSelection.action.left, Math.max(8, (viewerRef.current?.clientWidth ?? 360) - 186)), top: readingSelection.action.top }}>
+                <button
+                    type="button"
+                    className="reading-quote-action"
+                    data-reading-quote-action="true"
+                    data-no-nav="true"
+                    onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); readingSelection.capture(); }}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        const quote = readingSelection.takeQuote();
+                        if (!quote) return;
+                        setPendingQuote(quote);
+                        handleOpenChat(true);
+                        if (!companionId) setShowCharPicker(true);
+                    }}
+                >引用</button>
+                <button type="button" className="reading-tts-start-here" data-reading-quote-action="true"
+                    onPointerDown={event => {
+                        event.preventDefault(); event.stopPropagation();
+                        if (scrollRef.current) ttsSelectionAnchor.current = currentReadingAnchor(scrollRef.current, window.getSelection());
+                    }}
+                    onClick={event => {
+                        event.stopPropagation();
+                        const anchor = scrollRef.current && hasReadingSelection() ? currentReadingAnchor(scrollRef.current, window.getSelection()) : ttsSelectionAnchor.current;
+                        readingSelection.clear(); startTtsHere(anchor);
+                    }}>从这里朗读</button>
+                </div>
+            )}
 
             {/* Immersive Page Number */}
             <span className={`reading-immersive-page ${immersive ? 'opacity-35' : 'opacity-0'}`}>
@@ -2464,18 +2607,23 @@ export function ReadingViewer({ book, onBack }: Props) {
                                 ))}
                                 {chatting && <div className="ts-13 text-[var(--c-icon)] py-1">{companion?.name} 正在思考...</div>}
                             </div>
+                            {pendingQuote && (
+                                <div onPointerDown={event => event.stopPropagation()}>
+                                    <ReadingQuotePreview quote={pendingQuote} onCancel={() => setPendingQuote(null)} />
+                                </div>
+                            )}
                             <div className="reading-chat-float-input">
                                 <input
                                     value={chatInput}
                                     onChange={e => setChatInput(e.target.value)}
-                                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                                    onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); handleSend(); } }}
                                     placeholder="输入消息..."
                                     className="ui-input flex-1"
                                     disabled={chatting}
                                 />
                                 <button
                                     onClick={handleSend}
-                                    disabled={!chatInput.trim() || chatting}
+                                    disabled={!chatInput.trim() || !companionId || chatting}
                                     className="reading-chat-send-btn"
                                     aria-label="发送"
                                 ><SendHorizontal size={18} strokeWidth={1.8} /></button>

@@ -13,6 +13,7 @@ import { kvGet, kvSet, registerKvMigration } from "./kv-db";
 import { emitChatPluginEvent, runChatPluginTransformSync } from "./chat-plugin-hooks";
 import { parseAIResponse } from "./rich-message-parser";
 import { extractTextToolDirectiveText } from "./text-tool-protocol";
+import type { ReadingQuote } from "./reading-quote";
 
 export const DEFAULT_VISION_IMAGE_PROMPT_LIMIT = 1;
 export const MAX_VISION_IMAGE_PROMPT_LIMIT = 20;
@@ -239,6 +240,7 @@ export type ChatMessage = {
         mediaCompressedAt?: string;
         mediaCleanedAt?: string;
         readingBookTitle?: string; // 阅读讨论所属书名，用于 prompt 短期记忆边界
+        readingQuote?: ReadingQuote; // 共读原文引用；content 仅存用户输入
         appId?: string;
         appName?: string;
         appCardTitle?: string;

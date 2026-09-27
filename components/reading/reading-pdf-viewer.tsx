@@ -4,12 +4,18 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { loadRawFileBlob } from "@/lib/reading-storage";
 import { splitBilingualText } from "@/lib/bilingual-text";
 import { scrollElementWithinContainer } from "@/lib/dom-scroll";
+import { PDF_PAGES_PER_CHAPTER } from "@/lib/reading-parser";
+import { readReadingSelection } from "@/lib/reading-quote";
+import { pdfParagraphAt, type ReadingParagraphLocation } from "@/lib/reading-tts-location";
+import type { ReadingTtsPosition } from "@/lib/reading-tts";
 
 import type { ReadingAnnotation, BookChapter } from "@/lib/reading-types";
 
 type Props = {
     bookId: string;
     chapter?: BookChapter;
+    paragraphLocations?: ReadingParagraphLocation[];
+    activePosition?: ReadingTtsPosition | null;
     annotations?: ReadingAnnotation[];
     bilingualTranslationEnabled?: boolean;
     collapseBilingualTranslation?: boolean;
@@ -57,6 +63,8 @@ function loadPdfjs(): Promise<any> {
 export function PdfPageRenderer({
     bookId,
     chapter,
+    paragraphLocations,
+    activePosition,
     annotations,
     bilingualTranslationEnabled = false,
     collapseBilingualTranslation = true,
@@ -112,6 +120,38 @@ export function PdfPageRenderer({
 
     /** 渲染完成版本号：渲染 effect 每完成一轮全量渲染 +1，驱动待处理的跳页定位 */
     const [renderDone, setRenderDone] = useState(0);
+    const activePositionRef = useRef(activePosition);
+    activePositionRef.current = activePosition;
+
+    // Add metadata to PDF.js spans in place: selection ranges and the text layer stay intact.
+    const syncTextMetadata = useCallback((page: HTMLElement) => {
+        const rect = page.getBoundingClientRect();
+        if (!rect.height) return;
+        const pageNum = Number(page.dataset.page);
+        const locations = (paragraphLocations ?? []).filter(item => item.pageNum === pageNum);
+        for (const span of page.querySelectorAll<HTMLElement>(".reading-pdf-text-layer span")) {
+            const paragraph = pdfParagraphAt(locations, (span.getBoundingClientRect().bottom - rect.top) / rect.height);
+            if (paragraph) {
+                span.dataset.readingText = "true";
+                span.dataset.readingChapter = String(paragraph.chapterIndex);
+                span.dataset.readingParagraph = String(paragraph.paragraphIndex);
+            }
+            const active = activePositionRef.current;
+            if (paragraph && active?.chapterIndex === paragraph.chapterIndex && active.paragraphIndex === paragraph.paragraphIndex) span.dataset.readingTtsActive = "true";
+            else delete span.dataset.readingTtsActive;
+        }
+    }, [paragraphLocations]);
+    const syncTextMetadataRef = useRef(syncTextMetadata);
+    syncTextMetadataRef.current = syncTextMetadata;
+    useEffect(() => {
+        canvasContainerRef.current?.querySelectorAll<HTMLElement>("div[data-page]").forEach(syncTextMetadata);
+    }, [syncTextMetadata, renderDone]);
+    useEffect(() => {
+        const container = canvasContainerRef.current;
+        container?.querySelectorAll<HTMLElement>("[data-reading-tts-active]").forEach(span => { delete span.dataset.readingTtsActive; });
+        if (activePosition) container?.querySelectorAll<HTMLElement>(`[data-reading-chapter="${activePosition.chapterIndex}"][data-reading-paragraph="${activePosition.paragraphIndex}"]`)
+            .forEach(span => { span.dataset.readingTtsActive = "true"; });
+    }, [activePosition]);
 
     /**
      * 批注钉与页面渲染解耦：页面 canvas 渲染只依赖文档与渲染参数；
@@ -119,6 +159,7 @@ export function PdfPageRenderer({
      * 不再触发整本页面重建（开自动批注/生成批注也不闪烁）。
      */
     const createAnnotationPin = useCallback((pageNum: number) => {
+        const hasTextSelection = () => wrapperRef.current && readReadingSelection(wrapperRef.current, window.getSelection(), "");
         if (!chapter?.paragraphPages || !annotations?.length) return [] as HTMLDivElement[];
         const elements: HTMLDivElement[] = [];
         for (const ann of annotations) {
@@ -208,6 +249,7 @@ export function PdfPageRenderer({
                 }
             };
             const openMenu = () => {
+                if (hasTextSelection()) return;
                 annEl.dataset.expanded = "true";
                 menuEl.dataset.open = "true";
                 didLongPress = true;
@@ -215,6 +257,7 @@ export function PdfPageRenderer({
             bodyEl.onpointerdown = (e) => {
                 e.stopPropagation();
                 clearLongPress();
+                if (hasTextSelection()) return;
                 longPressTimer = window.setTimeout(openMenu, 500);
             };
             bodyEl.onpointerup = clearLongPress;
@@ -223,6 +266,7 @@ export function PdfPageRenderer({
             annEl.onclick = (e) => {
                 e.stopPropagation();
                 clearLongPress();
+                if (hasTextSelection()) return;
                 if (didLongPress) {
                     didLongPress = false;
                     return;
@@ -294,6 +338,7 @@ export function PdfPageRenderer({
 
         let cancelled = false;
         const renderSeq = ++renderSeqRef.current;
+        const textTasks = new Set<{ promise: Promise<void>; cancel: () => void }>();
 
         (async () => {
             try {
@@ -316,11 +361,14 @@ export function PdfPageRenderer({
                 const isNewPdf = renderedPdfRef.current !== pdf;
                 if (isNewPdf) renderedPdfRef.current = pdf;
                 const reusableCanvases = new Map<number, HTMLCanvasElement>();
+                const reusableTextLayers = new Map<number, HTMLElement>();
                 if (!isNewPdf) {
                     for (const child of Array.from(container.children)) {
                         const n = Number((child as HTMLElement).dataset.page);
                         const canvas = (child as HTMLElement).querySelector("canvas[data-page]") as HTMLCanvasElement | null;
                         if (n && canvas) reusableCanvases.set(n, canvas);
+                        const textLayer = child.querySelector<HTMLElement>(".reading-pdf-text-layer");
+                        if (n && textLayer) reusableTextLayers.set(n, textLayer);
                     }
                 }
 
@@ -383,13 +431,35 @@ export function PdfPageRenderer({
                         const ctx = canvas.getContext("2d", { alpha: false });
                         if (!ctx) throw new Error("Canvas 2D context unavailable");
                         await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
-                        page.cleanup?.();
-
-                        if (cancelled || renderSeq !== renderSeqRef.current) return;
+                        if (cancelled || renderSeq !== renderSeqRef.current) { page.cleanup?.(); return; }
 
                         renderedPagesRef.current.add(pageNum);
                         pageWrapper.style.height = `${cssHeight}px`;
                         pageWrapper.replaceChildren(canvas, ...annotationPinFactoryRef.current(pageNum));
+                        // Use the same PDF.js viewport at CSS resolution for native selection.
+                        // Failure/absence of embedded text must never hide the rendered page.
+                        try {
+                            const textContent = await page.getTextContent();
+                            const textLayer = document.createElement("div");
+                            textLayer.className = "reading-pdf-text-layer";
+                            textLayer.dataset.readingText = "true";
+                            textLayer.dataset.readingChapter = String(Math.floor((pageNum - 1) / PDF_PAGES_PER_CHAPTER));
+                            const textViewport = page.getViewport({ scale: effectiveWidth / viewport.width });
+                            textLayer.style.setProperty("--scale-factor", String(textViewport.scale));
+                            const pdfjs = await loadPdfjs();
+                            if (cancelled || renderSeq !== renderSeqRef.current) return;
+                            const textTask = pdfjs.renderTextLayer({ textContentSource: textContent, container: textLayer, viewport: textViewport });
+                            textTasks.add(textTask);
+                            try { await textTask.promise; } finally { textTasks.delete(textTask); }
+                            if (!cancelled && renderSeq === renderSeqRef.current) {
+                                pageWrapper.insertBefore(textLayer, canvas.nextSibling);
+                                syncTextMetadataRef.current(pageWrapper);
+                            }
+                        } catch (err) {
+                            if (!cancelled) console.warn("[Reading] PDF text selection unavailable on page", pageNum, err);
+                        } finally {
+                            page.cleanup?.();
+                        }
                         } finally {
                             activeRendersRef.current -= 1;
                         }
@@ -414,9 +484,11 @@ export function PdfPageRenderer({
 
                     // 同书重建且缩放率未变：复用已渲染的 canvas，不闪回米黄占位
                     const reused = reusableCanvases.get(i);
-                    if (reused && Math.abs(parseFloat(reused.style.width || "0") - effectiveWidth) < 1) {
+                    if (reused && reusableTextLayers.has(i) && Math.abs(parseFloat(reused.style.width || "0") - effectiveWidth) < 1) {
                         pageWrapper.style.height = reused.style.height || `${defaultCssHeight}px`;
                         pageWrapper.replaceChildren(reused, ...annotationPinFactoryRef.current(i));
+                        const textLayer = reusableTextLayers.get(i);
+                        if (textLayer) pageWrapper.insertBefore(textLayer, reused.nextSibling);
                         renderedPagesRef.current.add(i);
                     } else {
                         const placeholder = document.createElement("div");
@@ -533,6 +605,8 @@ export function PdfPageRenderer({
 
         return () => {
             cancelled = true;
+            for (const task of textTasks) task.cancel();
+            textTasks.clear();
             observerRef.current?.disconnect();
             cleanupRef.current?.();
             cleanupRef.current = null;

@@ -12,6 +12,7 @@ import { ContactCardGenerateFlow } from "@/components/chat/contact-card-generate
 import { MediaPreviewOverlay } from "@/components/chat/media-preview-overlay";
 import { findStickerByName } from "@/lib/sticker-data";
 import { splitBilingualText } from "@/lib/bilingual-text";
+import { getReadingQuote, type ReadingQuote } from "@/lib/reading-quote";
 import { isInvisibleOrWhitespaceOnly } from "@/lib/rich-message-parser";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
@@ -130,8 +131,10 @@ export const MessageBubble = memo(function MessageBubble({ msg, onUpdate, charNa
                 return <PluginKindBubble msg={msg} kind={msg.mediaType.slice("plugin:".length)} />;
             }
             const textBubble = <TextBubble content={displayContent ?? msg.content} onActionSelect={onActionSelect} defaultTranslationExpanded={defaultTranslationExpanded} />;
+            const readingQuote = getReadingQuote(msg);
             return (
                 <>
+                    {readingQuote && <ReadingQuotePreview quote={readingQuote} />}
                     {textBubble}
                     <ChatPluginSlot name="message.footer" slotProps={{ sessionId: msg.sessionId, message: msg }} className="chat-plugin-message-footer" />
                 </>
@@ -147,6 +150,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onUpdate, charNa
         if (prev.msg.isRetracted !== next.msg.isRetracted) return false;
         if (prev.msg.isTyping !== next.msg.isTyping) return false;
         if (prev.msg.mediaData?.status !== next.msg.mediaData?.status) return false;
+        if (prev.msg.mediaData?.readingQuote !== next.msg.mediaData?.readingQuote) return false;
         if (prev.msg.mediaData?.label !== next.msg.mediaData?.label) return false;
         if (prev.msg.mediaData?.claimedBy?.length !== next.msg.mediaData?.claimedBy?.length) return false;
         if (prev.msg.mediaData?.appName !== next.msg.mediaData?.appName) return false;
@@ -166,6 +170,18 @@ export const MessageBubble = memo(function MessageBubble({ msg, onUpdate, charNa
     if (prev.defaultTranslationExpanded !== next.defaultTranslationExpanded) return false;
     return true;
 });
+
+export function ReadingQuotePreview({ quote, onCancel }: { quote: ReadingQuote; onCancel?: () => void }) {
+    return (
+        <div className={`reading-quote-preview${onCancel ? " reading-quote-preview--draft" : ""}`}>
+            <div className="reading-quote-preview-copy">
+                <div className="reading-quote-preview-title">{quote.bookTitle ? `引用《${quote.bookTitle}》` : "引用书中文字"}</div>
+                <blockquote className="reading-quote-preview-text">{quote.text}</blockquote>
+            </div>
+            {onCancel && <button type="button" onClick={onCancel} aria-label="取消引用">×</button>}
+        </div>
+    );
+}
 
 // ── Text Bubble (default) ─────────────────────────────
 

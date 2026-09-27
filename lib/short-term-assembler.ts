@@ -27,6 +27,7 @@ import { loadBlackMarketTheaterProjectionEntries } from "./black-market-storage"
 import { loadInterviewMagazineProjectionEntries } from "./interview-magazine-memory";
 import { loadCoCreateProjectionEntries } from "./cocreate-memory";
 import { stripStateAndInnerForPrompt } from "./prompt-sanitizer";
+import { formatReadingQuoteContent } from "./reading-quote";
 import { renderUserNameMacro } from "./user-macro";
 import { loadChatOfflineProjectionEntries } from "./chat-offline-storage";
 import { loadCheckPhoneProjectionEntries } from "./checkphone-storage";
@@ -320,7 +321,7 @@ export function loadNativeTimeline(
             }
 
             const sender = msg.role === "user" ? userName : msg.role === "tool" ? "工具" : charName;
-            let content = stripStateAndInnerForPrompt(msg.content || "");
+            let content = formatReadingQuoteContent(msg, stripStateAndInnerForPrompt(msg.content || ""));
 
             // Action notifications: always override content to bracket format (stored content is natural language for UI)
             if (msg.mediaType === "accept_red_packet") content = "[领取红包]";
@@ -1097,7 +1098,7 @@ export function prepareShortTermContext(
     }
     for (let i = 0; i < history.length; i++) {
         if (isPromptHiddenChatMessage(history[i], { includeNativeToolHistory: options?.includeNativeToolHistory })) continue;
-        pool.push({ kind: "history", timestamp: history[i].createdAt, tokens: estimateTokens(history[i].content) + 4, msgIdx: i });
+        pool.push({ kind: "history", timestamp: history[i].createdAt, tokens: estimateTokens(formatReadingQuoteContent(history[i])) + 4, msgIdx: i });
     }
 
     pool.sort((a, b) => a.timestamp.localeCompare(b.timestamp));

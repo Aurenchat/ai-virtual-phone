@@ -27,6 +27,7 @@ import { formatCoreMemories, formatLongTermMemories } from "./memory-injector";
 import { prepareShortTermContext } from "./short-term-assembler";
 import { previewMessagesForApi, sendLLMRequest } from "./chat-engine";
 import { DEFAULT_READING_BILINGUAL_PROMPT, resolveBilingualPrompt } from "./bilingual-prompt-defaults";
+import { getReadingQuote } from "./reading-quote";
 
 export type ReadingDiscussAction =
     | { type: "add_annotation"; paragraphIndex: number; content: string }
@@ -105,6 +106,14 @@ async function resolveReadingInput(
         history: options.history,
         userName: userIdentity?.name ?? "用户",
     });
+    // A long current quote is request input, not expendable historical memory. Keep it
+    // intact even if it alone exceeds the history budget; historical truncation is unchanged.
+    const currentMessage = options.history?.at(-1);
+    if (appTags.includes("discuss") && currentMessage?.role === "user" && getReadingQuote(currentMessage)
+        && !truncatedHistory.some(message => message.id === currentMessage.id)) {
+        unifiedRecentItems.push({ kind: "history", timestamp: currentMessage.createdAt, historyIndex: truncatedHistory.length });
+        truncatedHistory.push(currentMessage);
+    }
     const readingConfig = loadReadingInteractionConfig();
 
     const input: AssemblerInput = {

@@ -9,7 +9,7 @@ export type VoiceApiConfigResolved = VoiceApiConfig;
  * Resolve the TTS voice config for a character via the binding cascade.
  * Returns null if no voice config is bound or found.
  */
-export function resolveVoiceConfig(characterId: string, appId?: ContentAppId): VoiceApiConfig | null {
+export function resolveVoiceConfig(characterId?: string, appId?: ContentAppId): VoiceApiConfig | null {
     const bindings = loadBindingConfig();
     const slot = resolveBinding(bindings, characterId, appId ?? "chat");
     if (!slot.voiceConfigId) return null;
@@ -29,18 +29,24 @@ export function resolveVoiceConfig(characterId: string, appId?: ContentAppId): V
 export async function synthesizeSpeech(
     text: string,
     voiceConfig: VoiceApiConfig,
-    options?: { emotion?: string },
+    options?: { emotion?: string; speed?: number; pitch?: number; signal?: AbortSignal },
 ): Promise<Blob | null> {
+    options?.signal?.throwIfAborted();
     if (!text.trim()) return null;
+
+    const config = { ...voiceConfig,
+        speechSpeed: options?.speed ?? voiceConfig.speechSpeed,
+        speechPitch: options?.pitch ?? voiceConfig.speechPitch,
+    };
 
     const provider = voiceConfig.provider;
 
     if (provider === "Minimax") {
-        return synthesizeMinimax(text, voiceConfig, options?.emotion);
+        return synthesizeMinimax(text, config, options?.emotion, options?.signal);
     }
 
     if (provider === "OpenAI") {
-        return synthesizeOpenAI(text, voiceConfig);
+        return synthesizeOpenAI(text, config, options?.signal);
     }
 
     return null;
@@ -52,18 +58,25 @@ export async function synthesizeSpeech(
 // toggled the mic. Abort after a ceiling so the caller can recover.
 const TTS_TIMEOUT_MS = 120_000;
 
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = TTS_TIMEOUT_MS): Promise<Response> {
+async function fetchWithTimeout<T>(url: string, init: RequestInit, consume: (response: Response) => Promise<T>, timeoutMs = TTS_TIMEOUT_MS): Promise<T> {
     const controller = new AbortController();
+    const externalSignal = init.signal;
+    externalSignal?.throwIfAborted();
+    const abort = () => controller.abort(externalSignal?.reason);
+    externalSignal?.addEventListener("abort", abort, { once: true });
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-        return await fetch(url, { ...init, signal: controller.signal });
+        // Keep both timeout and caller cancellation alive until the response body is consumed.
+        return await consume(await fetch(url, { ...init, signal: controller.signal }));
     } catch (e) {
+        if (externalSignal?.aborted) throw externalSignal.reason ?? new DOMException("已取消", "AbortError");
         if (e instanceof DOMException && e.name === "AbortError") {
             throw new Error(`语音合成超时（超过 ${Math.round(timeoutMs / 1000)} 秒无响应）`);
         }
         throw e;
     } finally {
         clearTimeout(timer);
+        externalSignal?.removeEventListener("abort", abort);
     }
 }
 
@@ -89,7 +102,7 @@ function normalizeMinimaxPitch(pitch: number | undefined): number {
     return Math.min(MINIMAX_PITCH_MAX, Math.max(MINIMAX_PITCH_MIN, Math.round(pitch)));
 }
 
-async function synthesizeMinimax(text: string, config: VoiceApiConfig, emotion?: string): Promise<Blob | null> {
+async function synthesizeMinimax(text: string, config: VoiceApiConfig, emotion?: string, signal?: AbortSignal): Promise<Blob | null> {
     if (!config.apiKey) throw new Error("Minimax API Key 未配置");
 
     const baseUrl = (config.baseUrl || "https://api.minimaxi.com/v1").replace(/\/$/, "");
@@ -104,7 +117,8 @@ async function synthesizeMinimax(text: string, config: VoiceApiConfig, emotion?:
         voiceSetting.emotion = normalizedEmotion;
     }
 
-    const response = await fetchWithTimeout(`${baseUrl}/t2a_v2`, {
+    return fetchWithTimeout(`${baseUrl}/t2a_v2`, {
+        signal,
         method: "POST",
         headers: {
             Authorization: `Bearer ${config.apiKey}`,
@@ -125,7 +139,7 @@ async function synthesizeMinimax(text: string, config: VoiceApiConfig, emotion?:
                 channel: 1,
             },
         }),
-    });
+    }, async response => {
 
     if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -143,15 +157,17 @@ async function synthesizeMinimax(text: string, config: VoiceApiConfig, emotion?:
     }
 
     throw new Error(data.base_resp?.status_msg || "Minimax 未返回音频数据");
+    });
 }
 
 // ── OpenAI TTS ──────────────────────────────────────
 
-async function synthesizeOpenAI(text: string, config: VoiceApiConfig): Promise<Blob | null> {
+async function synthesizeOpenAI(text: string, config: VoiceApiConfig, signal?: AbortSignal): Promise<Blob | null> {
     if (!config.apiKey) throw new Error("OpenAI API Key 未配置");
 
     const baseUrl = config.baseUrl || "https://api.openai.com/v1";
-    const response = await fetchWithTimeout(`${baseUrl.replace(/\/$/, "")}/audio/speech`, {
+    return fetchWithTimeout(`${baseUrl.replace(/\/$/, "")}/audio/speech`, {
+        signal,
         method: "POST",
         headers: {
             Authorization: `Bearer ${config.apiKey}`,
@@ -162,8 +178,9 @@ async function synthesizeOpenAI(text: string, config: VoiceApiConfig): Promise<B
             input: text,
             voice: config.defaultVoice || "alloy",
             response_format: "mp3",
+            ...(config.speechSpeed !== undefined ? { speed: Math.min(4, Math.max(0.25, config.speechSpeed)) } : {}),
         }),
-    });
+    }, async response => {
 
     if (!response.ok) {
         const errText = await response.text().catch(() => "");
@@ -172,6 +189,81 @@ async function synthesizeOpenAI(text: string, config: VoiceApiConfig): Promise<B
 
     const blob = await response.blob();
     return new Blob([await blob.arrayBuffer()], { type: "audio/mpeg" });
+    });
+}
+
+export type PausableSpeechPlayback = {
+    started: Promise<void>;
+    ended: Promise<void>;
+    pause: () => void;
+    resume: () => Promise<void>;
+    stop: () => void;
+};
+
+/** A reader owns one reusable element: pause retains currentTime, and other TTS callers
+ * keep their existing shared-player behavior. Unlock synchronously from a user gesture. */
+export function createSpeechMediaPlayer() {
+    let audio: HTMLAudioElement | null = null;
+    let active: PausableSpeechPlayback | null = null;
+    let primeUrl: string | null = null;
+    const getAudio = () => {
+        if (!audio) { audio = new Audio(); audio.setAttribute("playsinline", ""); }
+        return audio;
+    };
+    const clearPrime = () => { if (primeUrl) URL.revokeObjectURL(primeUrl); primeUrl = null; };
+    return {
+        unlock() {
+            if (active || primeUrl) return;
+            const element = getAudio();
+            const url = silentWavUrl(); primeUrl = url;
+            element.src = url;
+            void element.play().then(() => {
+                if (primeUrl === url && !active) { element.pause(); clearPrime(); }
+            }).catch(() => { if (primeUrl === url) clearPrime(); });
+        },
+        play(blob: Blob): PausableSpeechPlayback {
+            active?.stop(); clearPrime();
+            const element = getAudio();
+            const url = URL.createObjectURL(blob);
+            element.src = url;
+            element.volume = getTtsVolume();
+            let settled = false;
+            let playAttempt = 0;
+            let resolveEnd!: () => void;
+            let rejectEnd!: (error: Error) => void;
+            const ended = new Promise<void>((resolve, reject) => { resolveEnd = resolve; rejectEnd = reject; });
+            // A failed play() can reject before the caller begins awaiting ended.
+            void ended.catch(() => {});
+            const finish = (error?: Error) => {
+                if (settled) return;
+                settled = true;
+                element.onended = null; element.onerror = null;
+                element.pause(); element.removeAttribute("src"); element.load();
+                URL.revokeObjectURL(url);
+                if (active === playback) active = null;
+                if (error) rejectEnd(error); else resolveEnd();
+            };
+            element.onended = () => finish();
+            element.onerror = () => finish(new Error("音频播放失败，请重试或跳到下一段"));
+            const resume = () => {
+                const attempt = ++playAttempt;
+                return element.play().catch(error => {
+                    // pause()/stop() may reject a still-pending play() with AbortError.
+                    // Only the latest attempt can report a real playback failure.
+                    if (settled || attempt !== playAttempt) return;
+                    const message = error instanceof Error ? error.message : String(error);
+                    finish(new Error(`无法播放语音，请点击重试：${message}`));
+                    throw error;
+                });
+            };
+            const playback: PausableSpeechPlayback = { started: Promise.resolve(), ended,
+                pause: () => { ++playAttempt; element.pause(); }, resume, stop: () => finish() };
+            active = playback;
+            playback.started = resume();
+            return playback;
+        },
+        dispose() { active?.stop(); clearPrime(); audio?.pause(); audio?.removeAttribute("src"); audio = null; },
+    };
 }
 
 // ── iOS audio playback that coexists with speech recognition ──────────

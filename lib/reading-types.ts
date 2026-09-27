@@ -28,6 +28,8 @@ export type BookChapter = {
 export type ReadingProgress = {
     bookId: string;
     chapterIndex: number;
+    /** Exact paragraph when following read-aloud; old progress records remain valid. */
+    paragraphIndex?: number;
     scrollPosition: number;
     companionCharacterId?: string;
     progressFraction?: number;
