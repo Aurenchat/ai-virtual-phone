@@ -27,6 +27,7 @@ export function modelResponse(body){
 }
 export async function run({page,step,origin,captures,setDelay,repo,output}){
  page.setDefaultTimeout(12000);await page.setViewportSize({width:390,height:844});
+ await page.addStyleTag({url:origin+'/styles/app-market.css'});
  const root=path.join(repo,'custom-apps/anonymous-xiaohongshu');const manifest=JSON.parse(await fs.readFile(path.join(root,'manifest.json'),'utf8'));const assets={};
  for(const file of manifest.resources.assets){const mime=file.endsWith('.png')?'image/png':file.endsWith('.css')?'text/css':'text/javascript';assets[file]={path:file,mime,dataUrl:`data:${mime};base64,${(await fs.readFile(path.join(root,file))).toString('base64')}`};}
  const app={id:'anonymous.xiaohongshu',name:manifest.name,version:manifest.version,manifest,permissions:manifest.permissions,entryHtml:await fs.readFile(path.join(root,'index.html'),'utf8'),assets,installedAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
@@ -103,6 +104,7 @@ export async function run({page,step,origin,captures,setDelay,repo,output}){
  await step('same-viewport-native-visual-comparison',async()=>{
   const s=await state();await fs.writeFile(path.join(output,'state-fixture.json'),JSON.stringify(s,null,2));
   // Capture both products from the SAME saved state. Disable animations only for deterministic pixels.
+  await page.addStyleTag({url:origin+'/styles/app-market.css'});
   await page.addStyleTag({content:'html,body{margin:0;width:390px;height:844px} iframe{width:390px!important;height:844px!important;border:0!important;display:block}'});
   const f=await frame();const stableCss='*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';
   await f.addStyleTag({content:stableCss});
@@ -112,9 +114,22 @@ export async function run({page,step,origin,captures,setDelay,repo,output}){
    await ui.getByRole('button',{name:'关注',exact:true}).first().click();await save('following');
    await ui.getByRole('button',{name:'视频',exact:true}).first().click();await save('video');
    await ui.locator('.cp-xhs-note-card').first().click();await ui.getByRole('button',{name:'评论',exact:true}).click();await save('comment-sheet');await ui.getByRole('button',{name:'关闭评论'}).click();await ui.getByRole('button',{name:'返回',exact:true}).click();
-   await ui.getByRole('button',{name:'发现',exact:true}).first().click();await ui.locator('.cp-xhs-note-card').first().click();await save('detail');await ui.getByRole('button',{name:'返回',exact:true}).click();
+   await ui.getByRole('button',{name:'发现',exact:true}).first().click();await ui.locator('.cp-xhs-note-card').first().click();await save('detail');
+   if(side==='fork'){
+    const capsule=await page.locator('.custom-app-runner-capsule').boundingBox(),follow=await ui.locator('.cp-xhs-detail-follow').boundingBox(),share=await ui.locator('.cp-xhs-detail-share').boundingBox();
+    await page.locator('.custom-app-runner').screenshot({path:path.join(output,'hotfix-follow-after.png')});
+    await page.locator('.custom-app-runner').screenshot({path:path.join(output,'hotfix-share-after.png')});
+    assert(capsule&&follow&&share);assert(follow.x+follow.width<=capsule.x,JSON.stringify({capsule,follow,share}));assert(share.x+share.width<=capsule.x,JSON.stringify({capsule,follow,share}));
+   }
+   await ui.getByRole('button',{name:'返回',exact:true}).click();
    await ui.getByRole('button',{name:'附近',exact:true}).click();await save('nearby');
-   await ui.getByRole('button',{name:'我的',exact:true}).click();await save('profile');await ui.getByRole('button',{name:'Profile settings'}).click();await save('settings');
+   await ui.getByRole('button',{name:'我的',exact:true}).click();await save('profile');
+   if(side==='fork'){
+    const capsule=await page.locator('.custom-app-runner-capsule').boundingBox(),profileAction=await ui.getByRole('button',{name:'设置',exact:true}).boundingBox();
+    assert(capsule&&profileAction);assert(profileAction.x+profileAction.width<=capsule.x);
+    await page.locator('.custom-app-runner').screenshot({path:path.join(output,'hotfix-profile-after.png')});
+   }
+   await ui.getByRole('button',{name:'Profile settings'}).click();await save('settings');
    // Also capture all scrollable settings controls, in the original panel with no replacement UI.
    const style=await ui.addStyleTag({content:'.xhs-settings-edit-sheet{max-height:none!important}.xhs-settings-edit-sheet .xhs-profile-edit-body{max-height:none!important;overflow:visible!important}.xhs-modal-backdrop{overflow:visible!important;align-items:flex-start!important}'});
    await ui.locator('.xhs-settings-edit-sheet').screenshot({path:path.join(output,`${side}-settings-full.png`)});await style.evaluate(el=>el.remove());
@@ -164,6 +179,14 @@ export async function run({page,step,origin,captures,setDelay,repo,output}){
  await step('final-provider-payload-all-app-requests',async()=>{
   const appRequests=captures.filter(c=>c.label!=='same-viewport-native-visual-comparison');
   for(const capture of appRequests){const text=JSON.stringify(capture.body);for(const no of ['kk = Chloe','GLOBAL_IDENTITY_SECRET','CHAT_SECRET','LEGACY_SECRET','ORDINARY_SECRET','ownerKind','ownerId','ActorBinding','private-alpha','private-beta','Krueger','Soap'])assert(!text.includes(no),no);assert(text.includes('Host required policy'));}
-  return {requests:appRequests.length,leakage:false};
+ return {requests:appRequests.length,leakage:false};
+ });
+ await step('mobile-short-term-memory-wrap-regression',async()=>{
+  await page.evaluate(()=>{const p=window.phase0;p.close();p.mountMemory([{id:'anonymous-long-token',sourceApp:'custom_app',sourceDetail:'custom_app_event',customAppId:'anonymous.xiaohongshu',customAppName:'匿名小红书',customAppLabel:'匿名小红书',timestamp:new Date().toISOString(),content:'[匿名小红书] '+JSON.stringify({subject:{kind:'social_account',accountId:'acct_18be121dabbe4b4aae5a437382ed8a0c',displayName:'街角暗房与随身听',previousDisplayNames:['旅人_e19a1aa8']},participants:[{kind:'social_account',accountId:'acct_70ae8f03d15144048aa33241a9fa1a16',displayName:'八魂飞魄散中'}],event:'账号发布了含有很长结构化身份字段的笔记'})}]);});
+  await page.locator('.mem-tl-card').click();await page.waitForTimeout(100);
+  const metrics=await page.locator('.mem-tl-card').evaluate(card=>{const detail=card.querySelector('.mem-tl-card-detail'),projection=card.querySelector('.mem-tl-projection-text');return {cardClient:card.clientWidth,cardScroll:card.scrollWidth,detailClient:detail?.clientWidth,detailScroll:detail?.scrollWidth,projectionClient:projection?.clientWidth,projectionScroll:projection?.scrollWidth,documentClient:document.documentElement.clientWidth,documentScroll:document.documentElement.scrollWidth};});
+  assert.equal(metrics.cardScroll,metrics.cardClient);assert.equal(metrics.detailScroll,metrics.detailClient);assert.equal(metrics.documentScroll,metrics.documentClient);
+  await page.screenshot({path:path.join(output,'hotfix-memory-after.png')});
+  return metrics;
  });
 }

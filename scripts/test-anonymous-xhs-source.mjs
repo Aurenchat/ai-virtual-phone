@@ -47,6 +47,17 @@ await test('full native settings and prompt editors retained',()=>{
 await test('product CSS remains byte-equivalent after line-ending normalization',()=>{
  for(const file of ['checkphone','xiaohongshu'])assert.equal(read(src+`fork/styles/${file}.css`),read(root+`/upstream/styles/${file}.css.source`));
 });
+await test('fork-only Custom App chrome inset protects top-right actions',()=>{
+ const css=read(src+'styles/iframe.css');
+ assert(css.includes('--xhs-custom-app-chrome-inset:96px'));
+ for(const selector of ['.cp-xhs-appbar .cp-appbar-actions','.cp-xhs-profile-topbar','.cp-xhs-note-detail-header','.cp-xhs-thread-appbar','.cp-xhs-video-detail-topbar'])assert(css.includes(selector),selector);
+});
+await test('short-term memory projection text wraps unbroken account IDs',()=>{
+ const css=read('styles/components.css');
+ assert(css.includes('.mem-tl-card-detail {\n  min-width: 0;\n  max-width: 100%;\n  overflow-x: hidden;'));
+ assert(css.includes('.mem-tl-system {\n  box-sizing: border-box;\n  width: 100%;'));
+ assert(css.includes('.mem-tl-projection-text {\n  min-width: 0;\n  max-width: 100%;\n  overflow-wrap: anywhere;'));
+});
 await test('required opt-in permissions and default build cannot package',()=>{
  const m=JSON.parse(read(root+'/manifest.json'));for(const p of ['ai.generateScoped','ai.tasks','app.policy.manage','memory.source.read','memory.source.write','chat.sendCard'])assert(m.permissions.includes(p));
  for(const p of ['ai.generate','memory.search','user.profile.read'])assert(!m.permissions.includes(p));

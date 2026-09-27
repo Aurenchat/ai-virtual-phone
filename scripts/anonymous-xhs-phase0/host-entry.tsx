@@ -29,6 +29,7 @@ import * as provider from '../../lib/llm-provider-adapter';
 import * as transport from '../../lib/llm-http';
 import * as nativeSocial from '../../lib/xiaohongshu-engine';
 import {XiaohongshuApp} from '../../components/xiaohongshu/xiaohongshu-app';
+import {MemoryTimeline} from '../../components/memory/memory-timeline';
 import * as nativeStorage from '../../lib/xiaohongshu-storage';
 import * as nativeMedia from '../../lib/chat-asset-storage';
 import { DEFAULT_XIAOHONGSHU_SETTINGS } from '../../lib/xiaohongshu-types';
@@ -50,5 +51,6 @@ const probe = {
   },
   close() { root?.unmount(); root = null; },
   mountNative() { if(!root)root=createRoot(document.getElementById('app')!);root.render(<XiaohongshuApp onClose={()=>probe.close()} onNotice={console.log}/>); },
+  mountMemory(events: any[]) { if(!root)root=createRoot(document.getElementById('app')!);root.render(<main style={{width:'100%',minHeight:'100%',padding:'16px',boxSizing:'border-box',background:'var(--c-bg)'}}><MemoryTimeline events={events} userName="Chloe"/></main>); },
 };
 (window as any).phase0 = probe;

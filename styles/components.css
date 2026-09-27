@@ -5371,6 +5371,9 @@
 /* ── Expanded card detail ── */
 
 .mem-tl-card-detail {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
   margin-top: 10px;
   padding-top: 12px;
   border-top: 1px dashed var(--c-panel-border);
@@ -5391,6 +5394,12 @@
 /* ── Chat Bubbles ── */
 
 .mem-tl-system {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   text-align: center;
   font-size: calc(9px*var(--app-text-scale,1));
   color: var(--c-icon);
@@ -5403,6 +5412,11 @@
 }
 
 .mem-tl-projection-text {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
   font-size: calc(10.8px*var(--app-text-scale,1));
   line-height: 1.7;
   color: var(--c-text-title);

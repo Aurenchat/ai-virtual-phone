@@ -1,5 +1,5 @@
 {
-  "checks": 65,
+  "checks": 67,
   "tests": [
     "pinned snapshot SHA256 components/xiaohongshu/xiaohongshu-app.tsx",
     "pinned snapshot SHA256 lib/xiaohongshu-engine.ts",
@@ -53,6 +53,8 @@
     "native vision fallback consumes only the structured unsupported code",
     "full native settings and prompt editors retained",
     "product CSS remains byte-equivalent after line-ending normalization",
+    "fork-only Custom App chrome inset protects top-right actions",
+    "short-term memory projection text wraps unbroken account IDs",
     "required opt-in permissions and default build cannot package",
     "identity-only prompt projection keeps original output protocol",
     "one batch initializes multiple characters and resolves collisions",
