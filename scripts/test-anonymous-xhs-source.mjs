@@ -5,6 +5,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import ts from 'typescript';
+import {createSourceMemoryFixture} from './test-source-memory-timeline.mjs';
 const require=createRequire(import.meta.url);
 require.extensions['.ts']=(m,file)=>m._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2021,module:ts.ModuleKind.CommonJS,esModuleInterop:true}}).outputText,file);
 const root=path.resolve('custom-apps/anonymous-xiaohongshu'),src=root+'/src/';
@@ -68,8 +69,9 @@ await test('identity-only prompt projection keeps original output protocol',()=>
  const prompt=projectPromptIdentity('以下名字属于真实角色或用户\n{{user}}\n#用户笔记互动\n[点赞用户1]someone\n[被@角色]friend','moth');assert(!prompt.includes('真实角色或用户'));assert(prompt.includes('moth'));assert(prompt.includes('#用户笔记互动'));assert(prompt.includes('[点赞用户1]'));assert(prompt.includes('[被@账号]'));
 });
 
-const db=new Map(),tasks=new Map(),revisions=new Map(),memories=new Map();let calls=0,consumes=0,namingError=false,lastRequest;
-const scopeKey=s=>JSON.stringify([s.viewerCharacterId,s.sourceNamespace,s.sourceEntityId]);
+const db=new Map(),tasks=new Map();let calls=0,consumes=0,namingError=false,lastRequest;
+const memoryFixture=createSourceMemoryFixture(),memoryApp={id:'anonymous.xiaohongshu',name:'匿名小红书',permissions:['memory.source.read','memory.source.write']};
+const timelineFor=s=>memoryFixture.activeTimeline(memoryApp,s);
 const characters=[{id:'private-a',name:'Krueger',persona:'Krueger enjoys coffee; Chloe is a colleague.',avatar:'PRIVATE_AVATAR_A'},{id:'private-b',name:'Soap',persona:'Soap enjoys photography.',avatar:'PRIVATE_AVATAR_B'}];
 global.window={dispatchEvent(){},AiPhone:{
  app:{async setPolicy(){}},characters:{async list(){return characters;}},
@@ -77,7 +79,7 @@ global.window={dispatchEvent(){},AiPhone:{
  ai:{async startTask({idempotencyKey:key,request}){lastRequest=request;if(tasks.has(key))return tasks.get(key);calls++;let content='RESULT';
    if(request.appContext.includes('平台网名初始化工具')){if(namingError)throw Error('offline');const accounts=JSON.parse(request.messages[0].content.split('\n').slice(1).join('\n'));content=JSON.stringify({accounts:accounts.map(a=>({accountId:a.accountId,displayName:'nightfilm'}))});}
    const task={taskId:key,status:'completed',result:{content}};tasks.set(key,task);return task;},async getTask({taskId}){return tasks.get(taskId);},async consumeTask({taskId,writes}){const task=tasks.get(taskId);if(task.status==='consumed')return {applied:false};for(const w of writes)db.set(w.collection+'.'+w.id,structuredClone(w.value));task.status='consumed';consumes++;return {applied:true};}},
- memory:{async searchSource(s){const k=scopeKey(s);return {revision:revisions.get(k)||0,entries:[...(memories.get(k)||new Map()).values()]};},async invalidateSource(s){const k=scopeKey(s),r=(revisions.get(k)||0)+1;revisions.set(k,r);memories.delete(k);return {revision:r};},async writeSource(s){const k=scopeKey(s);assert.equal(s.expectedRevision,revisions.get(k)||0);const entries=memories.get(k)||new Map();const existing=entries.get(s.evidenceId);if(existing)assert.equal(existing.content,s.content);entries.set(s.evidenceId,{content:s.content});memories.set(k,entries);}}
+ memory:memoryFixture.api(memoryApp)
 }};
 const storage=require(src+'adapters/storage.ts'),identity=require(src+'adapters/identity.ts'),chars=require(src+'adapters/characters.ts'),ids=require(src+'identity/accounts.ts'),disclosure=require(src+'identity/disclosure.ts'),task=require(src+'adapters/tasks.ts'),memory=require(src+'adapters/memory.ts'),nativeStorage=require(src+'fork/lib/xiaohongshu-storage.ts');
 await storage.hydrate();identity.initIdentity();await chars.initializeCharacters();identity.setUserProfile('moth');
@@ -121,12 +123,40 @@ await test('double clicks cannot create overlapping journals',async()=>{
 await test('source subjects use explicit accountIds, never substring guessing',async()=>{
  const viewer=chars.loadCharacters()[0].id,a=identity.createAccount('小A'),b=identity.createAccount('小AB');identity.saveIdentity();
  memory.publishEventProjection(viewer,{id:'evt_1',content:'小AB 发了摄影笔记',timestamp:'now',noteId:'n1',subjectIds:[b.accountId]});await memory.flushMemories();
- assert.equal((await window.AiPhone.memory.searchSource({viewerCharacterId:'private-a',sourceNamespace:'social_posts',sourceEntityId:a.accountId})).entries.length,0);
- assert.equal((await window.AiPhone.memory.searchSource({viewerCharacterId:'private-a',sourceNamespace:'social_posts',sourceEntityId:b.accountId})).entries.length,1);
+ const scope=id=>({viewerCharacterId:'private-a',sourceNamespace:'social_posts',sourceEntityId:id});
+ assert.equal(timelineFor(scope(a.accountId)).length,0);
+ assert.equal(timelineFor(scope(b.accountId)).length,1);
  memory.publishEventProjection(viewer,{id:'evt_2',content:'小AB 发了做饭笔记',timestamp:'now',noteId:'n2',subjectIds:[b.accountId]});await memory.flushMemories();
  memory.removeEventProjections({noteId:'n1'});await memory.flushMemories();
- const active=await window.AiPhone.memory.searchSource({viewerCharacterId:'private-a',sourceNamespace:'social_posts',sourceEntityId:b.accountId});assert.equal(active.entries.length,1);assert(active.entries[0].content.includes('做饭'));assert.equal(active.revision,1);
- memory.publishEventProjection(viewer,{id:'evt_1',content:'小AB 发了摄影笔记',timestamp:'now',noteId:'n1',subjectIds:[b.accountId]});await memory.flushMemories();assert.equal((await window.AiPhone.memory.searchSource({viewerCharacterId:'private-a',sourceNamespace:'social_posts',sourceEntityId:b.accountId})).entries.length,1);
+ const active=timelineFor(scope(b.accountId));assert.equal(active.length,1);assert(active[0].summary.includes('做饭'));assert.equal(active[0].provenance.sources[0].revision,1);
+ memory.publishEventProjection(viewer,{id:'evt_1',content:'小AB 发了摄影笔记',timestamp:'now',noteId:'n1',subjectIds:[b.accountId]});await memory.flushMemories();assert.equal(timelineFor(scope(b.accountId)).length,1);
+ assert.equal(memoryFixture.writes,0);
+});
+await test('native post/comment/reply/follow events persist privately and project only to source-aware timeline',async()=>{
+ const events=require(src+'fork/lib/xiaohongshu-memory.ts'),viewer=chars.loadCharacters()[0],user=identity.userAccount();
+ const platform=nativeStorage.createDefaultXiaohongshuState(),note=nativeStorage.createUserXiaohongshuNote({title:'memory regression',body:'post body',tags:[]},platform.profile);
+ const comment={id:'memory-comment',authorId:viewer.id,authorName:viewer.name,authorType:'character',text:'comment body',createdAt:new Date().toISOString()};
+ note.comments=[comment];platform.notes=[note];nativeStorage.saveXiaohongshuState(platform);
+ const common={characterId:viewer.id,characterName:viewer.name,note};
+ events.recordXiaohongshuPostEvent(common);
+ events.recordXiaohongshuCommentEvent({...common,comment,liked:true,saved:true});
+ events.recordXiaohongshuReplyEvent({...common,comment:{...comment,id:'memory-reply'},targetComment:{...comment,id:'target',authorId:user.accountId,authorName:user.displayName,authorType:'user'}});
+ events.recordXiaohongshuFollowUserEvent({...common,userDisplayName:user.displayName});
+ await memory.flushMemories();await storage.flush();
+ const saved=db.get('fork_storage.kv').values,privateEvents=JSON.parse(saved['ai_phone_xiaohongshu_events_'+viewer.id]);
+ assert.equal(privateEvents.length,4);assert.equal(JSON.parse(saved.ai_phone_xiaohongshu_state_v1).notes[0].comments[0].text,'comment body');
+ for(const event of privateEvents){const rows=memoryFixture.timeline.filter(e=>e.summary.includes(event.content));assert(rows.length>0,event.id);for(const row of rows){assert.equal(row.provenance.mixed,false);assert.equal(row.provenance.sources[0].sourceAppId,memoryApp.id);assert(event.subjectIds.includes(row.provenance.sources[0].sourceEntityId));assert(row.summary.includes('social_account'));}}
+ assert.equal(memoryFixture.entries.length,0);assert.equal(memoryFixture.writes,0);
+});
+await test('all social event types share the timeline-only outbox including likes, saves, DMs and renames',async()=>{
+ const viewer=chars.loadCharacters()[0],subject=identity.userAccount();
+ for(const kind of ['post','comment','reply','like','save','follow','dm','rename']){
+  const event={id:'regression_'+kind,timestamp:new Date().toISOString(),subjectIds:[subject.accountId],content:'[regression] '+kind};
+  memory.publishEventProjection(viewer.id,event);await memory.flushMemories();
+  const ledger=JSON.parse(db.get('fork_storage.kv').values['memory-ledger']);assert(ledger.rows.some(r=>r.evidenceId===event.id+'.'+subject.accountId&&r.sent));
+  assert(memoryFixture.timeline.some(e=>e.summary.includes(event.content)&&e.provenance.sources[0].sourceEntityId===subject.accountId));
+ }
+ assert.equal(memoryFixture.entries.length,0);assert.equal(memoryFixture.writes,0);
 });
 await test('independent platform storage keeps original schema and graph semantics',()=>{
  const state=nativeStorage.createDefaultXiaohongshuState(),note=nativeStorage.createUserXiaohongshuNote({title:'range',body:'ten rounds',tags:[]},state.profile);state.notes=[note];const saved=nativeStorage.saveXiaohongshuState(state);assert.equal(saved.notes[0].authorId,identity.userAccount().accountId);assert.equal(saved.profile.nickname,'moth');assert.deepEqual(nativeStorage.loadXiaohongshuState().settings,state.settings);

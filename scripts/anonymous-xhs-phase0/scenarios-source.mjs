@@ -88,12 +88,17 @@ export async function run({page,step,origin,captures,setDelay,repo,output}){
  await step('native-delete-invalidates-source-evidence',async()=>{
   const f=await frame();let s=await state();const n=s.platform.notes.find(n=>n.source==='user');
   const scope={viewerCharacterId:'private-alpha',sourceNamespace:'social_posts',sourceEntityId:n.authorId};
+  const inspect=async()=>page.evaluate(async scope=>{const p=window.phase0;
+   const timeline=p.apps.loadCustomAppTimelineEntries(scope.viewerCharacterId).filter(e=>e.appId==='anonymous.xiaohongshu'&&p.provenance.isCachedMemoryProvenanceValid(e.provenance)&&e.provenance?.sources.some(s=>s.sourceNamespace===scope.sourceNamespace&&s.sourceEntityId===scope.sourceEntityId));
+   const longTerm=(await p.memory.loadMemoryEntries(scope.viewerCharacterId)).filter(e=>e.type==='long_term'&&e.provenance?.sources.some(s=>s.sourceAppId==='anonymous.xiaohongshu'&&s.sourceNamespace==='social_posts'));
+   return {timeline,longTerm};
+  },scope);
   const search=async()=>(await frame()).evaluate(scope=>window.AiPhone.memory.searchSource(scope),scope);
-  let before=await search();assert(before.entries.some(e=>e.content.includes(n.id)));
+  let source=await search(),before=await inspect();assert(before.timeline.some(e=>e.summary.includes(n.id)));assert.equal(before.longTerm.length,0);assert.equal(source.entries.length,0);
   await f.locator('.cp-xhs-note-card').filter({hasText:n.title}).first().click();await f.getByRole('button',{name:'删除帖子'}).click();await f.getByRole('button',{name:'确认删除',exact:true}).click();
-  let after;for(let i=0;i<100;i++){after=await search();if(after.revision>before.revision&&!after.entries.some(e=>e.content.includes(n.id)))break;await page.waitForTimeout(100);}
-  assert(after.revision>before.revision);assert(!after.entries.some(e=>e.content.includes(n.id)));assert(!(await state()).platform.notes.some(x=>x.id===n.id));
-  return {beforeEntries:before.entries.length,revision:after.revision,deletedEvidenceAbsent:true};
+  let after;for(let i=0;i<100;i++){source=await search();after=await inspect();if(source.revision>0&&!after.timeline.some(e=>e.summary.includes(n.id)))break;await page.waitForTimeout(100);}
+  assert(source.revision>0);assert(!after.timeline.some(e=>e.summary.includes(n.id)));assert.equal(after.longTerm.length,0);assert(!(await state()).platform.notes.some(x=>x.id===n.id));
+  return {beforeTimeline:before.timeline.length,revision:source.revision,deletedEvidenceAbsent:true,longTermWrites:after.longTerm.length};
  });
  await step('warm-feed-native-call-count-and-always-close',async()=>{
   const f=await frame(),before=captures.length;await f.getByRole('button',{name:'刷新小红书内容',exact:true}).click();await f.getByRole('button',{name:'确认新增',exact:true}).click();await idle();assert.equal(captures.length-before,3);

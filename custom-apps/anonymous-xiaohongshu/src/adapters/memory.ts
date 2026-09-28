@@ -50,7 +50,7 @@ export function flushMemories(){
    const e=ledger.rows.find(r=>!r.sent&&!r.deleted);if(!e)break;
    const scope:Scope={viewerCharacterId:e.viewerCharacterId,sourceNamespace:e.sourceNamespace,sourceEntityId:e.sourceEntityId};
    const {revision}=await host().memory.searchSource(scope);
-   await host().memory.writeSource({...scope,expectedRevision:revision,evidenceId:e.evidenceId,content:e.content,timeline:true});
+   await host().memory.writeSource({...scope,expectedRevision:revision,evidenceId:e.evidenceId,content:e.content,target:'timeline'});
    const latest=read(),row=latest.rows.find(r=>key(r)===key(e)&&r.evidenceId===e.evidenceId);
    if(row)row.sent=true;
    save(latest);await flush();

@@ -5,7 +5,7 @@ import { requireAppCapability } from "./custom-app-protected-policy";
 import { invalidateMemorySource, memorySourceKey, readMemoryRevisions, type MemorySourceRef } from "./memory-provenance";
 import { loadCharacters } from "./character-storage";
 import { hydrateKvDb } from "./kv-db";
-import { appendCustomAppTimelineEntry } from "./custom-app-storage";
+import { appendCustomAppTimelineEntry, loadCustomAppTimelineEntries } from "./custom-app-storage";
 
 export type SourceMemoryScope = { viewerCharacterId: string; sourceNamespace: string; sourceEntityId: string };
 async function withSourceLock<T>(ref: Omit<MemorySourceRef, "revision">, fn: () => Promise<T>): Promise<T> {
@@ -26,15 +26,31 @@ export async function searchSourceMemory(app: InstalledCustomApp, input: SourceM
     const entries = (await loadMemoryEntries(ref.viewerCharacterId)).filter(e => e.provenance && !e.provenance.mixed && e.provenance.sources.every(s => memorySourceKey(s) === memorySourceKey(ref) && s.revision === revision) && (!input.query || e.content.toLowerCase().includes(input.query.toLowerCase())));
     return { revision, entries };
 }
-export async function writeSourceMemory(app: InstalledCustomApp, input: SourceMemoryScope & { content: string; expectedRevision: number; evidenceId: string; timeline?: boolean }) {
+export async function writeSourceMemory(app: InstalledCustomApp, input: SourceMemoryScope & { content: string; expectedRevision: number; evidenceId: string; timeline?: boolean; target?: "long_term" | "timeline" }) {
     requireAppCapability(app, "memory.source.write");
     await hydrateKvDb();
     const ref = refFor(app, input);
+    if (input.target !== undefined && input.target !== "long_term" && input.target !== "timeline") throw new Error("Invalid source memory target");
     return withSourceLock(ref, async () => {
     const revision = (await readMemoryRevisions())[memorySourceKey(ref)] ?? 0;
     if (input.expectedRevision !== revision) throw new Error("Stale memory source revision");
     if (typeof input.content !== "string" || !input.content.trim() || input.content.length > 16000 || !/^[\w.-]{1,160}$/.test(input.evidenceId)) throw new Error("Invalid source memory");
     const id = `source:${JSON.stringify([memorySourceKey(ref), revision, input.evidenceId])}`;
+    // Timeline-only projections never read or write the long-term store. The default
+    // remains long-term for existing callers; retries reuse the scoped evidence id.
+    if (input.target === "timeline") {
+        const existing = loadCustomAppTimelineEntries(ref.viewerCharacterId).find(e => e.appId === app.id && e.data?.sourceMemoryId === id);
+        if (existing) {
+            if (existing.data?.sourceContent !== input.content) throw new Error("Evidence id conflict");
+            return existing;
+        }
+        return appendCustomAppTimelineEntry(app, {
+            characterId: ref.viewerCharacterId,
+            summary: input.content,
+            data: { sourceMemoryId: id, sourceContent: input.content },
+            provenance: { sources: [{ ...ref, revision }], mixed: false },
+        });
+    }
     const existing = (await loadMemoryEntries(ref.viewerCharacterId)).find(e => e.id === id);
     if (existing) {
         if (existing.content !== input.content) throw new Error("Evidence id conflict");

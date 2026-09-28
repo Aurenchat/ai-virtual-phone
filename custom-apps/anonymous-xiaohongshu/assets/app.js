@@ -16627,7 +16627,7 @@ function flushMemories() {
                 break;
             const scope = { viewerCharacterId: e.viewerCharacterId, sourceNamespace: e.sourceNamespace, sourceEntityId: e.sourceEntityId };
             const { revision } = await (0,_host__WEBPACK_IMPORTED_MODULE_2__/* .host */ .H)().memory.searchSource(scope);
-            await (0,_host__WEBPACK_IMPORTED_MODULE_2__/* .host */ .H)().memory.writeSource({ ...scope, expectedRevision: revision, evidenceId: e.evidenceId, content: e.content, timeline: true });
+            await (0,_host__WEBPACK_IMPORTED_MODULE_2__/* .host */ .H)().memory.writeSource({ ...scope, expectedRevision: revision, evidenceId: e.evidenceId, content: e.content, target: 'timeline' });
             const latest = read(), row = latest.rows.find(r => key(r) === key(e) && r.evidenceId === e.evidenceId);
             if (row)
                 row.sent = true;

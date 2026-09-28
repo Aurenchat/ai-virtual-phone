@@ -8,7 +8,7 @@ export async function confirmDisclosure(s:IdentityState,viewerCharacterId:string
  const {revision}=await host().memory.invalidateSource(scope);
  s.disclosures=s.disclosures.filter(d=>d.viewerCharacterId!==viewerCharacterId||d.accountId!==accountId);
  s.disclosures.push({viewerCharacterId,accountId,state:'explicitly_disclosed',identity:identity.trim(),revision});
- await host().memory.writeSource({...scope,expectedRevision:revision,evidenceId:'explicit-disclosure',content:'[匿名小红书] '+JSON.stringify({accountId,displayName:s.accounts[accountId].displayName,state:'explicitly_disclosed',identity:identity.trim()}),timeline:true});
+ await host().memory.writeSource({...scope,expectedRevision:revision,evidenceId:'explicit-disclosure',content:'[匿名小红书] '+JSON.stringify({accountId,displayName:s.accounts[accountId].displayName,state:'explicitly_disclosed',identity:identity.trim()}),target:'timeline'});
 }
 export async function revokeDisclosure(s:IdentityState,viewerCharacterId:string,accountId:string){
  const {revision}=await host().memory.invalidateSource({viewerCharacterId,sourceNamespace:'identity_disclosure',sourceEntityId:accountId});

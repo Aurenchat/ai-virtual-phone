@@ -46,7 +46,7 @@
 | `AiPhone.ai.cancelTask({taskId})` | `ai.tasks` | 当前 App task；running → cancelled，其他终态不改 |
 | `AiPhone.ai.consumeTask({taskId,writes})` | `ai.tasks` + `app.data.write` | `{applied:true/false}`；App records 与消费标记同一事务 |
 | `AiPhone.memory.searchSource(scope)` | `memory.source.read` | `{viewerCharacterId,sourceNamespace,sourceEntityId,query?}` → `{revision,entries}` |
-| `AiPhone.memory.writeSource(input)` | `memory.source.write` | scope + `{evidenceId,expectedRevision,content,timeline?}` → 原生 long-term entry |
+| `AiPhone.memory.writeSource(input)` | `memory.source.write` | scope + `{evidenceId,expectedRevision,content,timeline?,target?}` → 默认原生 long-term entry；`target:'timeline'` 仅来源感知的短期 timeline（无长期写入）；`timeline:true` 保留原有长期 + timeline 行为 |
 | `AiPhone.memory.invalidateSource(scope)` | `memory.source.write` | 递增 scope 修订号 → `{revision}` |
 
 SDK 没有任意指定 sourceAppId 的写入口。Host 以已安装 App 参数确定来源，generation 的 memory viewer 强制使用该次 `characterId`，忽略 scope 中夹带的其他 viewer/source 属性。管理 App 的直接记忆 API 仍显式指定 viewer，以支持多角色；它不是 Host 自动解析“当前聊天者”。
