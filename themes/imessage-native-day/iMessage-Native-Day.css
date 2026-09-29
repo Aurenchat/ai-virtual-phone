@@ -1,4 +1,4 @@
-/* iMessage Native Day 1.1.0-alpha.5 — iOS 26 light, ONE ROOM's custom CSS.
+/* iMessage Native Day 1.1.0-alpha.7 — iOS 26 light, ONE ROOM's custom CSS.
  * Replaces the complete original day-blue CSS; do not append to it.
  * Float's scoper splits selectors at every comma, including inside :is().
  * Keep selector lists simple. No remote assets, fonts, names or fake receipts.
@@ -14,6 +14,8 @@
   --im-secondary: #8e8e93;
   --im-glass: rgba(255,255,255,.62);
   --im-glass-edge: rgba(255,255,255,.86);
+  --im-header-fade: linear-gradient(180deg, rgba(255,255,255,.96), rgba(255,255,255,.84) 68%, transparent);
+  --im-footer-fade: linear-gradient(0deg,rgba(255,255,255,.96),rgba(255,255,255,.08));
   --im-font-size: calc(18px * var(--app-text-scale, 1));
   --im-line-height: 1.2;
   --im-radius: 23px;
@@ -40,16 +42,18 @@
   font-family: var(--im-font);
   color-scheme: light;
 }
-/* Wallpaper materials are frozen; text outline geometry is shared. */
+/* Only peripheral fades change with wallpaper; message materials stay frozen. */
 :root.im-plain-background { background-color: #fff; }
 :root.im-wallpaper {
   --im-incoming: rgba(249,249,249,.88);
   --im-time-color: #fff;
   --im-time-shadow: 0 1px 3px rgba(0,0,0,.35);
+  --im-header-fade: linear-gradient(180deg,rgba(255,255,255,.60) 0%,rgba(255,255,255,.47) 26%,rgba(255,255,255,.27) 55%,rgba(255,255,255,.09) 80%,rgba(255,255,255,0) 100%);
+  --im-footer-fade: linear-gradient(0deg,rgba(255,255,255,.66) 0%,rgba(255,255,255,.45) 30%,rgba(255,255,255,.19) 62%,rgba(255,255,255,.04) 84%,rgba(255,255,255,0) 100%);
 }
 /* Only the main chat panes: settings headers remain untouched. */
 .page-header.chat-room-main-pane {
-  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(255,255,255,.84) 68%, transparent);
+  background: var(--im-header-fade);
   border: 0;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -149,7 +153,7 @@
 }
 .im-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .im-camera svg { width: 28px; height: 28px; }
-.im-avatar { box-shadow: none; }
+.im-avatar { box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
 .page-header.chat-room-main-pane .page-header-right > .im-settings-source { display: none; }
 .page-header.chat-room-main-pane .chat-typing-indicator {
   top: calc(100% + 5px);
@@ -176,6 +180,17 @@
 .im-message-block { gap: 0; padding-top: var(--im-group-gap); }
 .im-message-block.im-follow { padding-top: var(--im-follow-gap); }
 .im-message-row { gap: 0; margin-top: 0 !important; }
+.im-message-row > button.chat-monologue-heart {
+  margin-left: 6px;
+  margin-right: 0;
+  color: var(--c-icon-rose);
+}
+.im-message-row > button.chat-monologue-heart[data-active] { color: #007aff; }
+/* The message block deliberately removes its generic flex gap for native
+ * consecutive bubbles. Restore a flow gap only for expanded status content;
+ * dynamic iframe height then pushes later messages without an overlay. */
+.im-message-block > .chat-status-bare { margin-top: 12px; min-width: 0; }
+.im-message-block > .chat-thought-card { margin-top: 12px; min-width: 0; }
 .im-message-row .chat-msg-content-wrap { max-width: var(--im-max-bubble); min-width: 0; }
 .im-message-row[data-im-plain] > .chat-msg-content-wrap { max-width: var(--im-text-max); }
 .im-message-block.im-follow:has(> .im-message-row[data-im-plain]) { padding-top: 5.667px; }
@@ -214,6 +229,21 @@
 .im-voice-transcript { width: var(--im-voice-width); max-width: 100%; box-sizing: border-box; padding: 0 16px 16px; font: inherit; overflow-wrap: anywhere; }
 .im-bilingual-original { cursor: pointer; user-select: text; -webkit-user-select: text; }
 .im-bilingual-translation { user-select: text; -webkit-user-select: text; }
+/* Touch holds belong to Float's existing pointer menu. Fine-pointer desktop
+ * selection and keyboard translation controls retain the alpha.5 behavior.
+ * No document-wide selection/callout suppression; composer is outside bubbles. */
+@media (pointer: coarse) {
+  .im-bubble, .im-bubble .chat-markdown, .im-bilingual-original, .im-bilingual-translation, .im-voice-transcript {
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .im-bubble input, .im-bubble textarea, .im-bubble [contenteditable="true"] {
+    user-select: text;
+    -webkit-user-select: text;
+    -webkit-touch-callout: default;
+  }
+}
 .im-bilingual-original:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 4px; }
 .im-bilingual-block .im-bilingual-translation { position: static; margin-top: 10px; font-size: .94em; line-height: 1.4; color: #5d5d65; background: none; border: 0; text-shadow: none; font-style: normal; opacity: 1; }
 .im-bilingual-translation .chat-markdown { color: inherit; font-size: inherit; font-style: normal; opacity: 1; }
@@ -317,7 +347,7 @@
   row-gap: 0;
   align-items: end;
   padding: 8px 27px var(--im-input-bottom);
-  background: linear-gradient(0deg,rgba(255,255,255,.96),rgba(255,255,255,.08));
+  background: var(--im-footer-fade);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border: 0;
@@ -359,6 +389,7 @@
 .im-composer .im-fold-source { display: none; }
 .im-composer > .chat-input-actions > button { pointer-events: auto; }
 .im-composer .im-plus {
+  order: -1;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -375,6 +406,7 @@
 }
 .im-composer .im-plus svg { width: 24px; height: 24px; }
 .im-composer .im-send {
+  order: 1;
   width: 30px;
   height: 30px;
   margin-right: 6px;
@@ -391,7 +423,7 @@
 .im-composer .im-send[data-im-stop]::after { width: 11px; height: 11px; border-radius: 2px; mask: none; -webkit-mask: none; }
 .im-composer .im-send:disabled { opacity: .35; }
 .im-composer .im-send.im-empty { display: none; }
-.im-composer .im-voice-input { margin-right: 6px; width: 30px; height: 36px; border: 0; background: none; color: #8e8e93; display: grid; place-items: center; cursor: pointer; }
+.im-composer .im-voice-input { order: 1; margin-right: 6px; width: 30px; height: 36px; border: 0; background: none; color: #8e8e93; display: grid; place-items: center; cursor: pointer; }
 .im-composer .im-voice-input svg { width: 22px; height: 22px; }
 .im-composer .im-voice-input[hidden] { display: none; }
 .im-composer > .chat-quote-bar,

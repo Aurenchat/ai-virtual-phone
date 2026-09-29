@@ -5,7 +5,7 @@ export default {
     id: "imessage-native-message-bridge",
     name: "iMessage · 分组与原生外观适配",
     apiVersion: 1,
-    version: "1.1.0-alpha.5",
+    version: "1.1.0-alpha.6",
     author: "Auren · Chloe 自用适配",
     description: "只处理已导入 iMessage Native Day CSS 的聊天室；动态头像、独立消息分组、真实状态、语音外观。",
     permissions: ["chat.read", "ui"],
@@ -18,7 +18,24 @@ export default {
   setup(ctx) {
     const rooms = new Map();
     const off = [];
-    let frame = 0, disposed = false;
+    let frame = 0, geometryFrame = 0, disposed = false;
+    const resized = new Map();
+    // One observer; resizing a transcript must not rescan every message or
+    // reread chat storage. Delivery occurs after layout, outside our writes.
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const {target} of entries) {
+        for (const state of rooms.values()) {
+          if (state.outlines.has(target)) { resized.set(target,state); break; }
+        }
+      }
+      if (!disposed && !geometryFrame) geometryFrame=requestAnimationFrame(() => {
+        geometryFrame=0;
+        resized.forEach((state,bubble) => {
+          if (bubble.isConnected && state.outlines.has(bubble)) outline(bubble,state,true);
+        });
+        resized.clear();
+      });
+    });
     const bubbleSelector = '.chat-bubble-role-user, .chat-bubble-role-assistant';
     const flag = (el, name, enabled) => { if (el.classList.contains(name) !== !!enabled) el.classList.toggle(name, !!enabled); };
     const attr = (el, name, value) => {
@@ -52,7 +69,7 @@ export default {
     function outline(bubble, state, enabled) {
       let item = state.outlines.get(bubble);
       if (!enabled) {
-        if (item) { item.resize.disconnect(); item.svg.remove(); state.nodes.delete(item.svg); state.outlines.delete(bubble); }
+        if (item) { resizeObserver.unobserve(bubble); resized.delete(bubble); item.svg.remove(); state.nodes.delete(item.svg); state.outlines.delete(bubble); }
         flag(bubble,'im-geometry-ready',false);
         return;
       }
@@ -60,11 +77,14 @@ export default {
         const svg = own(document.createElementNS('http://www.w3.org/2000/svg','svg'),state);
         svg.setAttribute('class','im-text-outline'); svg.setAttribute('aria-hidden','true'); svg.setAttribute('focusable','false');
         const path = document.createElementNS(svg.namespaceURI,'path'); svg.append(path); bubble.append(svg);
-        const resize = new ResizeObserver(schedule); resize.observe(bubble);
-        item = {svg,path,resize}; state.outlines.set(bubble,item);
+        item = {svg,path,key:null}; state.outlines.set(bubble,item);
+        resizeObserver.observe(bubble);
       }
       const box = getComputedStyle(bubble), w = parseFloat(box.width), h = parseFloat(box.height);
       if (!w || !h) return;
+      const key = `${w}/${h}/${bubble.hasAttribute('data-im-last')}/${bubble.classList.contains('chat-bubble-role-assistant')}`;
+      if (item.key === key) { flag(bubble,'im-geometry-ready',true); return; }
+      item.key = key;
       // P6 fit: multiline quarter corner r=23.9, control inset=8.4 CSS px.
       // Short 42.67px capsules fit a circular quarter. No text/font adjustment.
       const r = Math.min(24,h/2,w/2);
@@ -94,7 +114,7 @@ export default {
       flag(bubble,'im-geometry-ready',true);
     }
     function clean(room, state) {
-      state.outlines.forEach(item => item.resize.disconnect()); state.outlines.clear();
+      state.outlines.forEach((item,bubble) => { resizeObserver.unobserve(bubble); resized.delete(bubble); }); state.outlines.clear();
       state.marked.forEach(clearMessage); state.marked.clear();
       state.off.forEach(fn => fn());
       state.handlers.forEach(fns => fns.forEach(fn => fn()));
@@ -276,8 +296,40 @@ export default {
       state.handlers.forEach((fns,el) => { if (!el.isConnected) { fns.forEach(fn => fn()); state.handlers.delete(el); } });
       state.attrs.forEach((attrs,el) => { if (!el.isConnected) state.attrs.delete(el); });
     }
-    const observer = new MutationObserver(schedule);
-    const observe = () => observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['id','data-msg-id','data-consecutive','data-role','data-playing','data-has-bg-image','class','style']});
+    function relevantMutation(m) {
+      const el=m.target.nodeType===Node.ELEMENT_NODE ? m.target : m.target.parentElement;
+      if (!el || el.closest('[data-im-owned]')) return false;
+      // Session CSS injection/theme removal, ancestor visibility and room mounts.
+      if (el.closest('head')) return true;
+      const room=el.closest('.chat-room-wrapper');
+      if (!room) {
+        if (m.type==='attributes') return [...rooms.keys()].some(r=>el.contains(r));
+        return [...m.addedNodes,...m.removedNodes].some(n=>n.nodeType===1 && (n.matches('.chat-room-wrapper') || n.querySelector('.chat-room-wrapper')));
+      }
+      if (el===room) {
+        if(m.attributeName==='style') {
+          const relevantStyle=s=>(s||'').split(';').map(p=>p.trim()).filter(p=>p&&!p.startsWith('--chat-bottom-reserve:')).join(';');
+          return relevantStyle(m.oldValue)!==relevantStyle(room.getAttribute('style'));
+        }
+        return true;
+      }
+      if (el.closest('.chat-input-bar')) return false;
+      // ChatRoom adjusts the scroll pane's padding when the composer grows;
+      // this does not alter sender boundaries or bubble widths.
+      if (m.attributeName==='style' && el.matches('.page-body.chat-room-main-pane')) return false;
+      const bars=el.closest('.voice-msg-bars');
+      if (bars) {
+        if (m.attributeName==='data-playing') {
+          const bubble=bars.closest(bubbleSelector),state=rooms.get(room);
+          if(bubble && state) voice(bubble,state);
+        }
+        return false; // Native waveform animation is neither grouping nor layout.
+      }
+      if (m.type==='attributes' && m.attributeName==='style' && el.closest(bubbleSelector)) return false; // ResizeObserver owns geometry.
+      return !!el.closest('.page-body.chat-room-main-pane, .page-header.chat-room-main-pane');
+    }
+    const observer = new MutationObserver(records => { if(records.some(relevantMutation)) schedule(); });
+    const observe = () => observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeOldValue:true,attributeFilter:['id','data-msg-id','data-consecutive','data-role','data-playing','data-has-bg-image','class','style']});
     function refresh() {
       frame=0; if(disposed) return;
       observer.disconnect();
@@ -293,11 +345,13 @@ export default {
       } finally { if(!disposed) observe(); }
     }
     function schedule() { if(!disposed && !frame) frame=requestAnimationFrame(refresh); }
-    ['session.opened','message.persisted','message.updated','message.deleted','llm.streamChunk'].forEach(event => off.push(ctx.hooks.on(event,schedule)));
+    // Stream DOM changes already schedule the corresponding render. The hook
+    // would also scan while a chunk has not yet produced any visible change.
+    ['session.opened','message.persisted','message.updated','message.deleted'].forEach(event => off.push(ctx.hooks.on(event,schedule)));
     off.push(ctx.system.settings.onChange(schedule));
     refresh();
     return () => {
-      disposed=true; cancelAnimationFrame(frame); observer.disconnect(); off.forEach(fn=>fn());
+      disposed=true; cancelAnimationFrame(frame); cancelAnimationFrame(geometryFrame); resized.clear(); resizeObserver.disconnect(); observer.disconnect(); off.forEach(fn=>fn());
       rooms.forEach((state,room)=>clean(room,state)); rooms.clear();
     };
   }
