@@ -5,6 +5,7 @@
 // 高度自适应桥与剧场画布同款；allow-scripts 无 same-origin，碰不到宿主页面与数据。
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { StateValue } from "@/lib/chat-storage";
 
 const FRAME_MIN_HEIGHT = 36;
 
@@ -12,24 +13,31 @@ function escapeHtmlText(value: string): string {
     return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function buildSrcDoc(html: string, raw: string, frameId: string): string {
+function serializeInlineScriptValue(value: unknown): string {
+    return JSON.stringify(value)
+        .replace(/</g, "\\u003c")
+        .replace(/\u2028/g, "\\u2028")
+        .replace(/\u2029/g, "\\u2029");
+}
+
+function buildSrcDoc(html: string, raw: string, frameId: string, stateValues?: StateValue[]): string {
     const withRaw = html.split("{{RAW}}").join(escapeHtmlText(raw));
     const base = /<html[\s>]/i.test(withRaw)
         ? withRaw
         : `<!doctype html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head><body>${withRaw}</body></html>`;
-    const inject = `<script>window.STATUS_RAW=${JSON.stringify(raw)};</` + `script>`;
+    const inject = `<script>window.STATUS_RAW=${serializeInlineScriptValue(raw)};window.STATUS_VALUES=${serializeInlineScriptValue(stateValues ?? [])};</` + `script>`;
     return /<head[\s>]/i.test(base)
         ? base.replace(/<head([^>]*)>/i, `<head$1>${inject}`)
         : inject + base;
 }
 
-export function CustomStatusFrame({ html, raw }: { html: string; raw: string }) {
+export function CustomStatusFrame({ html, raw, stateValues }: { html: string; raw: string; stateValues?: StateValue[] }) {
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const [frameId] = useState(() => `csf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
     const [height, setHeight] = useState(FRAME_MIN_HEIGHT);
 
     const srcDoc = useMemo(() => {
-        const doc = buildSrcDoc(html, raw, frameId);
+        const doc = buildSrcDoc(html, raw, frameId, stateValues);
         const bridge = `<script>(function(){
   var frameId=${JSON.stringify(frameId)};
   function measure(){var b=document.body;if(!b)return ${FRAME_MIN_HEIGHT};var r=b.getBoundingClientRect();var h=r.height;
@@ -42,7 +50,7 @@ export function CustomStatusFrame({ html, raw }: { html: string; raw: string }) 
   setTimeout(send,60);setTimeout(send,400);
 })();</` + `script>`;
         return /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, `${bridge}</body>`) : doc + bridge;
-    }, [html, raw, frameId]);
+    }, [html, raw, frameId, stateValues]);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {

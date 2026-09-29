@@ -5822,6 +5822,12 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     const hasFoldedPanel = !!(renderMsg.statusPanel || renderMsg.innerMonologue);
                     // 内心卡片只展示本轮实际输出的状态值；旧数据没有 freshStateValues 时回退到合并快照
                     const cardStateValues = msg.freshStateValues ?? msg.stateValues;
+                    // An explicitly marked custom renderer can display the already-parsed
+                    // metrics itself. This is presentation-only: parsing, persistence and
+                    // the state-value chain continue to use the native data above.
+                    const integratedMonologueStatus = !!renderMsg.statusPanel
+                        && msg.statusRegionMode === "custom"
+                        && /<meta\b[^>]*\bname\s*=\s*["']im-monologue-integrated-metrics["'][^>]*>/i.test(statusRegionCfg.renderHtml);
                     const isSilentThought = !visibleContent && !renderMsg.mediaType && hasFoldedPanel && msg.role !== "user";
                     const isStandaloneHtmlPreview = !renderMsg.mediaType && isStandaloneHtmlPreviewContent(bubbleDisplayContent);
                     const isMediaBubble = (renderMsg.mediaType && CHAT_MEDIA_BUBBLE_TYPES.has(renderMsg.mediaType)) || isStandaloneHtmlPreview;
@@ -6113,12 +6119,12 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                             {hasFoldedPanel && expandedMonologueId === msg.id
                                 && (renderMsg.statusPanel || (!renderMsg.innerMonologue && cardStateValues && cardStateValues.length > 0)) && (
                                 <div className="chat-status-bare">
-                                    {!renderMsg.innerMonologue && cardStateValues && cardStateValues.length > 0 && (
+                                    {!integratedMonologueStatus && !renderMsg.innerMonologue && cardStateValues && cardStateValues.length > 0 && (
                                         <StateValuesPanel stateValues={cardStateValues} />
                                     )}
                                     {renderMsg.statusPanel && (
                                         msg.statusRegionMode === "custom" && statusRegionCfg.renderHtml.trim() ? (
-                                            <CustomStatusFrame html={statusRegionCfg.renderHtml} raw={renderMsg.statusPanel} />
+                                            <CustomStatusFrame html={statusRegionCfg.renderHtml} raw={renderMsg.statusPanel} stateValues={integratedMonologueStatus ? cardStateValues : undefined} />
                                         ) : (
                                             <BilingualTextBlock text={msg.displayProjected ? renderMsg.statusPanel : renderDisplayText(renderMsg.statusPanel, 6, false)} mode="markdown" defaultExpanded={session.collapseBilingualTranslation !== false ? false : true} />
                                         )
