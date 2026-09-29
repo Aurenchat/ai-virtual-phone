@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo, memo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useContext, useId, memo } from "react";
+import { ImessagePresentation, TranslationBody } from "./imessage-presentation";
+import { filterVoiceDisplayText } from "@/lib/voice-display-text";
 import { findCustomStickerByName, resolveCustomStickerUrl } from "@/lib/custom-sticker-storage";
 import { isMediaStoreRef, loadMediaObjectUrl } from "@/lib/media-cache-storage";
 import { getChatImageFromIndexedDB } from "@/lib/chat-asset-storage";
@@ -617,10 +619,14 @@ export const BilingualTextBlock = memo(function BilingualTextBlock({
     htmlFrameVariant?: ChatHtmlFrameVariant;
 }) {
     const bilingual = splitBilingualText(text);
-    const [expanded, setExpanded] = useState(defaultExpanded);
+    const presentation = useContext(ImessagePresentation);
+    const translationId = useId();
+    const [expanded, setExpanded] = useState(presentation.enabled ? false : defaultExpanded);
     useEffect(() => {
-        setExpanded(defaultExpanded);
-    }, [text, defaultExpanded]);
+        if (!presentation.enabled) setExpanded(defaultExpanded);
+    }, [text, defaultExpanded, presentation.enabled]);
+    useEffect(() => { if (presentation.enabled) setExpanded(false); }, [presentation.enabled]);
+    const display = (value: string) => presentation.enabled && presentation.voiceTranscript ? filterVoiceDisplayText(value) : value;
     const renderContent = (content: string, extraClass?: string) => {
         if (mode === "plain") return <PlainTextContent content={content} className={extraClass} />;
         return (
@@ -631,8 +637,19 @@ export const BilingualTextBlock = memo(function BilingualTextBlock({
     };
 
     if (!bilingual) {
-        return renderContent(text, className);
+        return renderContent(display(text), className);
     }
+
+    if (presentation.enabled) return (
+        <div className={`chat-bilingual-block im-bilingual-block ${className ?? ""}`.trim()}>
+            <TranslationBody expanded={expanded} controls={translationId} onToggle={() => setExpanded(v => !v)}>
+                {renderContent(display(bilingual.original), "chat-bilingual-content")}
+            </TranslationBody>
+            {expanded && <div id={translationId} data-im-text-body="" className="chat-bilingual-section-translation im-bilingual-translation">
+                {renderContent(display(bilingual.translated), "chat-bilingual-content")}
+            </div>}
+        </div>
+    );
 
     return (
         <div className={`chat-bilingual-block ${className ?? ""}`.trim()}>

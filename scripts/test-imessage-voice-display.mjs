@@ -1,0 +1,20 @@
+import fs from 'node:fs/promises';import assert from 'node:assert/strict';import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url),ts=require('typescript');
+const load=async file=>{const m={exports:{}};new Function('exports',ts.transpileModule(await fs.readFile(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(m.exports);return m.exports};
+const {filterVoiceDisplayText:filter,VOICE_SOUND_TAGS,VOICE_ACTION_TAGS_ZH}=await load('lib/voice-display-text.ts'),{splitBilingualText}=await load('lib/bilingual-text.ts');
+const checks=[];const check=(actual,expected,name)=>{assert.deepEqual(actual,expected,name);checks.push(name)};
+for(const tag of VOICE_SOUND_TAGS){check(filter(`(${tag}) Hello (${tag.toUpperCase()}).`),'Hello.',tag);check(filter(`（ ${tag.toUpperCase()} ）Hello`),'Hello',tag+' fullwidth')}
+for(const tag of VOICE_ACTION_TAGS_ZH)check(filter(`（${tag}）你好 (${tag})。`),'你好。',tag);
+for(const text of ['(New York)','(2026)','（明天）','（补充说明）','(whispers)','(laughing quietly)','(New York)  (2026)'])check(filter(text),text,'preserve '+text);
+check(filter('(chuckle)(inhale) Mwah. (sighs) Screen off.（呼气）'),'Mwah. Screen off.','consecutive and inline');
+check(filter('a(chuckle)b'),'a b','do not join words');check(filter('( clear - throat ) Hello'),'Hello','hyphen whitespace');
+check(filter('Hello (laughs)!\n（叹气）明天见。'),'Hello!\n明天见。','punctuation and line break');
+check(filter('(chuckle) Hello  there.  \n    Keep indentation.'),'Hello  there.  \n    Keep indentation.','unrelated whitespace and Markdown hard break preserved');
+check(filter('Keep  (New York)  intact. (sighs)'),'Keep  (New York)  intact.','ordinary parenthetical spacing preserved alongside tag');
+const raw='(chuckle) Mwah. Screen off.|(轻笑) Mwah。关屏幕吧。',parsed=splitBilingualText(raw);
+check(parsed,{original:'(chuckle) Mwah. Screen off.',translated:'(轻笑) Mwah。关屏幕吧。'},'host parser keeps raw tags');
+check(filter(parsed.original),'Mwah. Screen off.','display original');check(filter(parsed.translated),'Mwah。关屏幕吧。','display translation');
+check(splitBilingualText('a | b'),null,'ordinary pipe follows host parser');
+check(splitBilingualText('Name|姓名: Alex|亚历克斯'),{original:'Name: Alex',translated:'姓名: 亚历克斯'},'segmented protocol delegated to host');
+await fs.mkdir('themes/imessage-native-day/verification/phase1.5',{recursive:true});
+await fs.writeFile('themes/imessage-native-day/verification/phase1.5/filter-results.json',JSON.stringify({checks},null,2));console.log(checks.length+' display/parser checks passed');

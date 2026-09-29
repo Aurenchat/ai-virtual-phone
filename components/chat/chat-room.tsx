@@ -55,6 +55,7 @@ import type { UserIdentity } from "@/components/settings/user-identity";
 import { AlertCircle, Blocks, Check, Trash2, User, ChevronLeft, ChevronRight, Clapperboard, Clock, Gift, Languages, Loader2, MoreHorizontal, X } from "lucide-react";
 import { setDebugChatState } from "@/lib/debug-store";
 import { SessionCustomCSS } from "@/components/ui/session-custom-css";
+import { ImessagePresentation, useImessagePresentation } from "./imessage-presentation";
 import { setChatActive } from "@/lib/music-action-queue";
 import { getMusicControlBridge } from "@/lib/music-control-bridge";
 import { findPlayableMatch, getNeteaseLyrics, getNeteaseSongDetail } from "@/lib/music-service";
@@ -1203,6 +1204,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     const [bgLoading, setBgLoading] = useState(!!session.backgroundImage);
 
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const imessagePresentation = useImessagePresentation(wrapperRef, liveCSS, session.id);
+    const voiceTextKey = (id: string) => imessagePresentation ? `${session.id}:${id}` : id;
 
     // 全屏特效：命中触发词的新消息播放表情雨/礼花（微信同款）
     const [activeScreenEffect, setActiveScreenEffect] = useState<ActiveScreenEffect | null>(null);
@@ -4746,7 +4749,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
 
         // Prevent text selection on long press
-        e.preventDefault();
+        // Preserve mouse text selection in the opt-in translation body. Touch
+        // retains the native long-press menu; its copy action is unchanged.
+        if (!(imessagePresentation && e.pointerType === "mouse" && (e.target as Element).closest("[data-im-text-body]"))) e.preventDefault();
 
         const anchor = { x: e.clientX, y: e.clientY };
         startPosRef.current = anchor;
@@ -4925,7 +4930,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         {m.role === "assistant" && (m.rawResponseText || m.editableResponseText) ? "编辑回复" : "编辑"}
                     </button>
                     {m.mediaType === "audio" && m.mediaData?.label && (
-                        <button onClick={() => { setVoiceTextIds(prev => { const next = new Set(prev); if (next.has(m.id)) next.delete(m.id); else next.add(m.id); return next; }); setActiveMessageId(null); }} className="ctx-menu-btn">转文字</button>
+                        <button onClick={() => { setVoiceTextIds(prev => { const next = new Set(prev); const key = voiceTextKey(m.id); if (next.has(key)) next.delete(key); else next.add(key); return next; }); setActiveMessageId(null); }} className="ctx-menu-btn">{imessagePresentation && voiceTextIds.has(voiceTextKey(m.id)) ? "收起转写" : "转文字"}</button>
                     )}
                     {m.role === "user" && (
                         <button onClick={() => handleRetractMessage(storedMessageId)} className="ctx-menu-btn">撤回消息</button>
@@ -6030,6 +6035,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                             {/* Message Actions Popup */}
                                             {activeMessageId === msg.id && renderBubbleContextMenu(msg)}
 
+                                            <ImessagePresentation.Provider key={`${session.id}:${msg.id}`} value={{ enabled: imessagePresentation && !renderMsg.mediaType && !renderMsg.mediaData?.readingQuote, voiceTranscript: false }}>
                                             <MessageBubble
                                                 msg={renderMsg}
                                                 displayContent={msg.displayProjected ? undefined : bubbleDisplayContent}
@@ -6051,6 +6057,14 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                 onActionSelect={(text) => chatTextInputRef.current?.appendText(text)}
                                                 defaultTranslationExpanded={session.collapseBilingualTranslation !== false ? false : true}
                                             />
+                                            </ImessagePresentation.Provider>
+                                            {imessagePresentation && renderMsg.mediaType === "audio" && voiceTextIds.has(voiceTextKey(msg.id)) && renderMsg.mediaData?.label && (
+                                                <ImessagePresentation.Provider key={`transcript:${session.id}:${msg.id}`} value={{ enabled: true, voiceTranscript: true }}>
+                                                    <div className="im-voice-transcript">
+                                                        <BilingualTextBlock text={msg.displayProjected ? renderMsg.mediaData.label : renderDisplayText(renderMsg.mediaData.label, msg.role === "user" ? 1 : 2, false)} mode="markdown" />
+                                                    </div>
+                                                </ImessagePresentation.Provider>
+                                            )}
                                         </div>
                                         </div>}
                                         {msg.role !== "user" && !isSilentThought && !isEmptyBubble && hasFoldedPanel && (
@@ -6079,7 +6093,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                 )}
                             </div>
                             {/* Voice message: text transcription bubble */}
-                            {renderMsg.mediaType === "audio" && voiceTextIds.has(msg.id) && renderMsg.mediaData?.label && (
+                            {!imessagePresentation && renderMsg.mediaType === "audio" && voiceTextIds.has(msg.id) && renderMsg.mediaData?.label && (
                                 <div className={`chat-msg-wrapper`} data-role={uiRole(msg)} style={{ marginTop: -12 }}>
                                     {msg.role !== "user" && <div className="w-[40px] shrink-0" />}
                                     <div className="voice-msg-text-bubble">
