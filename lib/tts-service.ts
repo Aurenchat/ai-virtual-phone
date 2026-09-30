@@ -89,12 +89,19 @@ const MINIMAX_EMOTIONS = new Set([
 
 const MINIMAX_SPEED_MIN = 0.5;
 const MINIMAX_SPEED_MAX = 2.0;
+const MINIMAX_VOLUME_MIN = 0.1;
+const MINIMAX_VOLUME_MAX = 2.0;
 const MINIMAX_PITCH_MIN = -12;
 const MINIMAX_PITCH_MAX = 12;
 
 function normalizeMinimaxSpeed(speed: number | undefined): number {
     if (typeof speed !== "number" || !Number.isFinite(speed)) return 1.0;
     return Math.min(MINIMAX_SPEED_MAX, Math.max(MINIMAX_SPEED_MIN, speed));
+}
+
+export function normalizeMinimaxVolume(volume: number | undefined): number {
+    if (typeof volume !== "number" || !Number.isFinite(volume)) return 1.0;
+    return Math.min(MINIMAX_VOLUME_MAX, Math.max(MINIMAX_VOLUME_MIN, volume));
 }
 
 function normalizeMinimaxPitch(pitch: number | undefined): number {
@@ -109,7 +116,7 @@ async function synthesizeMinimax(text: string, config: VoiceApiConfig, emotion?:
     const voiceSetting: Record<string, unknown> = {
         voice_id: config.defaultVoice || "male-qn-qingse",
         speed: normalizeMinimaxSpeed(config.speechSpeed),
-        vol: 1.0,
+        vol: normalizeMinimaxVolume(config.speechVolume),
         pitch: normalizeMinimaxPitch(config.speechPitch),
     };
     const normalizedEmotion = emotion?.trim().toLowerCase();

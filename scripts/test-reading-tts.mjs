@@ -75,8 +75,8 @@ function fixture(texts = [["a", "b", "c"], ["d", "", "e"]], slow = false) {
     c.start(pos()); await turn(); c.pause(); calls[0].resolve(new Blob(["a"])); await turn();
     check(c.state.status === "paused" && clips.length === 0, "pause during synthesis prevents autoplay");
     const count = calls.length; c.resume(); await turn(); check(clips.length === 1 && calls.length === count, "resume prepared clip does not resynthesize");
-    c.configure({ voice: { ...voice, id: "other", speechPitch: 2 }, speed: 1.5, emotion: "calm", characterId: "new" }); await turn();
-    check(calls.at(-1).options.speed === 1.5 && calls.at(-1).config.id === "other" && calls[0].options.signal.aborted === false, "runtime parameter/character change restarts with new voice");
+    c.configure({ voice: { ...voice, id: "other", speechVolume: 1.4, speechPitch: 2 }, speed: 1.5, emotion: "calm", characterId: "new" }); await turn();
+    check(calls.at(-1).options.speed === 1.5 && calls.at(-1).config.id === "other" && calls.at(-1).config.speechVolume === 1.4 && calls[0].options.signal.aborted === false, "reading restart keeps saved voice volume with runtime parameters");
     check(clips[0].stops === 1 && calls.filter(item => item.text === "a").length === 2, "new parameters invalidate old audio cache"); c.dispose();
 }
 {
@@ -102,7 +102,7 @@ function fixture(texts = [["a", "b", "c"], ["d", "", "e"]], slow = false) {
     const key = readingTtsCacheKey(pos(), "a", { voice });
     for (const [label, position, text, options] of [
         ["book", { ...pos(), bookId: "b" }, "a", { voice }], ["paragraph", pos(1), "a", { voice }], ["text", pos(), "edited", { voice }],
-        ...["id", "provider", "model", "defaultVoice", "speechPitch"].map(field => [field, pos(), "a", { voice: { ...voice, [field]: "changed" } }]),
+        ...["id", "provider", "model", "defaultVoice", "speechVolume", "speechPitch"].map(field => [field, pos(), "a", { voice: { ...voice, [field]: field === "speechVolume" ? 1.4 : "changed" } }]),
         ["speed", pos(), "a", { voice, speed: 2 }], ["emotion", pos(), "a", { voice, emotion: "happy" }],
     ]) check(key !== readingTtsCacheKey(position, text, options), `cache key changes with ${label}`);
 }
@@ -120,12 +120,22 @@ try {
     let body;
     globalThis.fetch = async (_url, init) => { body = JSON.parse(init.body); return new Response(JSON.stringify({ data: { audio: "010203" } }), { status: 200 }); };
     await service.synthesizeSpeech("书中文字", voice);
-    check(!("emotion" in body.voice_setting) && body.voice_setting.speed === 1, "MiniMax auto omits emotion and preserves old defaults");
+    check(!("emotion" in body.voice_setting) && body.voice_setting.speed === 1 && body.voice_setting.vol === 1, "legacy MiniMax config defaults speed and volume to 1.0");
+    await service.synthesizeSpeech("书中文字", { ...voice, speechVolume: 1.4 });
+    check(body.voice_setting.vol === 1.4, "MiniMax uses saved speech volume");
+    await service.synthesizeSpeech("书中文字", { ...voice, speechVolume: 9 });
+    check(body.voice_setting.vol === 2, "MiniMax volume clamps above configured range");
+    await service.synthesizeSpeech("书中文字", { ...voice, speechVolume: -2 });
+    check(body.voice_setting.vol === 0.1, "MiniMax volume clamps below configured range");
+    await service.synthesizeSpeech("书中文字", { ...voice, speechVolume: Number.NaN });
+    check(body.voice_setting.vol === 1, "invalid MiniMax volume falls back to 1.0");
+    await service.synthesizeSpeech("书中文字", { ...voice, speechVolume: "loud" });
+    check(body.voice_setting.vol === 1, "non-numeric persisted volume falls back to 1.0");
     await service.synthesizeSpeech("书中文字", voice, { speed: 1.5, pitch: 3, emotion: "calm" });
     check(body.voice_setting.speed === 1.5 && body.voice_setting.pitch === 3 && body.voice_setting.emotion === "calm" && voice.speechSpeed === undefined, "MiniMax runtime overrides do not mutate saved config");
     globalThis.fetch = async (_url, init) => { body = JSON.parse(init.body); return new Response(new Blob(["audio"])); };
-    await service.synthesizeSpeech("words", { ...voice, provider: "OpenAI" }, { speed: 1.25, emotion: "sad" });
-    check(body.speed === 1.25 && !("emotion" in body), "OpenAI synthesis speed and graceful emotion ignore");
+    await service.synthesizeSpeech("words", { ...voice, provider: "OpenAI", speechVolume: 1.4 }, { speed: 1.25, emotion: "sad" });
+    check(body.speed === 1.25 && !("emotion" in body) && !("volume" in body) && !("vol" in body), "OpenAI synthesis ignores unsupported volume and emotion");
     const abort = new AbortController();
     globalThis.fetch = async (_url, init) => ({ ok: true, blob: () => new Promise((_resolve, reject) => init.signal.addEventListener("abort", () => reject(init.signal.reason), { once: true })) });
     const pending = service.synthesizeSpeech("words", { ...voice, provider: "OpenAI" }, { signal: abort.signal });

@@ -21,6 +21,11 @@ const MINIMAX_SPEED_MIN = 0.5;
 const MINIMAX_SPEED_MAX = 2.0;
 const MINIMAX_SPEED_STEP = 0.1;
 const DEFAULT_SPEECH_SPEED = 1.0;
+// MiniMax vol：保守限制在设置页常用范围，1.0 为原始音量。
+const MINIMAX_VOLUME_MIN = 0.1;
+const MINIMAX_VOLUME_MAX = 2.0;
+const MINIMAX_VOLUME_STEP = 0.1;
+const DEFAULT_SPEECH_VOLUME = 1.0;
 // Minimax voice_setting.pitch：半音，官方范围 ±12，0 为原声
 const MINIMAX_PITCH_MIN = -12;
 const MINIMAX_PITCH_MAX = 12;
@@ -42,6 +47,7 @@ const DEFAULT_VOICE_CONFIGS: VoiceApiConfig[] = [
         model: "speech-2.8-turbo",
         defaultVoice: "male-qn-qingse",
         speechSpeed: DEFAULT_SPEECH_SPEED,
+        speechVolume: DEFAULT_SPEECH_VOLUME,
         speechPitch: DEFAULT_SPEECH_PITCH,
         enableSTT: true,
         enableTTS: true,
@@ -207,7 +213,10 @@ function normalizeVoiceConfigs(configs: VoiceApiConfig[]): VoiceApiConfig[] {
             const speechPitch = typeof config.speechPitch === "number" && Number.isFinite(config.speechPitch)
                 ? Math.min(MINIMAX_PITCH_MAX, Math.max(MINIMAX_PITCH_MIN, Math.round(config.speechPitch)))
                 : DEFAULT_SPEECH_PITCH;
-            return { ...config, baseUrl, speechSpeed, speechPitch };
+            const speechVolume = typeof config.speechVolume === "number" && Number.isFinite(config.speechVolume)
+                ? Math.min(MINIMAX_VOLUME_MAX, Math.max(MINIMAX_VOLUME_MIN, config.speechVolume))
+                : DEFAULT_SPEECH_VOLUME;
+            return { ...config, baseUrl, speechSpeed, speechVolume, speechPitch };
         });
 }
 
@@ -277,6 +286,7 @@ export function VoiceSettings() {
             model: "speech-2.8-turbo",
             defaultVoice: "male-qn-qingse",
             speechSpeed: DEFAULT_SPEECH_SPEED,
+            speechVolume: DEFAULT_SPEECH_VOLUME,
             enableSTT: true,
             enableTTS: true,
         };
@@ -322,6 +332,7 @@ export function VoiceSettings() {
             model: wasMinimax ? (current?.model || "speech-2.8-turbo") : "speech-2.8-turbo",
             defaultVoice: wasMinimax ? (current?.defaultVoice || "male-qn-qingse") : "male-qn-qingse",
             speechSpeed: wasMinimax ? (current?.speechSpeed ?? DEFAULT_SPEECH_SPEED) : DEFAULT_SPEECH_SPEED,
+            speechVolume: wasMinimax ? (current?.speechVolume ?? DEFAULT_SPEECH_VOLUME) : DEFAULT_SPEECH_VOLUME,
         });
         if (!wasMinimax) {
             setManualModelIds(prev => ({ ...prev, [id]: false }));
@@ -761,6 +772,27 @@ export function VoiceSettings() {
                                                         <span className="absolute left-1 whitespace-nowrap">{MINIMAX_SPEED_MIN.toFixed(1)}×</span>
                                                         <span className="absolute whitespace-nowrap" style={{ left: "33.333%", transform: "translateX(-50%)" }}>1.0× 默认</span>
                                                         <span className="absolute right-1 whitespace-nowrap">{MINIMAX_SPEED_MAX.toFixed(1)}×</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-1 -mt-1">
+                                                    <div className="flex items-center justify-between px-1">
+                                                        <label className="menu-desc">音量 (Volume)</label>
+                                                        <span className="menu-label font-medium">{(config.speechVolume ?? DEFAULT_SPEECH_VOLUME).toFixed(1)}×</span>
+                                                    </div>
+                                                    <input
+                                                        type="range"
+                                                        min={MINIMAX_VOLUME_MIN}
+                                                        max={MINIMAX_VOLUME_MAX}
+                                                        step={MINIMAX_VOLUME_STEP}
+                                                        value={config.speechVolume ?? DEFAULT_SPEECH_VOLUME}
+                                                        onChange={(e) => updateConfig(config.id, { speechVolume: Number(e.target.value) })}
+                                                        className="w-full accent-black"
+                                                        aria-label="Minimax 音量"
+                                                    />
+                                                    <div className="relative h-4 px-1 text-xs text-gray-500" aria-hidden="true">
+                                                        <span className="absolute left-1 whitespace-nowrap">{MINIMAX_VOLUME_MIN.toFixed(1)}×</span>
+                                                        <span className="absolute whitespace-nowrap" style={{ left: "47.368%", transform: "translateX(-50%)" }}>1.0× 默认</span>
+                                                        <span className="absolute right-1 whitespace-nowrap">{MINIMAX_VOLUME_MAX.toFixed(1)}×</span>
                                                     </div>
                                                 </div>
                                                 <div className="flex flex-col gap-1 -mt-1">

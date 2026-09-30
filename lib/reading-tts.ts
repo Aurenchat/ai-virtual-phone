@@ -14,7 +14,7 @@ export function readingTtsCacheKey(position: ReadingTtsPosition, text: string, o
     const voice = options.voice;
     return JSON.stringify([position.bookId, position.chapterIndex, position.paragraphIndex, text,
         voice?.id, voice?.provider, voice?.baseUrl, voice?.defaultVoice, voice?.model, voice?.languageBoost,
-        options.emotion || "", options.speed ?? voice?.speechSpeed ?? 1, voice?.speechPitch ?? 0]);
+        options.emotion || "", options.speed ?? voice?.speechSpeed ?? 1, voice?.speechVolume ?? 1, voice?.speechPitch ?? 0]);
 }
 
 /** Session-only bounded blob cache. Object URLs belong to the active player, never the cache. */
