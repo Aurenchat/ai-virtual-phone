@@ -1,36 +1,201 @@
-const CACHE_VERSION = "ai-phone-pwa-v12";
-const STATIC_CACHE = `${CACHE_VERSION}-static`;
-const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
+(() => {
+const BUILD_ID = "__FLOAT_BUILD_ID__";
+// Old registrations still update /sw.js. Import the generated, versioned body
+// there instead of activating a worker with a placeholder namespace.
+if (BUILD_ID === "__FLOAT_" + "BUILD_ID__") {
+  importScripts("/sw-versioned.js");
+  return;
+}
+const BUILD_CACHE_PREFIX = "float-pwa-build-";
+const BUILD_CACHE_BASE = `${BUILD_CACHE_PREFIX}${BUILD_ID}`;
+const SHELL_CACHE = `${BUILD_CACHE_BASE}-shell`;
+const ASSET_CACHE = `${BUILD_CACHE_BASE}-assets`;
+const SHARED_CACHE = "float-pwa-shared-v1";
+const BUILD_META_URL = "/__float_pwa_build_meta__";
+const currentBuildClients = new Set();
+let preparePromise = null;
 
-const PRECACHE_URLS = [
-  "/",
-  "/manifest.json",
-  "/icon-192.png",
-  "/icon-512.png",
-];
+function normalizedBuildAsset(raw) {
+  try {
+    const url = new URL(raw, self.location.origin);
+    if (url.origin !== self.location.origin || !url.pathname.startsWith("/_next/static/")) return null;
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return null;
+  }
+}
+
+function htmlBuildId(html) {
+  const tag = html.match(/<meta\b[^>]*\bname=["']float-build-id["'][^>]*>/i)?.[0] || "";
+  return tag.match(/\bcontent=["']([^"']+)["']/i)?.[1] || null;
+}
+
+function htmlBuildAssets(html) {
+  const assets = new Set();
+  const attributePattern = /(?:src|href)=["']([^"']*\/_next\/static\/[^"']+)["']/gi;
+  for (const match of html.matchAll(attributePattern)) {
+    const asset = normalizedBuildAsset(match[1]);
+    if (asset) assets.add(asset);
+  }
+  return [...assets];
+}
+
+async function readBuildMeta() {
+  const response = await (await caches.open(SHELL_CACHE)).match(BUILD_META_URL);
+  if (!response) return null;
+  try {
+    const meta = await response.json();
+    return meta?.buildId === BUILD_ID ? meta : null;
+  } catch {
+    return null;
+  }
+}
+
+async function stageBuild(clientAssets = []) {
+  const requestedAssets = [...new Set(clientAssets.map(normalizedBuildAsset).filter(Boolean))];
+  const existing = await readBuildMeta();
+  if (existing) {
+    const assetCache = await caches.open(ASSET_CACHE);
+    const missing = [];
+    for (const asset of requestedAssets) {
+      if (!(await assetCache.match(asset))) missing.push(asset);
+    }
+    for (const asset of existing.assets || []) {
+      if (!(await assetCache.match(asset))) missing.push(asset);
+    }
+    if (missing.length === 0 && await (await caches.open(SHELL_CACHE)).match("/")) return existing;
+  }
+  if (preparePromise) return preparePromise;
+
+  preparePromise = (async () => {
+    const rootResponse = await fetch(new Request(new URL("/", self.location.origin).href, { cache: "reload", credentials: "same-origin" }));
+    if (!rootResponse.ok) throw new Error(`PWA root returned ${rootResponse.status}`);
+    const rootHtml = await rootResponse.clone().text();
+    const discoveredBuildId = htmlBuildId(rootHtml);
+    if (discoveredBuildId !== BUILD_ID) {
+      throw new Error(`PWA root build mismatch: expected ${BUILD_ID}, received ${discoveredBuildId || "missing"}`);
+    }
+
+    const priorAssets = Array.isArray(existing?.assets) ? existing.assets : [];
+    const assets = [...new Set([...htmlBuildAssets(rootHtml), ...priorAssets, ...requestedAssets])];
+    const shellCache = await caches.open(SHELL_CACHE);
+    const assetCache = await caches.open(ASSET_CACHE);
+    // Bound startup memory: stream at most four responses into CacheStorage,
+    // rather than retaining/cloning every large app chunk before writing any.
+    for (let offset = 0; offset < assets.length; offset += 4) {
+      await Promise.all(assets.slice(offset, offset + 4).map(async (asset) => {
+        const response = await fetch(new Request(new URL(asset, self.location.origin).href, { cache: "reload", credentials: "same-origin" }));
+        if (!response.ok || (response.headers.get("Content-Type") || "").includes("text/html")) {
+          throw new Error(`PWA invalid asset response ${response.status}: ${asset}`);
+        }
+        await assetCache.put(asset, response);
+      }));
+    }
+    await shellCache.put("/", rootResponse);
+    const meta = {
+      buildId: BUILD_ID,
+      stagedAt: existing?.stagedAt || Date.now(),
+      assets,
+    };
+    await shellCache.put(BUILD_META_URL, new Response(JSON.stringify(meta), {
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    }));
+    return meta;
+  })().catch(async (error) => {
+    throw error;
+  }).finally(() => {
+    preparePromise = null;
+  });
+
+  return preparePromise;
+}
+
+function cacheGroup(name) {
+  const buildMatch = name.match(/^(float-pwa-build-.+)-(?:shell|pages|assets)$/);
+  if (buildMatch) return buildMatch[1];
+  const legacyMatch = name.match(/^(ai-phone-pwa-v\d+)-(?:static|runtime)$/);
+  return legacyMatch ? legacyMatch[1] : null;
+}
+
+async function groupTimestamp(base, names) {
+  const shellName = names.find((name) => name === `${base}-shell`);
+  if (!shellName) return 0;
+  try {
+    const response = await (await caches.open(shellName)).match(BUILD_META_URL);
+    const meta = response ? await response.json() : null;
+    return Number(meta?.stagedAt) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function cleanupOldBuildCaches() {
+  // Suspended, legacy or unknown clients block collection.
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  const replies = await Promise.all(windows.map(client => new Promise(resolve => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => { channel.port1.close(); resolve(false); }, 1500);
+    channel.port1.onmessage = event => {
+      clearTimeout(timer);
+      channel.port1.close();
+      resolve(event.data?.buildId === BUILD_ID && event.data?.ready === true);
+    };
+    client.postMessage({ type: "PWA_QUERY_CLIENT" }, [channel.port2]);
+  })));
+  if (replies.some(ready => !ready)) return false;
+  const latest = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+  if (latest.some(client => !windows.some(known => known.id === client.id))) return false;
+  const cacheNames = await caches.keys();
+  const groups = new Map();
+  for (const name of cacheNames) {
+    const base = cacheGroup(name);
+    if (!base) continue;
+    const entries = groups.get(base) || [];
+    entries.push(name);
+    groups.set(base, entries);
+  }
+
+  const previous = [];
+  for (const [base, names] of groups) {
+    if (base === BUILD_CACHE_BASE) continue;
+    previous.push({ base, names, stagedAt: await groupTimestamp(base, names) });
+  }
+  previous.sort((a, b) => b.stagedAt - a.stagedAt);
+  const keepPrevious = previous[0]?.base || null;
+  await Promise.all(previous
+    .filter((group) => group.base !== keepPrevious)
+    .flatMap((group) => group.names.map((name) => caches.delete(name))));
+  return true;
+}
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE)
-      .then((cache) => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
-  );
+  // A new worker cannot naturally activate without a complete, verified shell.
+  // No old cache is removed even if staging fails.
+  event.waitUntil(stageBuild());
 });
 
+// No claim or eviction on activate. Update only when all clients are ready,
+// or naturally after the old worker no longer has clients.
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(
-        keys
-          .filter((key) => !key.startsWith(CACHE_VERSION))
-          .map((key) => caches.delete(key))
-      ))
-      // 刷新预缓存的 "/" 快照：它是离线导航的最终兜底，若停留在旧部署版本，
-      // 引用的旧 hash CSS/JS 已 404，会渲染出无样式页面（文字堆在左上角）。
-      .then(() => caches.open(STATIC_CACHE))
-      .then((cache) => cache.add(new Request("/", { cache: "reload" })).catch(() => {}))
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil(Promise.resolve());
+});
+
+self.addEventListener("message", (event) => {
+  const data = event.data || {};
+  const reply = (payload) => event.ports?.[0]?.postMessage(payload);
+  if (data.type === "PWA_VERSION") {
+    reply({ ok: true, buildId: BUILD_ID });
+    return;
+  }
+  if (data.buildId !== BUILD_ID || data.type !== "PWA_CLIENT_READY") return;
+  if (event.source?.id) currentBuildClients.add(event.source.id);
+  event.waitUntil(stageBuild(Array.isArray(data.assets) ? data.assets : [])
+    .then(cleanupOldBuildCaches)
+    .then(async (allClientsReady) => {
+      if (allClientsReady) await self.skipWaiting();
+      reply({ ok: true, buildId: BUILD_ID });
+    })
+    .catch((error) => reply({ ok: false, error: String(error?.message || error) })));
 });
 
 function isCacheableRequest(request) {
@@ -42,34 +207,63 @@ function isCacheableRequest(request) {
   return ["font", "image", "script", "style", "worker"].includes(request.destination);
 }
 
-async function networkFirst(request) {
-  const cache = await caches.open(RUNTIME_CACHE);
+async function responseBuildId(response) {
+  const contentType = response.headers.get("Content-Type") || "";
+  if (!contentType.includes("text/html")) return null;
   try {
-    const response = await fetch(request);
-    if (response.ok) cache.put(request, response.clone());
+    return htmlBuildId(await response.clone().text());
+  } catch {
+    return null;
+  }
+}
+
+async function networkFirstNavigation(event) {
+  const request = event.request;
+  const shellCache = await caches.open(SHELL_CACHE);
+  try {
+    const response = await fetch(new Request(request, { cache: "no-store" }));
+    if (!response.ok) {
+      const cached = await shellCache.match("/");
+      return cached || response;
+    }
+    const responseId = await responseBuildId(response);
+    if (responseId === BUILD_ID) {
+      // Navigation HTML is not an offline snapshot until stageBuild verifies
+      // every referenced boot asset. Only the verified shell is an offline fallback.
+      if (event.resultingClientId) currentBuildClients.add(event.resultingClientId);
+    } else if (responseId) {
+      // A newer build must be allowed to boot from one coherent network response,
+      // but is never written into this worker's cache namespace.
+      if (event.clientId) currentBuildClients.delete(event.clientId);
+    }
     return response;
   } catch (error) {
-    const cached = await cache.match(request);
+    const cached = await shellCache.match("/");
     if (cached) return cached;
-    const fallback = await caches.match("/");
-    if (fallback) return fallback;
     throw error;
   }
 }
 
-// 静态资源（字体/图片/脚本/样式/模型）用 cache-first：命中缓存直接返回，
-// 不再每次都在后台把整份文件重新拉一遍校验。字体动辄 7~24MB，旧的
-// stale-while-revalidate 会持续重下，是带宽爆掉的主因之一。
-// 需要更新缓存内容时，升 CACHE_VERSION 即可让旧缓存在 activate 时清空。
-async function cacheFirst(request) {
-  const cache = await caches.open(RUNTIME_CACHE);
+async function buildAssetFirst(event) {
+  const request = event.request;
+  const cache = await caches.open(ASSET_CACHE);
   const cached = await cache.match(request);
   if (cached) return cached;
   const response = await fetch(request);
-  if (response.ok) cache.put(request, response.clone());
+  if (response.ok && currentBuildClients.has(event.clientId)) {
+    await cache.put(request, response.clone());
+  }
   return response;
 }
 
+async function sharedAssetFirst(request) {
+  const cache = await caches.open(SHARED_CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const response = await fetch(request);
+  if (response.ok) await cache.put(request, response.clone());
+  return response;
+}
 // 离线推送：App 被杀后由系统唤起 SW 弹通知。payload 由服务端 JSON 编码。
 self.addEventListener("push", (event) => {
   let data = {};
@@ -174,10 +368,16 @@ self.addEventListener("notificationclick", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.mode === "navigate") {
-    event.respondWith(networkFirst(request));
+    event.respondWith(networkFirstNavigation(event));
     return;
   }
-  if (isCacheableRequest(request)) {
-    event.respondWith(cacheFirst(request));
+  if (!isCacheableRequest(request)) return;
+  const url = new URL(request.url);
+  if (url.pathname.startsWith("/_next/static/") || ["script", "style", "worker"].includes(request.destination)) {
+    event.respondWith(buildAssetFirst(event));
+    return;
   }
+  event.respondWith(sharedAssetFirst(request));
 });
+
+})();
