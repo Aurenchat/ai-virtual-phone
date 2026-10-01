@@ -38,6 +38,7 @@
   --im-text-max: 72%;
   --im-time-color: #737378;
   --im-time-shadow: none;
+  --im-heart-collapsed: rgba(142,142,147,.48);
   --im-tail: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M0 0H12V7C12 13 15 17 20 19C11 20 3 16 0 10Z'/%3E%3C/svg%3E");
   font-family: var(--im-font);
   color-scheme: light;
@@ -48,6 +49,7 @@
   --im-incoming: rgba(249,249,249,.88);
   --im-time-color: #fff;
   --im-time-shadow: 0 1px 3px rgba(0,0,0,.35);
+  --im-heart-collapsed: rgba(255,255,255,.76);
   --im-header-fade: linear-gradient(180deg,rgba(255,255,255,.60) 0%,rgba(255,255,255,.47) 26%,rgba(255,255,255,.27) 55%,rgba(255,255,255,.09) 80%,rgba(255,255,255,0) 100%);
   --im-footer-fade: linear-gradient(0deg,rgba(255,255,255,.66) 0%,rgba(255,255,255,.45) 30%,rgba(255,255,255,.19) 62%,rgba(255,255,255,.04) 84%,rgba(255,255,255,0) 100%);
 }
@@ -183,9 +185,12 @@
 .im-message-row > button.chat-monologue-heart {
   margin-left: 6px;
   margin-right: 0;
-  color: var(--c-icon-rose);
+  color: var(--im-heart-collapsed);
 }
+.im-message-row > div.chat-monologue-heart { color: var(--im-heart-collapsed); }
+.im-message-row > div.chat-monologue-heart > span.chat-monologue-heart { color: var(--im-heart-collapsed); }
 .im-message-row > button.chat-monologue-heart[data-active] { color: #007aff; }
+.im-message-row > div.chat-monologue-heart > span.chat-monologue-heart[data-active] { color: #007aff; }
 /* The message block deliberately removes its generic flex gap for native
  * consecutive bubbles. Restore a flow gap only for expanded status content;
  * dynamic iframe height then pushes later messages without an overlay. */

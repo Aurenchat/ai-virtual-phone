@@ -51,6 +51,7 @@ const PRIMARY_DATA_MODULES: DataModuleDefinition[] = [
           "ai_phone_timed_wake_schedules_v1",
           "ai_phone_removed_contacts_v1",
           "ai_phone_chat_status_region_v1",
+          "ai_phone_chat_status_renderers_v1",
           "chat-screen-effect-rules",
           "chat-screen-effect-builtins",
           "chat_plugins_v3",

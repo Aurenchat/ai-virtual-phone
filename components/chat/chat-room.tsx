@@ -16,7 +16,7 @@ import { StickerSearchSuggest } from "./sticker-search-suggest";
 import { StateValuesPanel } from "./state-values-panel";
 import { generateChatCompletion, generateOfflineChatCompletion, flattenCompletionResult, ChatEngineError } from "@/lib/chat-engine";
 import { formatOfflineTurnXml as formatOfflineTurnXmlShared, buildOfflinePromptHistory as buildOfflinePromptHistoryShared } from "@/lib/offline-prompt-builder";
-import { getStatusRegionConfig, isCustomStatusRegionActive } from "@/lib/chat-status-region";
+import { captureCurrentStatusRendererId, getStatusRegionConfig, isCustomStatusRegionActive, resolveStatusRendererForMessage } from "@/lib/chat-status-region";
 import { CustomStatusFrame } from "@/components/chat/custom-status-frame";
 import { sendBrowserNotification } from "@/lib/browser-notification";
 import { dispatchChatMessageNotice } from "@/lib/chat-notification-events";
@@ -2564,6 +2564,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     editableResponseText,
                     statusPanel: attachHere && statusPanel ? statusPanel : undefined,
                     statusRegionMode: customStatusActive && attachHere && statusPanel ? "custom" as const : undefined,
+                    statusRendererId: customStatusActive && attachHere && statusPanel ? statusRegionCfg.rendererId : undefined,
                     innerMonologue: attachHere && innerMonologue ? innerMonologue : undefined,
                     reasoningText: takeRoundReasoning(),
                     stateValues: attachHere && stateValues.length > 0 ? stateValues : undefined,
@@ -2601,6 +2602,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     editableResponseText,
                     statusPanel,
                     statusRegionMode: customStatusActive && statusPanel ? "custom" as const : undefined,
+                    statusRendererId: customStatusActive && statusPanel ? statusRegionCfg.rendererId : undefined,
                     innerMonologue,
                     reasoningText: takeRoundReasoning(),
                     stateValues: stateValues.length > 0 ? stateValues : undefined,
@@ -2895,6 +2897,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     rawResponseText,
                     statusPanel,
                     statusRegionMode: customStatusActive && statusPanel ? "custom" as const : undefined,
+                    statusRendererId: customStatusActive && statusPanel ? statusRegionCfg.rendererId : undefined,
                     innerMonologue,
                     reasoningText: options?.reasoningText,
                     stateValues: stateValues.length > 0 ? stateValues : undefined,
@@ -2928,6 +2931,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 rawResponseText,
                 statusPanel: idx === metaIdx && statusPanel ? statusPanel : undefined,
                 statusRegionMode: customStatusActive && idx === metaIdx && statusPanel ? "custom" as const : undefined,
+                statusRendererId: customStatusActive && idx === metaIdx && statusPanel ? statusRegionCfg.rendererId : undefined,
                 innerMonologue: idx === metaIdx && innerMonologue ? innerMonologue : undefined,
                 reasoningText: idx === metaIdx ? options?.reasoningText : undefined,
                 stateValues: idx === metaIdx && stateValues.length > 0 ? stateValues : undefined,
@@ -3654,6 +3658,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                 editableResponseText,
                                 statusPanel: !attachedState && statusPanel ? statusPanel : undefined,
                                 statusRegionMode: customStatusActive && !attachedState && statusPanel ? "custom" as const : undefined,
+                                statusRendererId: customStatusActive && !attachedState && statusPanel ? statusRegionCfg.rendererId : undefined,
                                 innerMonologue: !attachedState && innerMonologue ? innerMonologue : undefined,
                                 reasoningText: !attachedState ? roundReasoning : undefined,
                                 stateValues: !attachedState && stateValues.length > 0 ? stateValues : undefined,
@@ -3681,6 +3686,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                 editableResponseText,
                                 statusPanel,
                                 statusRegionMode: customStatusActive && statusPanel ? "custom" as const : undefined,
+                                statusRendererId: customStatusActive && statusPanel ? statusRegionCfg.rendererId : undefined,
                                 innerMonologue,
                                 reasoningText: roundReasoning,
                                 stateValues: stateValues.length > 0 ? stateValues : undefined,
@@ -4030,6 +4036,14 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     // 自定义状态栏：custom 生效时新消息盖戳，折叠区改走用户渲染代码；旧消息按原生渲染
     const statusRegionCfg = getStatusRegionConfig(session.id);
     const customStatusActive = isCustomStatusRegionActive(statusRegionCfg);
+    const [, bumpStatusRendererRegistry] = useState(0);
+    useEffect(() => {
+        if (!customStatusActive) return;
+        const rendererId = captureCurrentStatusRendererId(session.id);
+        if (rendererId && rendererId !== statusRegionCfg.rendererId) {
+            bumpStatusRendererRegistry(value => value + 1);
+        }
+    }, [customStatusActive, session.id, statusRegionCfg.renderHtml, statusRegionCfg.rendererId]);
 
     const formatOfflineTurnXml = useCallback((turn: ChatOfflineTurn): string => formatOfflineTurnXmlShared(turn), []);
 
@@ -4557,6 +4571,17 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
             const firstRoundIndex = storedMessages.findIndex(msg => msg.id === roundMessages[0].id);
             const stateCutoff = storedMessages[firstRoundIndex];
+            const originalStatusMetaByCharacter = new Map<string, Pick<ChatMessage, "statusRegionMode" | "statusRendererId">>();
+            roundMessages.forEach((roundMessage) => {
+                if (!roundMessage.senderCharacterId || !roundMessage.statusPanel) return;
+                originalStatusMetaByCharacter.set(roundMessage.senderCharacterId, {
+                    statusRegionMode: roundMessage.statusRegionMode,
+                    statusRendererId: roundMessage.statusRendererId,
+                });
+            });
+            const currentStatusRendererId = customStatusActive
+                ? captureCurrentStatusRendererId(session.id)
+                : undefined;
 
             const nameToId = new Map<string, string>();
             groupCharacters.forEach((groupCharacter) => {
@@ -4580,6 +4605,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 responseBatchId?: string;
                 statusPanel?: string;
                 statusRegionMode?: "custom";
+                statusRendererId?: string;
                 innerMonologue?: string;
                 stateValues?: StateValue[];
                 freshStateValues?: StateValue[];
@@ -4596,6 +4622,13 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 return latest;
             };
             for (const segment of segments) {
+                const originalStatusMeta = originalStatusMetaByCharacter.get(segment.characterId);
+                const statusRegionModeForEdit = originalStatusMeta
+                    ? originalStatusMeta.statusRegionMode
+                    : (customStatusActive ? "custom" as const : undefined);
+                const statusRendererIdForEdit = originalStatusMeta
+                    ? originalStatusMeta.statusRendererId
+                    : currentStatusRendererId;
                 const responseBatchId = createResponseBatchId();
                 const { parts: rawParts, stateValues, freshStateValues, statusPanel, innerMonologue } = parseAIResponse(segment.responseText, getCurrentStateForCharacter(segment.characterId));
                 const parts = stripInvalidStickerParts(rawParts, segment.characterId);
@@ -4614,7 +4647,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         rawResponseText: segment.responseText,
                         responseBatchId,
                         statusPanel: attachHere && statusPanel ? statusPanel : undefined,
-                        statusRegionMode: customStatusActive && attachHere && statusPanel ? "custom" as const : undefined,
+                        statusRegionMode: attachHere && statusPanel ? statusRegionModeForEdit : undefined,
+                        statusRendererId: attachHere && statusPanel ? statusRendererIdForEdit : undefined,
                         innerMonologue: attachHere && innerMonologue ? innerMonologue : undefined,
                         stateValues: attachHere && stateValues.length > 0 ? stateValues : undefined,
                         freshStateValues: attachHere ? freshStateValues : undefined,
@@ -4629,7 +4663,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         rawResponseText: segment.responseText,
                         responseBatchId,
                         statusPanel,
-                        statusRegionMode: customStatusActive && statusPanel ? "custom" as const : undefined,
+                        statusRegionMode: statusPanel ? statusRegionModeForEdit : undefined,
+                        statusRendererId: statusPanel ? statusRendererIdForEdit : undefined,
                         innerMonologue,
                         stateValues: stateValues.length > 0 ? stateValues : undefined,
                         freshStateValues,
@@ -4720,6 +4755,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         // 编辑只改文字，不改这批消息生成时所处的状态栏模式——沿用原戳，
         // 否则编辑一次就退回原生渲染，而且切回原生后再编辑又会反向串档。
         const originalStatusRegionMode = batchMessages.find(m => m.statusRegionMode === "custom")?.statusRegionMode;
+        const originalStatusRendererId = batchMessages.find(m => m.statusRendererId)?.statusRendererId;
 
         replaceResponseBatchWithParts(
             session.id,
@@ -4729,6 +4765,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             {
                 statusPanel,
                 statusRegionMode: originalStatusRegionMode,
+                statusRendererId: originalStatusRendererId,
                 innerMonologue,
                 stateValues: stateValues.length > 0 ? stateValues : undefined,
                 freshStateValues,
@@ -5147,6 +5184,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 const statusRegionModeHere = isMetaSlot && statusPanelHere
                     ? (storedMeta?.statusRegionMode ?? base.statusRegionMode)
                     : undefined;
+                const statusRendererIdHere = isMetaSlot && statusPanelHere
+                    ? (storedMeta?.statusRendererId ?? base.statusRendererId)
+                    : undefined;
                 const innerMonologueHere = isMetaSlot ? (parsed.innerMonologue || storedMeta?.innerMonologue) : undefined;
                 const reasoningTextHere = isMetaSlot ? storedMeta?.reasoningText : undefined;
                 const stateValuesHere = isMetaSlot ? storedMeta?.stateValues : undefined;
@@ -5168,6 +5208,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     mediaData,
                     statusPanel: statusPanelHere,
                     statusRegionMode: statusRegionModeHere,
+                    statusRendererId: statusRendererIdHere,
                     innerMonologue: innerMonologueHere,
                     reasoningText: reasoningTextHere,
                     stateValues: stateValuesHere,
@@ -5822,12 +5863,16 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     const hasFoldedPanel = !!(renderMsg.statusPanel || renderMsg.innerMonologue);
                     // 内心卡片只展示本轮实际输出的状态值；旧数据没有 freshStateValues 时回退到合并快照
                     const cardStateValues = msg.freshStateValues ?? msg.stateValues;
+                    const statusRendererResolution = renderMsg.statusPanel && renderMsg.statusRegionMode === "custom"
+                        ? resolveStatusRendererForMessage(renderMsg.statusRendererId, renderMsg.statusPanel)
+                        : undefined;
+                    const statusRendererHtml = statusRendererResolution?.snapshot?.renderHtml || "";
                     // An explicitly marked custom renderer can display the already-parsed
                     // metrics itself. This is presentation-only: parsing, persistence and
                     // the state-value chain continue to use the native data above.
                     const integratedMonologueStatus = !!renderMsg.statusPanel
-                        && msg.statusRegionMode === "custom"
-                        && /<meta\b[^>]*\bname\s*=\s*["']im-monologue-integrated-metrics["'][^>]*>/i.test(statusRegionCfg.renderHtml);
+                        && renderMsg.statusRegionMode === "custom"
+                        && /<meta\b[^>]*\bname\s*=\s*["']im-monologue-integrated-metrics["'][^>]*>/i.test(statusRendererHtml);
                     const isSilentThought = !visibleContent && !renderMsg.mediaType && hasFoldedPanel && msg.role !== "user";
                     const isStandaloneHtmlPreview = !renderMsg.mediaType && isStandaloneHtmlPreviewContent(bubbleDisplayContent);
                     const isMediaBubble = (renderMsg.mediaType && CHAT_MEDIA_BUBBLE_TYPES.has(renderMsg.mediaType)) || isStandaloneHtmlPreview;
@@ -6119,12 +6164,17 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                             {hasFoldedPanel && expandedMonologueId === msg.id
                                 && (renderMsg.statusPanel || (!renderMsg.innerMonologue && cardStateValues && cardStateValues.length > 0)) && (
                                 <div className="chat-status-bare">
-                                    {!integratedMonologueStatus && !renderMsg.innerMonologue && cardStateValues && cardStateValues.length > 0 && (
+                                    {!integratedMonologueStatus && (renderMsg.statusRegionMode !== "custom" || !!statusRendererHtml) && !renderMsg.innerMonologue && cardStateValues && cardStateValues.length > 0 && (
                                         <StateValuesPanel stateValues={cardStateValues} />
                                     )}
                                     {renderMsg.statusPanel && (
-                                        msg.statusRegionMode === "custom" && statusRegionCfg.renderHtml.trim() ? (
-                                            <CustomStatusFrame html={statusRegionCfg.renderHtml} raw={renderMsg.statusPanel} stateValues={integratedMonologueStatus ? cardStateValues : undefined} />
+                                        renderMsg.statusRegionMode === "custom" && statusRendererHtml ? (
+                                            <CustomStatusFrame html={statusRendererHtml} raw={renderMsg.statusPanel} stateValues={integratedMonologueStatus ? cardStateValues : undefined} />
+                                        ) : renderMsg.statusRegionMode === "custom" ? (
+                                            <div className="chat-status-renderer-fallback" data-status-renderer-state={statusRendererResolution?.source || "missing"} role="note">
+                                                <div className="chat-sys-msg mb-2">历史状态栏样式不可用，已显示原始内容</div>
+                                                <BilingualTextBlock text={msg.displayProjected ? renderMsg.statusPanel : renderDisplayText(renderMsg.statusPanel, 6, false)} mode="markdown" defaultExpanded={session.collapseBilingualTranslation !== false ? false : true} />
+                                            </div>
                                         ) : (
                                             <BilingualTextBlock text={msg.displayProjected ? renderMsg.statusPanel : renderDisplayText(renderMsg.statusPanel, 6, false)} mode="markdown" defaultExpanded={session.collapseBilingualTranslation !== false ? false : true} />
                                         )

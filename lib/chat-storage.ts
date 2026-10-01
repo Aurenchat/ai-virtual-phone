@@ -14,6 +14,7 @@ import { emitChatPluginEvent, runChatPluginTransformSync } from "./chat-plugin-h
 import { parseAIResponse } from "./rich-message-parser";
 import { extractTextToolDirectiveText } from "./text-tool-protocol";
 import type { ReadingQuote } from "./reading-quote";
+import { captureCurrentStatusRendererId } from "./chat-status-region";
 
 export const DEFAULT_VISION_IMAGE_PROMPT_LIMIT = 1;
 export const MAX_VISION_IMAGE_PROMPT_LIMIT = 20;
@@ -261,6 +262,7 @@ export type ChatMessage = {
     isTyping?: boolean; // temporary flag for UI rendering
     statusPanel?: string; // AI display-only status content from [状态栏] tags
     statusRegionMode?: "custom"; // 该消息生成时会话处于自定义状态栏模式（缺省=原生渲染）
+    statusRendererId?: string; // immutable custom status renderer snapshot reference
     innerMonologue?: string; // AI inner monologue content from [内心] tags
     reasoningText?: string; // 模型思维链（reasoning/CoT）内容，挂在回复批次的第一条气泡上
     stateValues?: StateValue[]; // parsed character state values from inner monologue
@@ -1193,6 +1195,11 @@ export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "sta
         newMsg = pluginResult.message;
     }
 
+    if (newMsg.statusRegionMode === "custom" && newMsg.statusPanel && !newMsg.statusRendererId) {
+        const statusRendererId = captureCurrentStatusRendererId(newMsg.sessionId);
+        if (statusRendererId) newMsg = { ...newMsg, statusRendererId };
+    }
+
     _messagesCache.push(newMsg);
     dbPutMessage(newMsg);
 
@@ -1965,6 +1972,8 @@ export function replaceMessageWithParts(
             responseRoundId: original.responseRoundId,
             editableResponseText: original.editableResponseText,
             statusPanel: i === 0 ? original.statusPanel : undefined,
+            statusRegionMode: i === 0 && original.statusPanel ? original.statusRegionMode : undefined,
+            statusRendererId: i === 0 && original.statusPanel ? original.statusRendererId : undefined,
             innerMonologue: i === 0 ? original.innerMonologue : undefined,
             reasoningText: i === 0 ? original.reasoningText : undefined,
             stateValues: i === 0 ? original.stateValues : undefined,
@@ -1991,6 +2000,7 @@ export function replaceResponseBatchWithParts(
     options?: {
         statusPanel?: string;
         statusRegionMode?: "custom";
+        statusRendererId?: string;
         innerMonologue?: string;
         reasoningText?: string;
         stateValues?: StateValue[];
@@ -2037,6 +2047,7 @@ export function replaceResponseBatchWithParts(
         cloudSync: firstMessage.cloudSync,
         statusPanel: index === (options?.metaPartIndex ?? 0) ? options?.statusPanel : undefined,
         statusRegionMode: index === (options?.metaPartIndex ?? 0) && options?.statusPanel ? options?.statusRegionMode : undefined,
+        statusRendererId: index === (options?.metaPartIndex ?? 0) && options?.statusPanel ? options?.statusRendererId : undefined,
         innerMonologue: index === (options?.metaPartIndex ?? 0) ? options?.innerMonologue : undefined,
         reasoningText: index === (options?.metaPartIndex ?? 0) ? options?.reasoningText : undefined,
         stateValues: index === (options?.metaPartIndex ?? 0) ? options?.stateValues : undefined,
@@ -2114,6 +2125,7 @@ export function replaceGroupResponseRound(
         responseBatchId?: string;
         statusPanel?: string;
         statusRegionMode?: "custom";
+        statusRendererId?: string;
         innerMonologue?: string;
         reasoningText?: string;
         stateValues?: StateValue[];
@@ -2157,6 +2169,7 @@ export function replaceGroupResponseRound(
         cloudSync: firstMessage.cloudSync,
         statusPanel: msg.statusPanel,
         statusRegionMode: msg.statusRegionMode,
+        statusRendererId: msg.statusRendererId,
         innerMonologue: msg.innerMonologue,
         reasoningText: msg.reasoningText,
         stateValues: msg.stateValues,

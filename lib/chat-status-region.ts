@@ -30,14 +30,176 @@ export type StatusRegionConfig = {
      *  不参与提示词，也不影响渲染。小卷写入契约时一并给出，否则预览会拿默认样例
      *  去套新契约的字段，显示成空白或错乱。缺省为空表示用内置样例。 */
     previewRaw?: string;
+    /** Immutable renderer snapshot used by messages created under this config. */
+    rendererId?: string;
 };
 
 const STORAGE_KEY = "ai_phone_chat_status_region_v1";
+export const STATUS_RENDERER_REGISTRY_STORAGE_KEY = "ai_phone_chat_status_renderers_v1";
 
 /** 配置被外部改写（小卷工具）后广播，已打开的聊天信息页据此刷新，
  *  否则面板的状态只在挂载时初始化一次，会停在旧值——写了但前台看不见。 */
 export const STATUS_REGION_UPDATED_EVENT = "chat-status-region-updated";
 registerKvMigration(STORAGE_KEY);
+registerKvMigration(STATUS_RENDERER_REGISTRY_STORAGE_KEY);
+
+export type StatusRendererSnapshot = {
+    id: string;
+    renderHtml: string;
+    contract: string;
+    previewRaw: string;
+    createdAt: string;
+};
+
+type StatusRendererRegistry = {
+    version: 1;
+    renderers: Record<string, StatusRendererSnapshot>;
+};
+
+export type StatusRendererResolution = {
+    snapshot?: StatusRendererSnapshot;
+    source: "message" | "legacy-inferred" | "missing" | "ambiguous";
+};
+
+const EMPTY_RENDERER_REGISTRY: StatusRendererRegistry = { version: 1, renderers: {} };
+let rendererRegistryCacheRaw: string | null | undefined;
+let rendererRegistryCache: StatusRendererRegistry = EMPTY_RENDERER_REGISTRY;
+let legacyResolutionCache = new Map<string, StatusRendererResolution>();
+
+function loadRendererRegistry(): StatusRendererRegistry {
+    if (typeof window === "undefined") return EMPTY_RENDERER_REGISTRY;
+    const raw = kvGet(STATUS_RENDERER_REGISTRY_STORAGE_KEY);
+    if (raw === rendererRegistryCacheRaw) return rendererRegistryCache;
+    rendererRegistryCacheRaw = raw;
+    legacyResolutionCache = new Map();
+    try {
+        const parsed = JSON.parse(raw || "{}") as Partial<StatusRendererRegistry>;
+        const candidates = parsed && typeof parsed.renderers === "object" && parsed.renderers
+            ? parsed.renderers
+            : {};
+        const renderers: Record<string, StatusRendererSnapshot> = {};
+        for (const [id, value] of Object.entries(candidates)) {
+            if (!value || typeof value !== "object") continue;
+            const snapshot = value as Partial<StatusRendererSnapshot>;
+            if (snapshot.id !== id || typeof snapshot.renderHtml !== "string" || !snapshot.renderHtml.trim()) continue;
+            renderers[id] = {
+                id,
+                renderHtml: snapshot.renderHtml,
+                contract: typeof snapshot.contract === "string" ? snapshot.contract : "",
+                previewRaw: typeof snapshot.previewRaw === "string" ? snapshot.previewRaw : "",
+                createdAt: typeof snapshot.createdAt === "string" ? snapshot.createdAt : new Date(0).toISOString(),
+            };
+        }
+        rendererRegistryCache = { version: 1, renderers };
+        return rendererRegistryCache;
+    } catch {
+        rendererRegistryCache = EMPTY_RENDERER_REGISTRY;
+        return rendererRegistryCache;
+    }
+}
+
+function saveRendererRegistry(registry: StatusRendererRegistry): void {
+    const raw = JSON.stringify(registry);
+    rendererRegistryCacheRaw = raw;
+    rendererRegistryCache = registry;
+    legacyResolutionCache = new Map();
+    kvSet(STATUS_RENDERER_REGISTRY_STORAGE_KEY, raw);
+}
+
+function createRendererId(): string {
+    const uuid = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+    return `status_renderer_${uuid}`;
+}
+
+/** Store renderer code once and return an immutable version reference. */
+export function ensureStatusRendererSnapshot(config: Pick<StatusRegionConfig, "renderHtml" | "contract" | "previewRaw">): StatusRendererSnapshot | undefined {
+    if (typeof window === "undefined" || !config.renderHtml.trim()) return undefined;
+    const registry = loadRendererRegistry();
+    const existing = Object.values(registry.renderers).find(item => item.renderHtml === config.renderHtml);
+    if (existing) return existing;
+    const id = createRendererId();
+    const snapshot: StatusRendererSnapshot = {
+        id,
+        renderHtml: config.renderHtml,
+        contract: config.contract,
+        previewRaw: config.previewRaw || "",
+        createdAt: new Date().toISOString(),
+    };
+    saveRendererRegistry({
+        version: 1,
+        renderers: { ...registry.renderers, [id]: snapshot },
+    });
+    return snapshot;
+}
+
+export function getStatusRendererSnapshot(rendererId: string | undefined): StatusRendererSnapshot | undefined {
+    if (!rendererId) return undefined;
+    return loadRendererRegistry().renderers[rendererId];
+}
+
+export function listStatusRendererSnapshots(): StatusRendererSnapshot[] {
+    return Object.values(loadRendererRegistry().renderers);
+}
+
+function statusShapeTokens(raw: string): string[] {
+    const tokens = new Set<string>();
+    const body = raw.replace(/\[状态栏\]/g, "").replace(/\[\/状态栏\]/g, "");
+    const fieldPattern = /(?:^|\n)\s*([^=\n]{1,32})\s*=/g;
+    let fieldMatch: RegExpExecArray | null;
+    while ((fieldMatch = fieldPattern.exec(body))) {
+        const name = fieldMatch[1].trim();
+        if (name) tokens.add(`field:${name}`);
+    }
+    const tagPattern = /\[([^\]/:\n]{1,32})\][\s\S]*?\[\/\1\]/g;
+    let tagMatch: RegExpExecArray | null;
+    while ((tagMatch = tagPattern.exec(body))) {
+        const name = tagMatch[1].trim();
+        if (name && name !== "状态栏") tokens.add(`tag:${name}`);
+    }
+    return [...tokens].sort();
+}
+
+function snapshotMatchesLegacyPanel(snapshot: StatusRendererSnapshot, statusPanel: string): boolean {
+    const evidence = statusShapeTokens(snapshot.previewRaw);
+    // One generic field is not enough to identify a renderer safely.
+    if (evidence.length < 2) return false;
+    const actual = new Set(statusShapeTokens(statusPanel));
+    return evidence.every(token => actual.has(token));
+}
+
+/**
+ * Resolve the renderer saved on a message. Legacy messages without an id may
+ * use a renderer only when its preview schema is a unique high-confidence
+ * match. The current session renderer is never used as an implicit fallback.
+ */
+export function resolveStatusRendererForMessage(
+    rendererId: string | undefined,
+    statusPanel: string,
+): StatusRendererResolution {
+    if (rendererId) {
+        const snapshot = getStatusRendererSnapshot(rendererId);
+        return snapshot ? { snapshot, source: "message" } : { source: "missing" };
+    }
+    loadRendererRegistry();
+    const cacheKey = `${rendererRegistryCacheRaw || ""}\u0000${statusPanel}`;
+    const cached = legacyResolutionCache.get(cacheKey);
+    if (cached) return cached;
+    const matches = Object.values(rendererRegistryCache.renderers).filter(snapshot => snapshotMatchesLegacyPanel(snapshot, statusPanel));
+    const result: StatusRendererResolution = matches.length === 1
+        ? { snapshot: matches[0], source: "legacy-inferred" }
+        : { source: matches.length > 1 ? "ambiguous" : "missing" };
+    legacyResolutionCache.set(cacheKey, result);
+    return result;
+}
+
+/** Pure, read-only audit helper for a future reviewed legacy backfill. */
+export function getLegacyStatusRendererCandidates(statusPanel: string): string[] {
+    return Object.values(loadRendererRegistry().renderers)
+        .filter(snapshot => snapshotMatchesLegacyPanel(snapshot, statusPanel))
+        .map(snapshot => snapshot.id);
+}
 
 /** 状态栏方案库在 css-scheme-storage 里的 target 键（负载=契约+渲染+示例数据 JSON） */
 export const STATUS_REGION_SCHEME_TARGET = "chat_status_region";
@@ -122,6 +284,7 @@ export function getStatusRegionConfig(sessionId: string): StatusRegionConfig {
         contract: typeof raw.contract === "string" ? raw.contract : "",
         renderHtml: typeof raw.renderHtml === "string" ? raw.renderHtml : "",
         previewRaw: typeof raw.previewRaw === "string" ? raw.previewRaw : "",
+        rendererId: typeof raw.rendererId === "string" ? raw.rendererId : undefined,
     };
 }
 
@@ -131,9 +294,28 @@ export function saveStatusRegionConfig(sessionId: string, config: StatusRegionCo
     if (config.mode === "native" && !config.contract.trim() && !config.renderHtml.trim()) {
         delete all[sessionId];
     } else {
-        all[sessionId] = config;
+        const snapshot = isCustomStatusRegionActive(config)
+            ? ensureStatusRendererSnapshot(config)
+            : undefined;
+        all[sessionId] = { ...config, rendererId: snapshot?.id };
     }
     kvSet(STORAGE_KEY, JSON.stringify(all));
+}
+
+/** Capture the renderer active at message creation without copying HTML into the message. */
+export function captureCurrentStatusRendererId(sessionId: string): string | undefined {
+    const config = getStatusRegionConfig(sessionId);
+    if (!isCustomStatusRegionActive(config)) return undefined;
+    const existing = getStatusRendererSnapshot(config.rendererId);
+    if (existing?.renderHtml === config.renderHtml) return existing.id;
+    const snapshot = ensureStatusRendererSnapshot(config);
+    if (!snapshot) return undefined;
+    const all = loadAll();
+    if (all[sessionId]) {
+        all[sessionId] = { ...all[sessionId], rendererId: snapshot.id };
+        kvSet(STORAGE_KEY, JSON.stringify(all));
+    }
+    return snapshot.id;
 }
 
 /** custom 是否真正生效（契约与渲染都要有内容，缺一回退 native 行为） */
