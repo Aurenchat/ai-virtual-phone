@@ -216,7 +216,8 @@
 .im-message-row .im-bubble { max-width: 100%; box-sizing: border-box; }
 .im-message-row[data-role="user"] .chat-msg-content-wrap { align-items: flex-end; }
 .im-message-row[data-role="assistant"] .chat-msg-content-wrap { align-items: flex-start; }
-:root.im-single .im-message-row > .chat-msg-avatar { display: none; }
+:root.im-single .im-message-row > .chat-msg-avatar,
+:root.im-group .im-message-row[data-role="user"] > .chat-msg-avatar { display: none; }
 :root.im-group .im-message-row[data-role="assistant"] > .chat-msg-avatar {
   align-self: flex-end;
   margin-right: 7px;
