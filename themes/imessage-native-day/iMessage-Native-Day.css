@@ -6,7 +6,6 @@
 :root {
   --im-theme: 1;
   --im-presentation: 1;
-  --app-text-scale: 1;
   --im-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
   --im-blue: #0095ff;
   --im-incoming: #e9e9eb;
@@ -43,6 +42,9 @@
   font-family: var(--im-font);
   color-scheme: light;
 }
+/* Keep the accepted iMessage typography fixed only in the online ChatRoom.
+ * Offline mode shares the session root, so it must inherit Float's real scale. */
+:root.chat-mode-online { --app-text-scale: 1; }
 /* Only peripheral fades change with wallpaper; message materials stay frozen. */
 :root.im-plain-background { background-color: #fff; }
 :root.im-wallpaper {
