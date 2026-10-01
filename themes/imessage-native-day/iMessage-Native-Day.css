@@ -45,6 +45,16 @@
 /* Keep the accepted iMessage typography fixed only in the online ChatRoom.
  * Offline mode shares the session root, so it must inherit Float's real scale. */
 :root.chat-mode-online { --app-text-scale: 1; }
+/* Offline prose remains on Float's real scale. UI labels are stable chrome,
+ * so keep only those labels at the accepted 100% measurements. */
+:root.chat-mode-offline .page-header.chat-room-main-pane .page-title,
+:root.chat-mode-offline .im-contact-name { font-size: 18px; }
+:root.chat-mode-offline .chat-offline-empty { font-size: 12px; }
+:root.chat-mode-offline .chat-offline-time,
+:root.chat-mode-offline .chat-offline-label { font-size: 11px; }
+:root.chat-mode-offline .chat-offline-summary-fold > summary { font-size: 12px; }
+:root.chat-mode-offline .chat-offline-summary-fold > summary::before { font-size: 14px; }
+:root.chat-mode-offline .chat-offline-generating { font-size: 13px; }
 /* Only peripheral fades change with wallpaper; message materials stay frozen. */
 :root.im-plain-background { background-color: #fff; }
 :root.im-wallpaper {
@@ -207,7 +217,12 @@
 .im-message-row[data-role="user"] .chat-msg-content-wrap { align-items: flex-end; }
 .im-message-row[data-role="assistant"] .chat-msg-content-wrap { align-items: flex-start; }
 :root.im-single .im-message-row > .chat-msg-avatar { display: none; }
-:root.im-group .im-message-row > .chat-msg-avatar { margin-right: 7px; }
+:root.im-group .im-message-row[data-role="assistant"] > .chat-msg-avatar {
+  align-self: flex-end;
+  margin-right: 7px;
+  visibility: hidden;
+}
+:root.im-group .im-message-row[data-role="assistant"]:has(.im-bubble[data-im-last]) > .chat-msg-avatar { visibility: visible; }
 :root.im-group .chat-group-sender-name { font-size: 11px; margin: 0 12px 4px; color: var(--im-time-color); text-shadow: var(--im-time-shadow); }
 .im-bubble.im-kind-text,
 .im-bubble.im-kind-voice {
@@ -344,6 +359,14 @@
 .im-bubble.im-kind-media { padding: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important; border-radius: 23px !important; overflow: visible !important; }
 .im-kind-media .chat-photo-card--image { padding: 0 !important; border: 0 !important; box-shadow: none !important; border-radius: 23px !important; overflow: hidden; max-width: 100%; }
 .im-kind-media .chat-photo-card-image { display: block; width: var(--im-media-width) !important; max-width: 100% !important; height: auto !important; max-height: none !important; border-radius: 23px !important; object-fit: contain; }
+/* ImageBubble is a single-image protocol record. Clip once on its card for
+ * incoming media; the image's white background + second rounded edge caused
+ * the visible light fringe on dark wallpapers. Outgoing media stays frozen. */
+.im-message-row[data-role="assistant"] .im-bubble[data-im-single-image] .chat-photo-card--image { background: transparent !important; }
+.im-message-row[data-role="assistant"] .im-bubble[data-im-single-image] .chat-photo-card-image {
+  background: transparent !important;
+  border-radius: 0 !important;
+}
 .im-kind-media video { max-width: 100%; border-radius: 23px; }
 .im-kind-media .chat-sticker { background: transparent !important; }
 /* Input enhancement is enabled only after buttons are safely identified. */

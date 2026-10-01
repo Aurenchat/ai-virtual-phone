@@ -17,7 +17,11 @@ const probe={
  chat, plugins, install: installChatPluginFromCode,
  async mount(variant='current') {
   await hydrateKvDb(); await chat.hydrateChatStorage(); await ensureSettingsStorageHydrated();
-  saveCharacters([{id:'im-reference',name:'dickhead 🖕🏻',avatar:null,persona:'',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}]);
+  const now=new Date().toISOString();
+  saveCharacters([
+   {id:'im-reference',name:'dickhead 🖕🏻',avatar:null,persona:'',createdAt:now,updatedAt:now},
+   {id:'im-second',name:'Misty Olszewski',avatar:null,persona:'',createdAt:now,updatedAt:now},
+  ]);
   chat.addChatContact('im-reference');
   session=chat.createOrGetSession('im-reference');
   session={...session,autoReplied:true,customCSS:await (await fetch(`/theme/${variant}/iMessage-Native-Day.css`)).text()};
@@ -41,6 +45,16 @@ const probe={
   chat.clearChatSessionMessages(session.id);
   const saved=messages.map((msg,i)=>probe.add({createdAt:new Date(Date.UTC(2026,8,29,1,0,i)).toISOString(),...msg}));
   probe.remount();return saved;
+ },
+ groupScene(messages: Partial<chat.ChatMessage>[]){
+  session={...session,isGroup:true,groupName:'Fixture Group',participantIds:['im-reference','im-second'],isSpectator:true};
+  chat.saveChatSessions([session]);
+  return probe.scene(messages);
+ },
+ singleScene(messages: Partial<chat.ChatMessage>[]){
+  session={...session,isGroup:false,groupName:undefined,participantIds:undefined,isSpectator:undefined};
+  chat.saveChatSessions([session]);
+  return probe.scene(messages);
  },
  offlineScene(){
   clearChatOfflineTurns(session.id);

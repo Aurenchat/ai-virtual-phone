@@ -59,7 +59,7 @@ export default {
     };
     const newState = () => ({ nodes: new Set(), attrs: new Map(), handlers: new Map(), off: [], header: null, outlines: new Map(), marked: new Set() });
     const messageClasses = ['im-message-block','im-follow','im-message-row','im-bubble','im-kind-text','im-kind-plain','im-kind-voice','im-kind-media','im-time-wrap','im-geometry-ready'];
-    const messageAttrs = ['data-im-last','data-im-first','data-im-group','data-im-plain','data-im-text-gap'];
+    const messageAttrs = ['data-im-last','data-im-first','data-im-group','data-im-plain','data-im-text-gap','data-im-single-image'];
     function clearMessage(el) {
       messageClasses.forEach(c => flag(el,c,false));
       messageAttrs.forEach(a => attr(el,a,null));
@@ -123,7 +123,7 @@ export default {
       const classes = ['im-header-ready','im-single','im-group','im-wallpaper','im-plain-background','im-message-block','im-follow','im-message-row','im-bubble','im-kind-text','im-kind-plain','im-kind-voice','im-kind-media','im-time-wrap','im-wave-ready'];
       [room, ...room.querySelectorAll('*')].forEach(el => {
         classes.forEach(c => flag(el,c,false));
-        ['data-im-last','data-im-first','data-im-group','data-im-plain','data-im-duration'].forEach(a => attr(el,a,null));
+        ['data-im-last','data-im-first','data-im-group','data-im-plain','data-im-duration','data-im-single-image'].forEach(a => attr(el,a,null));
       });
     }
     function header(room, state, session) {
@@ -253,6 +253,10 @@ export default {
         const isMedia = !!bubble.querySelector('.chat-photo-card--image, .chat-sticker, .chat-media-file-video');
         const isText = !isVoice && !isMedia && !bubble.classList.contains('chat-bubble-media') && (!msg?.mediaType || msg.mediaType==='quote');
         flag(bubble,'im-kind-text',isText); flag(bubble,'im-kind-voice',isVoice); flag(bubble,'im-kind-media',isMedia);
+        // A protocol image record owns exactly one ImageBubble/mediaUrl. Keep
+        // this marker narrower than generic media so galleries, files, video,
+        // stickers and future multi-image renderers cannot inherit its polish.
+        attr(bubble,'data-im-single-image',msg?.mediaType==='image' && isMedia ? '' : null);
         // Phase-one calibration requires a mapped ordinary text record. Keep the
         // original special renderers, translation, quotes and plugin projections.
         const textRecord = isText && !!msg && !msg.mediaType && !msg.isRetracted &&

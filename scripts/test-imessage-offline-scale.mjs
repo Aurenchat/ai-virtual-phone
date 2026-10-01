@@ -46,12 +46,20 @@ try{
   const offline=[];
   for(const scale of [1,1.25,1.5]){
     await setScale(scale);
-    offline.push(await page.locator('.chat-offline-text').first().evaluate((el,requested)=>{const root=el.closest('.chat-room-wrapper'),s=getComputedStyle(el);return{requested,mode:root.classList.contains('chat-mode-offline'),rootScale:getComputedStyle(root).getPropertyValue('--app-text-scale').trim(),font:parseFloat(s.fontSize),line:parseFloat(s.lineHeight)}},scale));
+    offline.push(await page.evaluate(requested=>{
+      const body=document.querySelector('.chat-offline-text'),root=body.closest('.chat-room-wrapper');
+      const font=selector=>parseFloat(getComputedStyle(document.querySelector(selector)).fontSize);
+      const s=getComputedStyle(body);
+      return{requested,mode:root.classList.contains('chat-mode-offline'),rootScale:getComputedStyle(root).getPropertyValue('--app-text-scale').trim(),font:parseFloat(s.fontSize),line:parseFloat(s.lineHeight),label:font('.chat-offline-label'),time:font('.chat-offline-time'),summaryLabel:font('.chat-offline-summary-fold > summary'),summaryBody:font('.chat-offline-summary-content'),contact:font('.im-contact-name')};
+    },scale));
   }
   check(offline.every(x=>x.mode),'offline mode uses the actual ChatRoom branch');
   check(offline.every(x=>Math.abs(Number(x.rootScale)-x.requested)<.001),'offline root inherits Float global text scale without hardcoded tiers');
   check(offline.every(x=>Math.abs(x.font-14.5*x.requested)<.02),'offline body text scales at the native 14.5px base ratio');
   check(offline.every(x=>Math.abs(x.line-26.825*x.requested)<.05),'offline body line height scales with the same host ratio');
+  check(offline.every(x=>x.label===11&&x.time===11),'offline speaker labels and timestamps remain fixed UI text');
+  check(offline.every(x=>x.summaryLabel===12&&x.contact===18),'offline summary header and contact name remain fixed UI text');
+  check(offline.every(x=>Math.abs(x.summaryBody-13*x.requested)<.02),'offline summary content continues to follow the host scale');
   await page.locator('.chat-offline-summary-fold > summary').click();await settle();
   check(Math.abs(await page.locator('.chat-offline-summary-content').evaluate(e=>parseFloat(getComputedStyle(e).fontSize))-19.5)<.02,'offline summary inherits 150% host scale');
   await page.locator('button[aria-label="返回线上模式"]').click();await page.locator('.chat-mode-online .im-bubble').first().waitFor();
