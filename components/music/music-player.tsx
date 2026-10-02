@@ -329,9 +329,13 @@ export default function MusicPlayer() {
     const openShareViaChat = useCallback(() => {
         if (!player.currentTrack) return;
         window.dispatchEvent(new CustomEvent("open-mini-chat", {
-            detail: { share: { type: "music", title: player.currentTrack.title, artist: player.currentTrack.artist } },
+            detail: { share: {
+                type: "music", title: player.currentTrack.title, artist: player.currentTrack.artist,
+                musicTrackId: neteaseId || undefined,
+                musicCoverUrl: neteaseId ? player.currentTrack.coverUrl : undefined,
+            } },
         }));
-    }, [player.currentTrack]);
+    }, [player.currentTrack, neteaseId]);
 
     const openMiniChat = useCallback(() => {
         window.dispatchEvent(new CustomEvent("open-mini-chat"));

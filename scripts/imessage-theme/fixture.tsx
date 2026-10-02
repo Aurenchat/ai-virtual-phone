@@ -10,10 +10,31 @@ import { ensureSettingsStorageHydrated, saveApiConfigs, saveBindingConfig } from
 import { installChatPluginFromCode } from '../../lib/chat-plugin-loader';
 import { getChatPluginRuntime } from '../../lib/chat-plugin-runtime';
 import * as plugins from '../../lib/chat-plugin-storage';
+import { saveMusicApiConfig } from '../../lib/music-service';
+import { registerMusicControlBridge } from '../../lib/music-control-bridge';
+import type { MusicTrack } from '../../lib/music-storage';
+import { resolveMusicSharePreview, persistMusicSharePreview } from '../../lib/music-share-preview';
 const root=createRoot(document.getElementById('app')!);
 let session: chat.ChatSession;
 let renderKey: string | number = 'current';
 const probe={
+ musicPlays: [] as MusicTrack[],
+ resolveMusicSharePreview, persistMusicSharePreview,
+ async musicResume(){
+  await hydrateKvDb(); await chat.hydrateChatStorage(); await ensureSettingsStorageHydrated();
+  await getChatPluginRuntime().ensureStarted();
+  probe.musicSetup(); probe.remount();
+ },
+ musicSetup(){
+  saveMusicApiConfig({baseUrl:location.origin+'/netease',enabled:true});
+  registerMusicControlBridge({
+   getState:()=>({currentTrack:null,isPlaying:false,currentTime:0,duration:0,playMode:'sequence',queue:[],volume:1}),
+   playTrack:async track=>{probe.musicPlays.push(track);return {ok:true,message:'fixture',track};},
+   playByQuery:async()=>({ok:false,message:'unused'}),
+   addToQueue:async tracks=>({ok:true,message:'fixture',queue:tracks}),
+   pause(){},resume(){},stop(){},next(){},prev(){},setPlayMode(){},
+  });
+ },
  chat, plugins, install: installChatPluginFromCode,
  async mount(variant='current') {
   await hydrateKvDb(); await chat.hydrateChatStorage(); await ensureSettingsStorageHydrated();

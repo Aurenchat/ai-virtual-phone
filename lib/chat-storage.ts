@@ -213,6 +213,8 @@ export type ChatMessage = {
         adminMuteMinutes?: number;// 禁言时长（分钟）
         musicTitle?: string;      // 音乐标题
         musicArtist?: string;     // 音乐歌手
+        musicTrackId?: number;    // 网易云歌曲 ID，仅供音乐分享展示补全
+        musicCoverUrl?: string;   // 音乐分享封面快照，不依赖当前播放器
         xiaohongshuAuthor?: string;       // 小红书分享作者
         xiaohongshuTitle?: string;        // 小红书分享标题
         xiaohongshuBody?: string;         // 小红书分享正文

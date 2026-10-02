@@ -2,6 +2,8 @@ export type MusicChatSharePayload = {
     type: "music";
     title: string;
     artist: string;
+    musicTrackId?: number;
+    musicCoverUrl?: string;
 };
 
 export type XiaohongshuNoteChatSharePayload = {

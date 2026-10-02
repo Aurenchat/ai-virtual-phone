@@ -2094,65 +2094,113 @@
 }
 
 .chat-music-share-card {
-  width: 220px;
-  border-radius: 16px;
+  display: block;
+  position: relative;
+  width: clamp(196px, calc(68vw - 22px), 270px);
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 22px;
   overflow: hidden;
-  background: var(--c-music-surface, rgba(255,255,255,0.06));
-  border: 1px solid var(--c-music-surface-solid, rgba(255,255,255,0.12));
-  backdrop-filter: blur(16px);
+  background: #29272b;
+  color: #fff;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
   box-shadow: none;
 }
 
-.chat-music-share-body {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px;
+.chat-music-share-card:focus-visible {
+  outline: 2px solid #007aff;
+  outline-offset: 3px;
 }
 
 .chat-music-share-cover {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: var(--c-music-surface-solid, rgba(255,255,255,0.12));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  background: #343036;
+  color: #bdb2b8;
+}
+
+.chat-music-share-cover > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+
+.chat-music-share-card[data-cover-state="loaded"] .chat-music-share-cover > img { opacity: 1; }
+.chat-music-share-card[data-cover-state="loaded"] .chat-music-share-placeholder { visibility: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-music-share-cover > img { transition: none; }
 }
 
 .chat-music-share-info {
-  flex: 1;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  box-sizing: border-box;
+  height: calc(112px * var(--app-text-scale, 1));
+  padding: calc(12px * var(--app-text-scale, 1)) 14px;
   min-width: 0;
 }
 
+.chat-music-share-tint {
+  position: absolute;
+  z-index: -2;
+  inset: -20px;
+  width: calc(100% + 40px);
+  height: calc(100% + 40px);
+  object-fit: cover;
+  filter: blur(16px) saturate(1.15);
+  pointer-events: none;
+}
+
+.chat-music-share-info::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: rgba(15, 13, 19, .74);
+  pointer-events: none;
+}
+
 .chat-music-share-title {
-  font-size: calc(11.7px*var(--app-text-scale,1));
+  font-size: calc(16px * var(--app-text-scale, 1));
+  line-height: 1.25;
+  height: 2.5em;
   font-weight: 600;
-  color: var(--c-music-text, #2d3b36);
-  white-space: nowrap;
+  color: #fff;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .chat-music-share-artist {
-  font-size: calc(9.9px*var(--app-text-scale,1));
-  color: var(--c-music-accent, #7c9a92);
-  margin-top: 3px;
+  font-size: calc(13px * var(--app-text-scale, 1));
+  line-height: 1.4;
+  color: #e2dfe3;
+  margin-top: calc(5px * var(--app-text-scale, 1));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .chat-music-share-footer {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  border-top: 1px solid var(--c-music-surface, rgba(255,255,255,0.08));
-  color: var(--c-music-accent, #7c9a92);
-  font-size: calc(9px*var(--app-text-scale,1));
-  opacity: 0.7;
+  margin-top: calc(5px * var(--app-text-scale, 1));
+  color: #b9b4bd;
+  font-size: calc(11px * var(--app-text-scale, 1));
+  line-height: 1.3;
+  white-space: nowrap;
 }
 
 /* ── Media File Card ── */

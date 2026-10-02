@@ -202,11 +202,11 @@ function resolveNeteaseRequestBase(baseUrl: string): string {
 }
 
 /** Search songs via Netease API */
-export async function searchNetease(query: string, limit = 20): Promise<NeteaseSearchResult[]> {
+export async function searchNetease(query: string, limit = 20, signal?: AbortSignal): Promise<NeteaseSearchResult[]> {
     const base = neteaseBase();
     if (!base) return [];
     try {
-        const resp = await fetch(withNeteaseParams(`${base}/cloudsearch?keywords=${encodeURIComponent(query)}&limit=${limit}`));
+        const resp = await fetch(withNeteaseParams(`${base}/cloudsearch?keywords=${encodeURIComponent(query)}&limit=${limit}`), { signal });
         const data = await resp.json();
         const songs = data?.result?.songs;
         if (!Array.isArray(songs)) return [];
@@ -280,11 +280,11 @@ export async function getNeteaseLyrics(songId: number): Promise<string> {
 }
 
 /** Get song detail (cover, artist ids, etc.) */
-export async function getNeteaseSongDetail(songId: number): Promise<{ coverUrl?: string; name?: string; artists?: string; artistList?: { id: number; name: string }[]; album?: string } | null> {
+export async function getNeteaseSongDetail(songId: number, signal?: AbortSignal): Promise<{ coverUrl?: string; name?: string; artists?: string; artistList?: { id: number; name: string }[]; album?: string } | null> {
     const base = neteaseBase();
     if (!base) return null;
     try {
-        const resp = await fetch(withNeteaseParams(`${base}/song/detail?ids=${songId}`));
+        const resp = await fetch(withNeteaseParams(`${base}/song/detail?ids=${songId}`), { signal });
         const data = await resp.json();
         const song = data?.songs?.[0];
         if (!song) return null;

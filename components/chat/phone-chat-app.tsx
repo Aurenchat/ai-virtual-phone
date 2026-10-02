@@ -174,6 +174,8 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
                     mediaData: {
                         musicTitle: sharePayload.title,
                         musicArtist: sharePayload.artist,
+                        musicTrackId: sharePayload.musicTrackId,
+                        musicCoverUrl: sharePayload.musicCoverUrl,
                         label: `${sharePayload.title} - ${sharePayload.artist}`,
                     },
                 });
