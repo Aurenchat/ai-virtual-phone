@@ -28,6 +28,7 @@ const browser=await chromium.launch({headless:true,channel:'msedge'});
 
 const sharp=require('sharp');
 const image=await sharp('public/images/black-market/operator.jpg').resize(400,400,{fit:'cover'}).png().toBuffer();
+const colors={};for(const [name,color] of Object.entries({red:'#dd2838',blue:'#225cdd',white:'#ffffff'}))colors[name]=await sharp({create:{width:400,height:400,channels:3,background:color}}).png().toBuffer();
 const out=process.env.MUSIC_CARD_EVIDENCE_DIR || path.join(temp,'evidence');
 await fs.mkdir(out,{recursive:true});
 const checks=[];const check=(ok,name)=>{assert.ok(ok,name);checks.push(name);console.log('PASS '+name)};
@@ -41,7 +42,7 @@ await context.route('**/*',async route=>{
  if(u.hostname==='cover.test'){
   if(holdCovers)await new Promise(resolve=>held.push(resolve));
   if(u.pathname.includes('404'))return route.fulfill({status:404,body:''});
-  return route.fulfill({contentType:'image/png',body:image});
+  return route.fulfill({contentType:'image/png',body:colors[u.pathname.slice(1).replace('.png','')]||image});
  }
  if(u.pathname.startsWith('/netease/')){
   calls.push(u.pathname+u.search);active++;peak=Math.max(peak,active);
@@ -85,17 +86,21 @@ try{
   await scene(entries);
   await page.waitForFunction(()=>[...document.querySelectorAll('.chat-music-share-card')].every(c=>c.dataset.coverState==='loaded'));
   const g=await geometry(),mode=wallpaper?'wallpaper':'plain';
-  check(g.every(x=>Math.abs(x.w-g[0].w)<.1&&Math.abs(x.h-g[0].h)<.1),mode+': five mixed-language cards have identical dimensions');
-  check(g.every(x=>Math.abs(x.coverW-x.coverH)<.1&&x.infoH===112),mode+': square cover and stable information height');
-  check(g[0].w/370>=.65&&g[0].w/370<=.70,mode+': width is 65–70% of mobile chat area');
+  check(g.every(x=>Math.abs(x.w-216)<.1),mode+': five mixed-language cards share reference-scale 216px width');
+  check(g.every(x=>Math.abs(x.coverW-x.coverH)<.1)&&g[1].infoH>g[0].infoH,mode+': square cover and content-driven information height');
+  check(g[4].infoH>g[2].infoH,mode+': long artist wraps and grows the card');
   check(g.filter((_,i)=>i%2).every(x=>Math.abs(x.right-386)<.1)&&g.filter((_,i)=>!(i%2)).every(x=>Math.abs(x.left-16)<.1),mode+': accepted incoming/outgoing insets');
   check(await page.locator('.chat-music-share-card').evaluateAll(cards=>cards.every(c=>{
    const t=c.querySelector('.chat-music-share-title'),a=c.querySelector('.chat-music-share-artist');
-   return getComputedStyle(t).webkitLineClamp==='2'&&t.clientHeight===40&&getComputedStyle(a).whiteSpace==='nowrap'&&c.querySelector('.chat-music-share-footer').textContent==='网易云音乐';
-  })),mode+': title clamps to two lines, artist to one, source contains no URL or album');
+   return getComputedStyle(t).webkitLineClamp==='none'&&t.scrollHeight===t.clientHeight&&a.scrollHeight===a.clientHeight&&Math.abs(a.getBoundingClientRect().top-t.getBoundingClientRect().bottom-4)<.1&&c.querySelector('.chat-music-share-footer').textContent==='网易云音乐';
+  })),mode+': complete title and artist text, no reserved title space, compact 4px gap');
   const card=page.locator('.chat-music-share-card').last();await card.scrollIntoViewIfNeeded();await card.screenshot({path:path.join(out,mode+'-loaded.png')});
  }
  check(calls.length===0,'saved covers render without API search or detail requests');
+ await fs.writeFile(path.join(out,'surface-audit.json'),JSON.stringify(await page.locator('.chat-music-share-card').last().evaluate(card=>{
+  const nodes=[card,...card.querySelectorAll('*'),card.parentElement,card.parentElement.parentElement];
+  return nodes.map(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return {class:el.className,w:r.width,h:r.height,background:s.background,borderRadius:s.borderRadius,overflow:s.overflow,filter:s.filter,clipPath:s.clipPath,before:getComputedStyle(el,'::before').content,after:getComputedStyle(el,'::after').content}});
+ }),null,2));
  // Pending -> loaded: real network response held until both geometry snapshots.
  holdCovers=true;
  await scene([music('Delayed cover',{musicCoverUrl:'https://cover.test/delayed.png',musicArtist:'Artist'})]);
@@ -159,6 +164,44 @@ try{
  await scene(sample);const single=(await geometry())[0];await scene(sample,true);const group=(await geometry())[0];
  check(single.right===group.right&&single.w===group.w,'group outgoing music preserves single-chat inset and width');
  check(await page.locator('.im-message-row[data-role="user"] > .chat-msg-avatar').evaluate(e=>getComputedStyle(e).display)==='none','group outgoing avatar stays removed');
+ // Same native grouping + frozen outline for all four layout directions.
+ for(const background of ['plain','dark','light'])for(const grouped of [false,true])for(const role of ['assistant','user']){
+  await page.evaluate(bg=>{
+   window.imTest.wallpaper(bg!=='plain',bg==='dark'?'#17202e':'#f3e9d7');
+  },background);
+  const song={...music('晴天',{musicArtist:'Artist',musicCoverUrl:'https://cover.test/blue.png'},role),senderCharacterId:role==='assistant'?'im-reference':undefined};
+  await scene([song,song],grouped);
+  const state=await page.locator('.chat-bubble-music-share').evaluateAll(bs=>bs.map(b=>({
+   group:b.dataset.imGroup,path:b.querySelector('.im-text-outline path').getAttribute('d'),clip:getComputedStyle(b.querySelector('.chat-music-share-surface')).clipPath,
+   svg:getComputedStyle(b.querySelector('.im-text-outline')).display,before:getComputedStyle(b,'::before').content,after:getComputedStyle(b,'::after').content,w:b.getBoundingClientRect().width,
+  })));
+  check(state[0].group==='first'&&state[1].group==='last'&&state[0].path!==state[1].path&&state.every(s=>s.clip.startsWith('path(')&&s.svg==='none'&&s.before==='none'&&s.after==='none'&&s.w===216),`${background}/${grouped?'group':'single'}/${role}: one clipped surface, tail only on group end`);
+  const last=page.locator('.chat-music-share-card').last();await last.scrollIntoViewIfNeeded();await settle();
+  const box=await last.boundingBox();await page.screenshot({path:path.join(out,`${background}-${grouped?'group':'single'}-${role}.png`),clip:{x:box.x-2,y:box.y-2,width:box.width+4,height:box.height+12}});
+  // A text message after music belongs to the same group, not a new media group.
+  await scene([song,{role,senderCharacterId:song.senderCharacterId,content:'After music'}],grouped);
+  check(await page.locator('.chat-bubble-music-share').getAttribute('data-im-group')==='first',`${background}/${grouped?'group':'single'}/${role}: following text removes music tail`);
+ }
+ // Pixel checks include the below-body tail; uniform raster colors make joins measurable.
+ const pixels={};
+ await page.evaluate(()=>window.imTest.wallpaper(false));
+ for(const color of ['red','blue','white'])for(const role of ['assistant','user']){
+  await scene([music('Hi',{musicArtist:'Artist',musicCoverUrl:`https://cover.test/${color}.png`},role)]);
+  await page.locator('.chat-music-share-card[data-cover-state="loaded"]').waitFor();
+  const c=page.locator('.chat-music-share-card');await c.scrollIntoViewIfNeeded();await settle();const box=await c.boundingBox();
+  const png=await page.screenshot({clip:{x:box.x,y:box.y,width:box.width,height:box.height+10}});
+  await fs.writeFile(path.join(out,`${color}-${role}-tail.png`),png);
+  const raw=await sharp(png).removeAlpha().raw().toBuffer({resolveWithObject:true});
+  const px=(x,y)=>{const i=(Math.floor(y*3)*raw.info.width+Math.floor(x*3))*3;return [...raw.data.subarray(i,i+3)]};
+  const h=box.height,w=box.width;
+  const body=px(w/2,h-8),tip=px(role==='assistant'?11:w-11,h+4),other=px(role==='assistant'?w-11:11,h+4);
+  check(body.every((v,i)=>Math.abs(v-tip[i])<8)&&other.every(v=>v>245),`${color}/${role}: tail is on correct side and matches body pixels`);
+  check(px(1,h-1).every(v=>v>245)&&px(w-1,h-1).every(v=>v>245),`${color}/${role}: both bottom corners stay round without colored square leakage`);
+  pixels[color]=body;
+ }
+ check(pixels.red[0]>pixels.red[2]+40&&pixels.blue[2]>pixels.blue[0]+40,'red and blue covers produce clearly distinct information colors');
+ const linear=c=>{c/=255;return c<=.04045?c/12.92:((c+.055)/1.055)**2.4},lum=c=>c.map(linear).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0);
+ check((lum([228,223,231])+.05)/(lum(pixels.white)+.05)>=4.5,'even a white cover retains at least 4.5:1 secondary text contrast');
  for(const width of [320,393,430]){
   await page.setViewportSize({width,height:874});await scene(sample);const g=(await geometry())[0];
   check(g.left>=0&&g.right<=width&&Math.abs(g.coverW-g.coverH)<.1,width+'px: compact card remains inside viewport');

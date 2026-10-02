@@ -88,9 +88,10 @@ const probe={
   session={...session,streamOnline:true};chat.saveChatSessions([session]);probe.remount();
  },
  requestReply(){window.dispatchEvent(new CustomEvent(chat.CHAT_REQUEST_REPLY_EVENT,{detail:{sessionId:session.id}}));},
- wallpaper(enabled: boolean){
+ wallpaper(enabled: boolean, tone?: string){
   const svg='<svg xmlns="http://www.w3.org/2000/svg" width="402" height="874"><defs><pattern id="grid" width="36" height="36" patternUnits="userSpaceOnUse"><rect width="36" height="36" fill="#30475e"/><rect width="18" height="18" fill="#a2bbca"/><rect x="18" y="18" width="18" height="18" fill="#a2bbca"/></pattern></defs><rect width="402" height="874" fill="url(#grid)"/></svg>';
-  session={...chat.loadChatSessions()[0],backgroundImage:enabled?'data:image/svg+xml;base64,'+btoa(svg):undefined};
+  const backdrop=tone?`<svg xmlns="http://www.w3.org/2000/svg" width="402" height="874"><rect width="402" height="874" fill="${tone}"/></svg>`:svg;
+  session={...chat.loadChatSessions()[0],backgroundImage:enabled?'data:image/svg+xml;base64,'+btoa(backdrop):undefined};
   chat.saveChatSessions([session]);probe.remount();
  },
 };

@@ -297,6 +297,17 @@
 .chat-bubble-role-assistant > .im-text-outline { fill: var(--im-incoming); }
 .im-kind-plain.chat-bubble-role-user > .im-text-outline { fill: var(--im-text-blue); }
 .im-kind-plain.chat-bubble-role-assistant > .im-text-outline { fill: var(--im-text-incoming); }
+/* Music paints a single cover-tinted surface through the same measured path.
+ * The generic text SVG stays non-painted; no blue/gray shell or extra tail. */
+.im-bubble.chat-bubble-music-share > .im-text-outline { display: none; }
+.im-bubble.chat-bubble-music-share.im-geometry-ready .chat-music-share-surface {
+  height: calc(100% + 8px);
+  clip-path: var(--im-music-outline);
+}
+.im-bubble.chat-bubble-music-share.im-geometry-ready .chat-music-share-cover {
+  border-radius: 0;
+  clip-path: var(--im-music-outline);
+}
 .im-bubble.im-kind-text:not(.im-geometry-ready)[data-im-last]::before,
 .im-bubble.im-kind-voice:not(.im-geometry-ready)[data-im-last]::before {
   content: "";

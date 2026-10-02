@@ -5,7 +5,7 @@ export default {
     id: "imessage-native-message-bridge",
     name: "iMessage · 分组与原生外观适配",
     apiVersion: 1,
-    version: "1.1.0-alpha.6",
+    version: "1.1.0-alpha.7-music.1",
     author: "Auren · Chloe 自用适配",
     description: "只处理已导入 iMessage Native Day CSS 的聊天室；动态头像、独立消息分组、真实状态、语音外观。",
     permissions: ["chat.read", "ui"],
@@ -63,12 +63,14 @@ export default {
     function clearMessage(el) {
       messageClasses.forEach(c => flag(el,c,false));
       messageAttrs.forEach(a => attr(el,a,null));
+      el.style.removeProperty('--im-music-outline');
     }
     // Only the background is drawn. React content, pointer handlers and plugin
     // attachments remain unwrapped/unclipped. One filled path avoids overlap seams.
     function outline(bubble, state, enabled) {
       let item = state.outlines.get(bubble);
       if (!enabled) {
+        bubble.style.removeProperty('--im-music-outline');
         if (item) { resizeObserver.unobserve(bubble); resized.delete(bubble); item.svg.remove(); state.nodes.delete(item.svg); state.outlines.delete(bubble); }
         flag(bubble,'im-geometry-ready',false);
         return;
@@ -111,6 +113,11 @@ export default {
       attr(item.svg,'height',n(h+8));
       attr(item.path,'d',d);
       attr(item.path,'transform',null);
+      // Music reuses the exact frozen outline, but clips its OWN colored
+      // background to it. Text stays unclipped; the cover uses its top edge.
+      if (bubble.classList.contains('chat-bubble-music-share')) {
+        bubble.style.setProperty('--im-music-outline', `path("${d}")`);
+      }
       flag(bubble,'im-geometry-ready',true);
     }
     function clean(room, state) {
@@ -280,7 +287,8 @@ export default {
         const nativeSpecialShell = !!msg && !msg.isRetracted &&
           ((msg.mediaType==='audio' && isVoice) ||
            (msg.mediaType==='quote' && isText && !!bubble.querySelector(':scope > .chat-quote-message')));
-        outline(bubble,state,(textRecord && (!bilingual || e.role==='assistant')) || nativeSpecialShell);
+        const musicShell = msg?.mediaType==='music_share' && !msg.isRetracted && !!bubble.querySelector('.chat-music-share-surface');
+        outline(bubble,state,(textRecord && (!bilingual || e.role==='assistant')) || nativeSpecialShell || musicShell);
         if (isVoice) voice(bubble,state);
         const wrap = bubble.closest('.chat-msg-content-wrap');
         let receipt = wrap?.querySelector(':scope > .im-receipt');

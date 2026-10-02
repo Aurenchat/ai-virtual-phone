@@ -41,6 +41,9 @@ export function MusicShareBubble({ msg, onPlay, onUpdate }: {
         <button type="button" className="chat-music-share-card" data-cover-state={ready ? "loaded" : failed === cover && cover ? "failed" : "pending"}
             aria-label={`播放 ${title}${artist ? ` · ${artist}` : ""}`}
             onClick={e => { e.stopPropagation(); onPlay?.(title, artist || undefined); }}>
+            <div className="chat-music-share-surface" aria-hidden="true">
+                {ready && <img className="chat-music-share-tint" src={cover} alt="" />}
+            </div>
             <div className="chat-music-share-cover" aria-hidden="true">
                 <svg className="chat-music-share-placeholder" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2">
                     <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
@@ -49,7 +52,6 @@ export function MusicShareBubble({ msg, onPlay, onUpdate }: {
                     onLoad={() => setLoaded(cover)} onError={() => setFailed(cover)} />}
             </div>
             <div className="chat-music-share-info">
-                {ready && <img className="chat-music-share-tint" src={cover} alt="" aria-hidden="true" />}
                 <div className="chat-music-share-title">{title}</div>
                 <div className="chat-music-share-artist">{shownArtist}</div>
                 <div className="chat-music-share-footer">网易云音乐</div>
