@@ -15,7 +15,10 @@ function run(b, file, mocks) {
   return exports;
 }
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
-function fakeDexie(tables) { return { default: class { version() { return { stores: () => Object.assign(this, tables) }; } } }; }
+function fakeDexie(tables) { return { default: class {
+  version() { return { stores: () => { Object.assign(this, tables); for (const table of Object.values(tables)) Object.assign(table, { db: this, toCollection() { return this; }, limit() { return this; } }); } }; }
+  transaction(_mode, _table, fn) { return fn(); }
+} }; }
 (async () => {
   const bootResults = [];
   for (const disabled of [false, true]) {
@@ -29,7 +32,7 @@ function fakeDexie(tables) { return { default: class { version() { return { stor
     if (!disabled) check(b.diag.getCurrent().activeStages, ['KV_READ', 'KV_CACHE', 'CHAT_DB', 'CHAT_HYDRATE', 'CHAT_MESSAGES']);
     kvDone.resolve([{ key: 'synthetic', value: 'fixture' }]); await kvPromise;
     if (!disabled) { check(b.diag.getCurrent().lastStage, 'KV_CACHE_DONE'); check(b.diag.getCurrent().activeStages.includes('CHAT_MESSAGES'), true); }
-    messagesDone.resolve([{ id: 'synthetic-message' }]); await Promise.resolve(); await Promise.resolve();
+    messagesDone.resolve([{ id: 'synthetic-message' }]); await new Promise(setImmediate);
     if (!disabled) { check(b.diag.getCurrent().lastStage, 'CHAT_MESSAGES_DONE'); check(b.diag.getCurrent().activeStages.includes('CHAT_DB'), true); }
     sessionsDone.resolve([]); const data = await chatPromise;
     bootResults.push({ reads, data, hydrated: kv.isKvHydrated(), value: kv.kvGet('synthetic') });
@@ -71,6 +74,14 @@ function fakeDexie(tables) { return { default: class { version() { return { stor
   for (const file of ['lib/chat-db.ts', 'lib/chat-storage.ts', 'lib/kv-db.ts', 'lib/vn-storage.ts', 'lib/map-storage.ts', 'lib/chat-plugin-runtime.ts', 'components/main-app.tsx', 'components/desktop-shell.tsx']) {
     const before = cp.execFileSync('git', ['show', 'ebd54d4:' + file], { cwd: root, encoding: 'utf8', maxBuffer: 10e6 });
     const after = fs.readFileSync(path.join(root, file), 'utf8');
+    // Stage 3B intentionally changes these boundaries. Dedicated chunk/scheduling
+    // tests check their behavior; keep all Stage 3A marker calls unchanged here.
+    if (['lib/chat-db.ts', 'lib/map-storage.ts', 'components/main-app.tsx'].includes(file)) {
+      const markers = text => text.match(/markBootStage\("[A-Z_]+"\)/g) || [];
+      const telemetryBaseline = cp.execFileSync('git', ['show', '4324623:' + file], { cwd: root, encoding: 'utf8', maxBuffer: 10e6 });
+      check(markers(after), markers(telemetryBaseline));
+      continue;
+    }
     const strip = text => text.replace(/^import \{ markBootStage \} from [^\n]+\n/gm, '')
       .replace(/  useEffect\(\(\) => \{\s*if \(desktopReady\) markBootStage\("SHELL_INTERACTIVE"\);\s*\}, \[desktopReady\]\);/g, '')
       .replace(/\.then\(messages => \{ markBootStage\("CHAT_MESSAGES_DONE"\); return messages; \}\)/g, '')

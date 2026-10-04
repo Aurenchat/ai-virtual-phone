@@ -3,9 +3,10 @@
 
 import Dexie from "dexie";
 import { markBootStage } from "./boot-diagnostics";
+import { hydrateChatStorage } from "./chat-storage";
 import type { MapWorld, GameSave, CharacterAgent, StoryDirector, CharStats } from "./map-types";
 import { formatChatTimestamp } from "./llm-prompt-assembler";
-import { kvGet, kvSet, kvRemove, registerKvMigration, registerDynamicPrefix } from "./kv-db";
+import { kvGet, kvSet, kvRemove, registerKvMigration, registerDynamicPrefix, hydrateKvDb } from "./kv-db";
 import { DEFAULT_ADVENTURE_BILINGUAL_PROMPT } from "./bilingual-prompt-defaults";
 
 /** Roll 3d6×5 for each stat (CoC-style, range 15-90) */
@@ -56,18 +57,29 @@ const mapDb = new MapDatabase();
 let _worldsCache: MapWorld[] = [];
 let _savesCache: GameSave[] = [];
 let _hydrated = false;
+let _hydratePromise: Promise<void> | null = null;
 
-export async function hydrateMapStorage(): Promise<void> {
-  if (_hydrated || typeof window === "undefined") return;
-  markBootStage("MAP_BEGIN");
-  try {
-    _worldsCache = await mapDb.worlds.toArray();
-    _savesCache = await mapDb.saves.toArray();
-  } catch { /* first run */ }
-  // Hydrate theme blobs from IDB into memory cache
-  try { await hydrateThemeBlobs(); } catch { /* ignore */ }
-  _hydrated = true;
-  markBootStage("MAP_DONE");
+export function hydrateMapStorage(): Promise<void> {
+  if (_hydrated || typeof window === "undefined") return Promise.resolve();
+  if (_hydratePromise) return _hydratePromise;
+  _hydratePromise = (async () => {
+    // The auto-call occurs during module evaluation. Defer until imports have
+    // initialized, then keep Map's large reads out of chat's materialization window.
+    await Promise.resolve();
+    // The module auto-call must not start Chat normalization before KV settings exist.
+    await hydrateKvDb();
+    await hydrateChatStorage();
+    markBootStage("MAP_BEGIN");
+    try {
+      _worldsCache = await mapDb.worlds.toArray();
+      _savesCache = await mapDb.saves.toArray();
+    } catch { /* first run */ }
+    // Hydrate theme blobs from IDB into memory cache
+    try { await hydrateThemeBlobs(); } catch { /* ignore */ }
+    _hydrated = true;
+    markBootStage("MAP_DONE");
+  })().finally(() => { _hydratePromise = null; });
+  return _hydratePromise;
 }
 
 // Auto-hydrate

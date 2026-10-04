@@ -13,6 +13,7 @@ import { OfflinePushRevampAnnouncement } from "./offline-push-revamp-announcemen
 import { SplashAnimation } from "./splash-animation";
 import { MusicProvider } from "@/lib/music-context";
 import { hydrateKvDb, isKvHydrated } from "@/lib/kv-db";
+import { hydrateChatStorage } from "@/lib/chat-storage";
 import { getThemeAssetMap, readThemeProfile } from "@/lib/theme-storage";
 import { resolveActiveIconSkins, type ThemeProfile } from "@/lib/theme-types";
 import { hasPendingMcpOAuthCallback } from "@/lib/tool-executor";
@@ -257,6 +258,10 @@ export function MainApp() {
       setKvHydrateFailed(false);
 
       let nextPreparedTheme: PreparedDesktopTheme | null = null;
+      // Keep theme read/decode (and the later desktop auxiliary hydration) out
+      // of the full chat materialization window. Existing failure handling stays in ChatStorage.
+      await hydrateChatStorage();
+      if (cancelled) return;
       try {
         nextPreparedTheme = await prepareDesktopThemeForFirstPaint();
       } catch (error) {

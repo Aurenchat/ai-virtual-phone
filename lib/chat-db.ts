@@ -25,6 +25,32 @@ class ChatDatabase extends Dexie {
 
 export const chatDb = new ChatDatabase();
 
+// 50k x 10 KiB calibration: 256 keeps per-request payload near 2.5 MiB and
+// leaves shorter scheduling gaps than 4096. This is a row cap, not a byte cap.
+export const CHAT_MESSAGE_READ_CHUNK_SIZE = 256;
+
+/** Same primary-key order and readonly snapshot as messages.toArray(). */
+export function readChatMessagesInChunks(
+    table: Dexie.Table<ChatMessage, string> = chatDb.messages,
+    chunkSize = CHAT_MESSAGE_READ_CHUNK_SIZE,
+): Promise<ChatMessage[]> {
+    if (!Number.isSafeInteger(chunkSize) || chunkSize < 1) return Promise.reject(new RangeError("Invalid chat read chunk size"));
+    return table.db.transaction("r", table, async () => {
+        const messages: ChatMessage[] = [];
+        let lastKey: string | undefined;
+        for (;;) {
+            // Each awaited IDB request completes in a new event-loop task. Do not
+            // await timers here: they can auto-commit the snapshot transaction.
+            // Dexie 4.3 uses bounded getAll(range, limit), with a cursor fallback.
+            const batch = await (lastKey === undefined ? table.toCollection() : table.where(":id").above(lastKey))
+                .limit(chunkSize).toArray();
+            for (const message of batch) messages.push(message); // references, no deep copy/concat
+            if (batch.length < chunkSize) return messages;
+            lastKey = batch[batch.length - 1].id;
+        }
+    });
+}
+
 // ── Initialization + Migration from localStorage ──
 
 const LS_MESSAGES_KEY = "ai_phone_chat_messages_v1";
@@ -56,16 +82,18 @@ export async function initChatDb(): Promise<{
         // If we blindly "re-migrated" from now-empty localStorage we would shadow
         // real data with empty caches, and the next write would wipe IndexedDB.
         // So when IDB already has data, treat it as already migrated and reuse it.
+        let reusingExistingDb = false;
         try {
             const existingCount =
                 (await chatDb.messages.count()) +
                 (await chatDb.sessions.count()) +
                 (await chatDb.contacts.count());
             if (existingCount > 0) {
+                reusingExistingDb = true;
                 window.localStorage.setItem(LS_MIGRATED_FLAG, "1");
                 markBootStage("CHAT_MESSAGES_BEGIN");
                 const [messages, sessions, contacts] = await Promise.all([
-                    chatDb.messages.toArray().then(messages => { markBootStage("CHAT_MESSAGES_DONE"); return messages; }),
+                    readChatMessagesInChunks().then(messages => { markBootStage("CHAT_MESSAGES_DONE"); return messages; }),
                     chatDb.sessions.toArray(),
                     chatDb.contacts.toArray(),
                 ]);
@@ -73,6 +101,8 @@ export async function initChatDb(): Promise<{
                 return { messages, sessions, contacts };
             }
         } catch (err) {
+            // A failed chunk must not fall through to an empty legacy snapshot.
+            if (reusingExistingDb) throw err;
             console.warn("[ChatDB] Pre-migration IndexedDB check failed:", err);
         }
 
@@ -125,7 +155,7 @@ export async function initChatDb(): Promise<{
         try {
             markBootStage("CHAT_MESSAGES_BEGIN");
             const [messages, sessions, contacts] = await Promise.all([
-                chatDb.messages.toArray().then(messages => { markBootStage("CHAT_MESSAGES_DONE"); return messages; }),
+                readChatMessagesInChunks().then(messages => { markBootStage("CHAT_MESSAGES_DONE"); return messages; }),
                 chatDb.sessions.toArray(),
                 chatDb.contacts.toArray(),
             ]);
