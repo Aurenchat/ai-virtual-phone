@@ -296,13 +296,13 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                                 const name = s.alias || allChars.find(c => c.id === s.contactId)?.name || "";
                                 return name.toLowerCase().includes(keyword);
                             })
+                            .map(session => ({ session, time: parseTime(getSessionListTime(session)) }))
                             .sort((a, b) => {
-                                if (a.isPinned && !b.isPinned) return -1;
-                                if (!a.isPinned && b.isPinned) return 1;
-                                const aTime = getSessionListTime(a);
-                                const bTime = getSessionListTime(b);
-                                return parseTime(bTime) - parseTime(aTime);
+                                if (a.session.isPinned && !b.session.isPinned) return -1;
+                                if (!a.session.isPinned && b.session.isPinned) return 1;
+                                return b.time - a.time;
                             })
+                            .map(item => item.session)
                             .map(s => (
                                 <div key={s.id}>
                                     <SessionItem session={s} onSelect={() => onSelectSession(s)} isPinned={!!s.isPinned} />

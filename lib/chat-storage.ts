@@ -503,15 +503,17 @@ export function compareChatMessages(a: ChatMessage, b: ChatMessage): number {
 }
 
 function getSortedSessionMessages(sessionId: string): ChatMessage[] {
-    return _loadAllMessages()
-        .filter(m => m.sessionId === sessionId)
-        .sort(compareChatMessages);
+    let sorted = _sortedSessionMessages.get(sessionId);
+    if (!sorted) {
+        sorted = [...(_sessionMessageIndex.get(sessionId) || [])].sort(compareChatMessages);
+        _sortedSessionMessages.set(sessionId, sorted);
+    }
+    return sorted;
 }
 
 function getNextMessageOrder(sessionId: string): number {
     let maxOrder = -1;
-    for (const msg of _messagesCache) {
-        if (msg.sessionId !== sessionId) continue;
+    for (const msg of _sessionMessageIndex.get(sessionId) || []) {
         const order = getStableMessageOrder(msg);
         if (order !== null && order > maxOrder) maxOrder = order;
     }
@@ -528,7 +530,7 @@ function reindexSessionMessageOrders(sessionId: string): void {
     });
 
     if (changed.size === 0) return;
-    _messagesCache = _messagesCache.map(msg => changed.get(msg.id) || msg);
+    replaceMessagesCache(_messagesCache.map(msg => changed.get(msg.id) || msg));
     dbPutMessages([...changed.values()]);
 }
 
@@ -548,7 +550,7 @@ export function reindexSessionMessageOrdersByTime(sessionId: string): void {
     });
 
     if (changed.size > 0) {
-        _messagesCache = _messagesCache.map(msg => changed.get(msg.id) || msg);
+        replaceMessagesCache(_messagesCache.map(msg => changed.get(msg.id) || msg));
         dbPutMessages([...changed.values()]);
     }
 
@@ -564,12 +566,15 @@ export function reindexSessionMessageOrdersByTime(sessionId: string): void {
 }
 
 export function getLastVisibleSessionMessage(sessionId: string): ChatMessage | null {
+    if (_lastVisibleMessages.has(sessionId)) return _lastVisibleMessages.get(sessionId)!;
     const messages = getSortedSessionMessages(sessionId);
     for (let i = messages.length - 1; i >= 0; i -= 1) {
         const msg = messages[i];
         if (!isSessionPreviewCandidate(msg)) continue;
+        _lastVisibleMessages.set(sessionId, msg);
         return msg;
     }
+    _lastVisibleMessages.set(sessionId, null);
     return null;
 }
 
@@ -589,6 +594,154 @@ let _sessionsCache: ChatSession[] = [];
 let _messagesCache: ChatMessage[] = [];
 let _hydrated = false;
 let _hydratePromise: Promise<void> | null = null;
+
+// Derived views only. The flat cache remains authoritative, including its input
+// order for stable sorting of old/mixed-order records. Never expose these arrays.
+let _sessionMessageIndex = new Map<string, ChatMessage[]>();
+const _sortedSessionMessages = new Map<string, ChatMessage[]>();
+const _lastVisibleMessages = new Map<string, ChatMessage | null>();
+const _sessionDataRevisions = new Map<string, number>();
+let _revision = 0;
+const _pendingSessionNotifications = new Set<string>();
+export const CHAT_SESSION_DATA_UPDATED_EVENT = "chat-session-data-updated";
+
+/** Cheap invalidation token for readers; does not load/repair any data. */
+export function getChatSessionRevision(sessionId: string): number {
+    return _sessionDataRevisions.get(sessionId) || 0;
+}
+
+function touchSessionData(sessionId: string): void {
+    _sessionDataRevisions.set(sessionId, ++_revision);
+    if (typeof window === "undefined") return;
+    const pending = _pendingSessionNotifications.size > 0;
+    _pendingSessionNotifications.add(sessionId);
+    if (!pending) queueMicrotask(() => {
+        const sessionIds = [..._pendingSessionNotifications];
+        _pendingSessionNotifications.clear();
+        window.dispatchEvent(new CustomEvent(CHAT_SESSION_DATA_UPDATED_EVENT, { detail: { sessionIds } }));
+    });
+}
+
+function invalidateSessionMessages(sessionId: string): void {
+    _sortedSessionMessages.delete(sessionId);
+    _lastVisibleMessages.delete(sessionId);
+    touchSessionData(sessionId);
+}
+
+function rebuildMessageIndex(): void {
+    _sessionMessageIndex = new Map();
+    _sortedSessionMessages.clear();
+    _lastVisibleMessages.clear();
+    for (const message of _messagesCache) {
+        let bucket = _sessionMessageIndex.get(message.sessionId);
+        if (!bucket) _sessionMessageIndex.set(message.sessionId, bucket = []);
+        bucket.push(message);
+    }
+}
+
+function refreshChangedSessionPreview(sessionId: string): void {
+    const index = _sessionsCache.findIndex(session => session.id === sessionId);
+    if (index === -1) return;
+    const result = refreshSessionPreviewMetadata([_sessionsCache[index]]);
+    if (!result.changed) return;
+    _sessionsCache[index] = result.items[0];
+    if (_hydrated) dbPutSessions(result.items);
+}
+
+// Names/bindings affect preview wording without editing a message. Repair at
+// those explicit write boundaries, using cached last messages, never on reads.
+if (typeof window !== "undefined") window.addEventListener("chat-preview-context-updated", () => {
+    if (!_hydrated) return;
+    const refreshed = refreshSessionPreviewMetadata(_sessionsCache);
+    if (!refreshed.changed) return;
+    const changed = refreshed.items.filter((session, index) => session !== _sessionsCache[index]);
+    _sessionsCache = refreshed.items;
+    dbPutSessions(changed);
+    for (const session of changed) touchSessionData(session.id);
+});
+
+/** Bulk edits may rebuild buckets once, retaining sorted views for unchanged sessions. */
+function replaceMessagesCache(messages: ChatMessage[]): void {
+    const previous = _sessionMessageIndex;
+    const next = new Map<string, ChatMessage[]>();
+    for (const message of messages) {
+        let bucket = next.get(message.sessionId);
+        if (!bucket) next.set(message.sessionId, bucket = []);
+        bucket.push(message);
+    }
+    _messagesCache = messages;
+    _sessionMessageIndex = next;
+    for (const id of new Set([...previous.keys(), ...next.keys()])) {
+        const before = previous.get(id) || [], after = next.get(id) || [];
+        if (before.length === after.length && before.every((message, i) => message === after[i])) continue;
+        invalidateSessionMessages(id);
+        refreshChangedSessionPreview(id);
+    }
+}
+
+function replaceCachedMessage(index: number, message: ChatMessage): void {
+    const previous = _messagesCache[index];
+    if (previous.sessionId !== message.sessionId) {
+        const next = _messagesCache.slice();
+        next[index] = message;
+        replaceMessagesCache(next);
+        return;
+    }
+    _messagesCache[index] = message;
+    const bucket = _sessionMessageIndex.get(message.sessionId)!;
+    bucket[bucket.indexOf(previous)] = message;
+    invalidateSessionMessages(message.sessionId);
+    refreshChangedSessionPreview(message.sessionId);
+}
+
+function appendCachedMessage(message: ChatMessage, refreshPreview = true): void {
+    const sorted = _sortedSessionMessages.get(message.sessionId);
+    const before = _sessionMessageIndex.get(message.sessionId) || [];
+    const order = getStableMessageOrder(message);
+    // Preserve the existing append/preview fast path for ordinary ordered chat.
+    // Mixed legacy orders deliberately fall back to sorting the original bucket.
+    const orderedAppend = !!sorted && order !== null && before.every(item => {
+        const previousOrder = getStableMessageOrder(item);
+        return previousOrder !== null && previousOrder < order;
+    });
+    _messagesCache.push(message);
+    let bucket = _sessionMessageIndex.get(message.sessionId);
+    if (!bucket) _sessionMessageIndex.set(message.sessionId, bucket = []);
+    bucket.push(message);
+    if (orderedAppend) {
+        sorted!.push(message);
+        if (isSessionPreviewCandidate(message)) _lastVisibleMessages.set(message.sessionId, message);
+        touchSessionData(message.sessionId);
+    } else invalidateSessionMessages(message.sessionId);
+    if (refreshPreview) refreshChangedSessionPreview(message.sessionId);
+}
+
+function spliceCachedMessages(start: number, count: number, ...messages: ChatMessage[]): void {
+    const next = _messagesCache.slice();
+    next.splice(start, count, ...messages);
+    replaceMessagesCache(next);
+}
+
+/** Explicit development/test diagnostic; never scans history on production reads. */
+export function assertChatMessageIndexConsistency(): void {
+    if (process.env.NODE_ENV === "production") return;
+    for (const id of new Set([..._messagesCache.map(message => message.sessionId), ..._sessionMessageIndex.keys()])) {
+        const expected = _messagesCache.filter(message => message.sessionId === id);
+        const actual = _sessionMessageIndex.get(id) || [];
+        if (actual.length !== expected.length || actual.some((message, i) => message !== expected[i])) {
+            throw new Error(`Chat message index mismatch: ${id}`);
+        }
+        expected.sort(compareChatMessages);
+        const sorted = getSortedSessionMessages(id);
+        if (sorted.length !== expected.length || sorted.some((message, i) => message !== expected[i])) {
+            throw new Error(`Chat message order mismatch: ${id}`);
+        }
+        if (_lastVisibleMessages.has(id)) {
+            const last = expected.slice().reverse().find(isSessionPreviewCandidate) || null;
+            if (_lastVisibleMessages.get(id) !== last) throw new Error(`Chat message preview index mismatch: ${id}`);
+        }
+    }
+}
 
 type NormalizedList<T> = { items: T[]; changed: boolean };
 type NormalizedSessionList = NormalizedList<ChatSession> & { redirects: Map<string, string> };
@@ -796,14 +949,14 @@ function redirectMessagesToPreferredSessions(redirects: Map<string, string>): nu
     const affectedSessionIds = new Set<string>();
     const changedMessages: ChatMessage[] = [];
 
-    _messagesCache = _messagesCache.map(message => {
+    replaceMessagesCache(_messagesCache.map(message => {
         const nextSessionId = redirects.get(message.sessionId);
         if (!nextSessionId || nextSessionId === message.sessionId) return message;
         affectedSessionIds.add(nextSessionId);
         const updated = { ...message, sessionId: nextSessionId };
         changedMessages.push(updated);
         return updated;
-    });
+    }));
 
     if (changedMessages.length === 0) return 0;
     dbPutMessages(changedMessages);
@@ -815,10 +968,67 @@ function normalizeLegacyTextToolHistory(messages: ChatMessage[]): {
     items: ChatMessage[];
     changedMessages: ChatMessage[];
 } {
+    const directives = new Map<string, string>();
+    const directive = (text: string) => {
+        if (!directives.has(text)) directives.set(text, extractTextToolDirectiveText(text));
+        return directives.get(text)!;
+    };
+    const hasCandidate = messages.some(message =>
+        (message.mediaType === "tool_result" && !message.nativeToolResult &&
+            (message.role === "user" || (message.role === "assistant" && !!directive(message.content)))) ||
+        (message.role === "assistant" && message.mediaType === "tool_notice" &&
+            !!message.rawResponseText && !!message.responseBatchId && !!directive(message.rawResponseText))
+    );
+    if (!hasCandidate) return { items: messages, changedMessages: [] };
+
     const byId = new Map(messages.map(message => [message.id, message]));
     const changed = new Map<string, ChatMessage>();
     const added: ChatMessage[] = [];
     const sorted = [...messages].sort(compareChatMessages);
+
+    // Index the original notice population once. Resolve through byId at query
+    // time so earlier normalization still removes notices from later matches.
+    const exactNotices = new Map<string, ChatMessage[]>();
+    const timedNotices = new Map<string, { message: ChatMessage; time: number }[]>();
+    const batchNotices = new Map<string, ChatMessage[]>();
+    const positions = new Map(sorted.map((message, index) => [message.id, index]));
+    const key = (sessionId: string, value: string) => JSON.stringify([sessionId, value]);
+    const add = <T,>(index: Map<string, T[]>, indexKey: string, value: T) => {
+        let bucket = index.get(indexKey);
+        if (!bucket) index.set(indexKey, bucket = []);
+        bucket.push(value);
+    };
+    for (const message of sorted) {
+        if (message.role !== "assistant" || message.mediaType !== "tool_notice") continue;
+        if (message.responseBatchId) add(batchNotices, key(message.sessionId, message.responseBatchId), message);
+        if (!message.rawResponseText) continue;
+        add(exactNotices, key(message.sessionId, message.rawResponseText), message);
+        add(timedNotices, key(message.sessionId, directive(message.rawResponseText)), { message, time: parseIsoTime(message.createdAt) });
+    }
+    for (const bucket of timedNotices.values()) bucket.sort((a, b) => a.time - b.time);
+    const liveNotice = (original: ChatMessage) => {
+        const message = byId.get(original.id) || original;
+        return message.role === "assistant" && message.mediaType === "tool_notice" ? message : null;
+    };
+    const findCopies = (current: ChatMessage, directiveText: string, currentTime: number) => {
+        const candidates = new Map<string, ChatMessage>();
+        for (const original of exactNotices.get(key(current.sessionId, current.content)) || []) {
+            const message = liveNotice(original);
+            if (message) candidates.set(message.id, message);
+        }
+        const timed = timedNotices.get(key(current.sessionId, directiveText)) || [];
+        let low = 0, high = timed.length;
+        while (low < high) {
+            const mid = (low + high) >>> 1;
+            if (timed[mid].time <= currentTime - 60_000) low = mid + 1;
+            else high = mid;
+        }
+        for (let index = low; index < timed.length && timed[index].time < currentTime + 60_000; index++) {
+            const message = liveNotice(timed[index].message);
+            if (message) candidates.set(message.id, message);
+        }
+        return [...candidates.values()].sort((a, b) => positions.get(a.id)! - positions.get(b.id)!);
+    };
 
     for (const original of sorted) {
         const current = byId.get(original.id) || original;
@@ -831,24 +1041,11 @@ function normalizeLegacyTextToolHistory(messages: ChatMessage[]): {
         }
 
         if (current.role !== "assistant" || current.mediaType !== "tool_result" || current.nativeToolResult) continue;
-        const directiveText = extractTextToolDirectiveText(current.content);
+        const directiveText = directive(current.content);
         if (!directiveText) continue;
 
         const currentTime = parseIsoTime(current.createdAt);
-        const candidateCopies = sorted
-            .map(message => byId.get(message.id) || message)
-            .filter(message => {
-                if (
-                    message.sessionId !== current.sessionId
-                    || message.role !== "assistant"
-                    || message.mediaType !== "tool_notice"
-                    || !message.rawResponseText
-                ) return false;
-                if (message.rawResponseText === current.content) return true;
-                const copyTime = parseIsoTime(message.createdAt);
-                return Math.abs(copyTime - currentTime) < 60_000
-                    && extractTextToolDirectiveText(message.rawResponseText) === directiveText;
-            });
+        const candidateCopies = findCopies(current, directiveText, currentTime);
         const copyGroups = new Map<string, ChatMessage[]>();
         for (const copy of candidateCopies) {
             if (!copy.responseBatchId) continue;
@@ -907,17 +1104,11 @@ function normalizeLegacyTextToolHistory(messages: ChatMessage[]): {
             || !current.rawResponseText
             || !current.responseBatchId
         ) continue;
-        const directiveText = extractTextToolDirectiveText(current.rawResponseText);
+        const directiveText = directive(current.rawResponseText);
         if (!directiveText) continue;
 
-        const batchCopies = sorted
-            .map(message => byId.get(message.id) || message)
-            .filter(message =>
-                message.sessionId === current.sessionId
-                && message.responseBatchId === current.responseBatchId
-                && message.role === "assistant"
-                && message.mediaType === "tool_notice"
-            );
+        const batchCopies = (batchNotices.get(key(current.sessionId, current.responseBatchId)) || [])
+            .map(liveNotice).filter((message): message is ChatMessage => message !== null);
         for (const copy of batchCopies) {
             const normalizedCopy: ChatMessage = { ...copy, mediaType: undefined };
             byId.set(copy.id, normalizedCopy);
@@ -989,6 +1180,7 @@ export function hydrateChatStorage(): Promise<void> {
     _hydratePromise = initChatDb().then(data => {
         const normalizedToolHistory = normalizeLegacyTextToolHistory(data.messages);
         _messagesCache = normalizedToolHistory.items;
+        rebuildMessageIndex();
         if (normalizedToolHistory.changedMessages.length > 0) {
             dbPutMessages(normalizedToolHistory.changedMessages);
         }
@@ -1019,6 +1211,7 @@ function _loadAllMessages(): ChatMessage[] {
 
 // ── CRUD for Contacts ─────────────────────────
 export function loadChatContacts(): ChatContact[] {
+    // Keep contact recovery semantics; last-visible lookups now use the index.
     let normalized = normalizeChatContacts(_contactsCache);
     normalized = restoreContactsForPrivateSessions(normalized.items, _sessionsCache);
     if (normalized.changed) {
@@ -1063,13 +1256,6 @@ export function removeChatContact(characterId: string) {
 
 // ── CRUD for Sessions ─────────────────────────
 export function loadChatSessions(): ChatSession[] {
-    const normalized = normalizeChatSessions(_sessionsCache);
-    const redirectedMessages = redirectMessagesToPreferredSessions(normalized.redirects);
-    const refreshed = refreshSessionPreviewMetadata(normalized.items);
-    if (normalized.changed || redirectedMessages > 0 || refreshed.changed) {
-        _sessionsCache = refreshed.items;
-        if (_hydrated && typeof window !== "undefined") dbReplaceSessions(refreshed.items);
-    }
     return _sessionsCache;
 }
 
@@ -1078,6 +1264,7 @@ export function saveChatSessions(sessions: ChatSession[]) {
     const redirectedMessages = redirectMessagesToPreferredSessions(normalized.redirects);
     const refreshed = refreshSessionPreviewMetadata(normalized.items);
     _sessionsCache = refreshed.items;
+    for (const session of _sessionsCache) touchSessionData(session.id);
     if (!_hydrated && typeof window !== "undefined") {
         console.warn("[ChatStorage] saveChatSessions before hydration; using additive write to avoid replacing existing sessions.");
         dbPutSessions(refreshed.items);
@@ -1142,12 +1329,12 @@ export function deleteChatSession(sessionId: string) {
 export function reassignChatSessionMessages(fromSessionId: string, toSessionId: string): number {
     if (fromSessionId === toSessionId) return 0;
     const changed: ChatMessage[] = [];
-    _messagesCache = _messagesCache.map(message => {
+    replaceMessagesCache(_messagesCache.map(message => {
         if (message.sessionId !== fromSessionId) return message;
         const updated = { ...message, sessionId: toSessionId };
         changed.push(updated);
         return updated;
-    });
+    }));
     if (changed.length === 0) return 0;
     dbPutMessages(changed);
     reindexSessionMessageOrdersByTime(toSessionId);
@@ -1158,7 +1345,7 @@ export function reassignChatSessionMessages(fromSessionId: string, toSessionId: 
 export function loadChatMessages(sessionId: string, limit?: number): ChatMessage[] {
     const all = getSortedSessionMessages(sessionId);
     if (limit && limit < all.length) return all.slice(-limit);
-    return all;
+    return all.slice();
 }
 
 function createMessageId(): string {
@@ -1200,31 +1387,21 @@ export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "sta
         if (statusRendererId) newMsg = { ...newMsg, statusRendererId };
     }
 
-    _messagesCache.push(newMsg);
+    appendCachedMessage(newMsg, false);
     dbPutMessage(newMsg);
 
     // Auto update session last message only for records that can produce a list preview.
     // 优化：直接增量更新内存会话缓存并异步写单条，避免每次发送都走 loadChatSessions +
     // saveChatSessions 触发全量会话预览重算（会话/消息多了以后会明显卡顿）。
     const preview = getChatMessagePreview(newMsg);
-    const sessIdx = _sessionsCache.findIndex(s => s.id === msg.sessionId);
-    if (sessIdx !== -1 && isSessionPreviewCandidate(newMsg)) {
+    const sessIdx = _sessionsCache.findIndex(s => s.id === newMsg.sessionId);
+    if (sessIdx !== -1 && getLastVisibleSessionMessage(newMsg.sessionId)?.id === newMsg.id) {
         const target = _sessionsCache[sessIdx];
         target.lastMessageId = newMsg.id;
         if (preview) target.lastMessagePreview = preview;
         target.updatedAt = newMsg.createdAt;
         dbPutSessions([target]);
-    } else if (sessIdx === -1) {
-        // 缓存未命中（极端情况）：回退全量路径，保证列表预览仍会刷新
-        const sessions = loadChatSessions();
-        const idx2 = sessions.findIndex(s => s.id === msg.sessionId);
-        if (idx2 !== -1 && isSessionPreviewCandidate(newMsg)) {
-            sessions[idx2].lastMessageId = newMsg.id;
-            if (preview) sessions[idx2].lastMessagePreview = preview;
-            sessions[idx2].updatedAt = newMsg.createdAt;
-            saveChatSessions(sessions);
-        }
-    }
+    } else refreshChangedSessionPreview(newMsg.sessionId);
 
     if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent(CHAT_MESSAGE_PUSHED_EVENT, { detail: { message: newMsg } }));
@@ -1245,7 +1422,7 @@ export function upsertImportedChatMessage(msg: ChatMessage): { message: ChatMess
         order: typeof msg.order === "number" ? msg.order : getNextMessageOrder(msg.sessionId),
     };
 
-    _messagesCache.push(newMsg);
+    appendCachedMessage(newMsg);
     dbPutMessage(newMsg);
 
     const preview = getChatMessagePreview(newMsg);
@@ -1432,7 +1609,7 @@ function syncDeletedResponseBatchMetadata(deletedMessages: ChatMessage[]): void 
     }
 
     if (changed.size === 0) return;
-    _messagesCache = _messagesCache.map(message => changed.get(message.id) || message);
+    replaceMessagesCache(_messagesCache.map(message => changed.get(message.id) || message));
     dbPutMessages([...changed.values()]);
 }
 
@@ -1467,7 +1644,7 @@ export function deleteChatMessage(messageId: string) {
 
     const deletedMessages = expandToolExecutionDeleteSet([targetMsg]);
     const deletedIds = new Set(deletedMessages.map(message => message.id));
-    _messagesCache = _messagesCache.filter(message => !deletedIds.has(message.id));
+    replaceMessagesCache(_messagesCache.filter(message => !deletedIds.has(message.id)));
     syncDeletedResponseBatchMetadata(deletedMessages);
     dbDeleteMessagesByIds([...deletedIds]);
 
@@ -1503,7 +1680,7 @@ export function deleteChatMessagesFrom(messageId: string) {
     const deletedIds = deletedMessages.map(m => m.id);
     const deletedIdSet = new Set(deletedIds);
 
-    _messagesCache = _messagesCache.filter(m => !deletedIdSet.has(m.id));
+    replaceMessagesCache(_messagesCache.filter(m => !deletedIdSet.has(m.id)));
     syncDeletedResponseBatchMetadata(deletedMessages);
     dbDeleteMessagesByIds(deletedIds);
 
@@ -1537,7 +1714,7 @@ export function deleteChatMessagesByIds(sessionId: string, messageIds: string[])
     if (deletedIds.length === 0) return 0;
 
     const deletedIdSet = new Set(deletedIds);
-    _messagesCache = _messagesCache.filter(m => m.sessionId !== sessionId || !deletedIdSet.has(m.id));
+    replaceMessagesCache(_messagesCache.filter(m => m.sessionId !== sessionId || !deletedIdSet.has(m.id)));
     syncDeletedResponseBatchMetadata(deletedMessages);
     dbDeleteMessagesByIds(deletedIds);
     reindexSessionMessageOrders(sessionId);
@@ -1564,7 +1741,7 @@ export function deleteChatMessagesByIds(sessionId: string, messageIds: string[])
 export function editChatMessage(messageId: string, newContent: string) {
     const msgIdx = _messagesCache.findIndex(m => m.id === messageId);
     if (msgIdx !== -1) {
-        _messagesCache[msgIdx] = { ..._messagesCache[msgIdx], content: newContent };
+        replaceCachedMessage(msgIdx, { ..._messagesCache[msgIdx], content: newContent });
         dbPutMessage(_messagesCache[msgIdx]);
 
         const sessionId = _messagesCache[msgIdx].sessionId;
@@ -1582,7 +1759,7 @@ export function editChatMessage(messageId: string, newContent: string) {
 export function retractChatMessage(messageId: string) {
     const msgIdx = _messagesCache.findIndex(m => m.id === messageId);
     if (msgIdx !== -1) {
-        _messagesCache[msgIdx] = { ..._messagesCache[msgIdx], isRetracted: true };
+        replaceCachedMessage(msgIdx, { ..._messagesCache[msgIdx], isRetracted: true });
         dbPutMessage(_messagesCache[msgIdx]);
 
         const sessionId = _messagesCache[msgIdx].sessionId;
@@ -1599,7 +1776,7 @@ export function retractChatMessage(messageId: string) {
 
 export function clearChatSessionMessages(sessionId: string) {
     const deletedMessages = _messagesCache.filter(m => m.sessionId === sessionId);
-    _messagesCache = _messagesCache.filter(m => m.sessionId !== sessionId);
+    replaceMessagesCache(_messagesCache.filter(m => m.sessionId !== sessionId));
     dbDeleteMessagesBySession(sessionId);
 
     // Update session to remove last message preview
@@ -1682,9 +1859,9 @@ export function clearChatSessionToolHistory(sessionId: string): ClearChatSession
     }
 
     const cleanedById = new Map(cleanedMessages.map(msg => [msg.id, msg]));
-    _messagesCache = _messagesCache
+    replaceMessagesCache(_messagesCache
         .filter(msg => msg.sessionId !== sessionId || !deletedIds.has(msg.id))
-        .map(msg => cleanedById.get(msg.id) || msg);
+        .map(msg => cleanedById.get(msg.id) || msg));
 
     if (deletedIds.size > 0) {
         syncDeletedResponseBatchMetadata(sessionMessages.filter(message => deletedIds.has(message.id)));
@@ -1774,7 +1951,7 @@ export function clearFollowUpSchedule(sessionId: string): void {
 export function updateMessageMediaStatus(messageId: string, newStatus: "pending" | "opened" | "received" | "declined") {
     const idx = _messagesCache.findIndex(m => m.id === messageId);
     if (idx !== -1) {
-        _messagesCache[idx] = { ..._messagesCache[idx], mediaData: { ..._messagesCache[idx].mediaData, status: newStatus } };
+        replaceCachedMessage(idx, { ..._messagesCache[idx], mediaData: { ..._messagesCache[idx].mediaData, status: newStatus } });
         dbPutMessage(_messagesCache[idx]);
     }
 }
@@ -1783,7 +1960,7 @@ export function updateMessageMediaStatus(messageId: string, newStatus: "pending"
 export function updateMessageMediaData(messageId: string, data: ChatMessage["mediaData"]) {
     const idx = _messagesCache.findIndex(m => m.id === messageId);
     if (idx !== -1) {
-        _messagesCache[idx] = { ..._messagesCache[idx], mediaData: data };
+        replaceCachedMessage(idx, { ..._messagesCache[idx], mediaData: data });
         dbPutMessage(_messagesCache[idx]);
     }
 }
@@ -1791,7 +1968,7 @@ export function updateMessageMediaData(messageId: string, data: ChatMessage["med
 export function updateMessageMediaUrl(messageId: string, mediaUrl: string) {
     const idx = _messagesCache.findIndex(m => m.id === messageId);
     if (idx !== -1) {
-        _messagesCache[idx] = { ..._messagesCache[idx], mediaUrl };
+        replaceCachedMessage(idx, { ..._messagesCache[idx], mediaUrl });
         dbPutMessage(_messagesCache[idx]);
     }
 }
@@ -1813,7 +1990,7 @@ export async function persistMessageVoiceAudio(
             mediaUrl,
             mediaData: { ..._messagesCache[idx].mediaData, synthesizedFromText },
         };
-        _messagesCache[idx] = next;
+        replaceCachedMessage(idx, next);
         dbPutMessage(next);
         return;
     }
@@ -1838,7 +2015,7 @@ export function updateChatMessage(
     const idx = _messagesCache.findIndex(m => m.id === messageId);
     if (idx === -1) return null;
 
-    _messagesCache[idx] = { ..._messagesCache[idx], ...patch };
+    replaceCachedMessage(idx, { ..._messagesCache[idx], ...patch });
     const updated = _messagesCache[idx];
     dbPutMessage(updated);
 
@@ -1929,7 +2106,7 @@ export function syncChatGeneratedImagePromptText(
     }
 
     if (changed.size === 0) return [];
-    _messagesCache = _messagesCache.map(msg => changed.get(msg.id) || msg);
+    replaceMessagesCache(_messagesCache.map(msg => changed.get(msg.id) || msg));
     const updatedMessages = [...changed.values()];
     dbPutMessages(updatedMessages);
     return updatedMessages;
@@ -1950,7 +2127,6 @@ export function replaceMessageWithParts(
     const baseOrder = getStableMessageOrder(original) ?? getNextMessageOrder(original.sessionId);
 
     // Remove original
-    _messagesCache.splice(idx, 1);
     dbDeleteMessage(originalId);
 
     // Insert parsed parts at the same position, preserving timestamp
@@ -1982,11 +2158,11 @@ export function replaceMessageWithParts(
             senderCharacterId: original.senderCharacterId,
             senderName: original.senderName,
         };
-        _messagesCache.splice(idx + i, 0, newMsg);
         dbPutMessage(newMsg);
         newMsgs.push(newMsg);
     }
 
+    spliceCachedMessages(idx, 1, ...newMsgs);
     reindexSessionMessageOrders(original.sessionId);
     const newIds = new Set(newMsgs.map(msg => msg.id));
     return getSortedSessionMessages(original.sessionId).filter(msg => newIds.has(msg.id));
@@ -2023,7 +2199,7 @@ export function replaceResponseBatchWithParts(
     if (insertIdx === -1) return [];
 
     const deletedIds = batchMessages.map(m => m.id);
-    _messagesCache = _messagesCache.filter(m => !deletedIds.includes(m.id));
+    replaceMessagesCache(_messagesCache.filter(m => !deletedIds.includes(m.id)));
     dbDeleteMessagesByIds(deletedIds);
 
     const baseTime = new Date(firstMessage.createdAt).getTime();
@@ -2078,7 +2254,7 @@ export function replaceResponseBatchWithParts(
         : undefined;
     const newMessages = toolCallMessage ? [...visibleMessages, toolCallMessage] : visibleMessages;
 
-    _messagesCache.splice(insertIdx, 0, ...newMessages);
+    spliceCachedMessages(insertIdx, 0, ...newMessages);
     dbPutMessages(newMessages);
     reindexSessionMessageOrders(sessionId);
 
@@ -2147,7 +2323,7 @@ export function replaceGroupResponseRound(
     if (insertIdx === -1) return [];
 
     const deletedIds = roundMessages.map(m => m.id);
-    _messagesCache = _messagesCache.filter(m => !deletedIds.includes(m.id));
+    replaceMessagesCache(_messagesCache.filter(m => !deletedIds.includes(m.id)));
     dbDeleteMessagesByIds(deletedIds);
 
     const baseTime = new Date(firstMessage.createdAt).getTime();
@@ -2179,7 +2355,7 @@ export function replaceGroupResponseRound(
         senderName: msg.senderName,
     }));
 
-    _messagesCache.splice(insertIdx, 0, ...newMessages);
+    spliceCachedMessages(insertIdx, 0, ...newMessages);
     dbPutMessages(newMessages);
     reindexSessionMessageOrders(sessionId);
 
