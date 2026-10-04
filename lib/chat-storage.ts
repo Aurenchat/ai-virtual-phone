@@ -1,4 +1,5 @@
 // lib/chat-storage.ts
+import { markBootStage } from "./boot-diagnostics";
 
 import {
     chatDb,
@@ -1180,9 +1181,12 @@ export function hydrateChatStorage(): Promise<void> {
     if (_hydrated || typeof window === "undefined") return Promise.resolve();
     if (_hydratePromise) return _hydratePromise;
     _hydratePromise = initChatDb().then(data => {
+        markBootStage("CHAT_NORMALIZE_BEGIN");
         const normalizedToolHistory = normalizeLegacyTextToolHistory(data.messages);
+        markBootStage("CHAT_NORMALIZE_DONE");
         _messagesCache = normalizedToolHistory.items;
         rebuildMessageIndex();
+        markBootStage("CHAT_INDEX_DONE");
         if (normalizedToolHistory.changedMessages.length > 0) {
             dbPutMessages(normalizedToolHistory.changedMessages);
         }
@@ -1196,6 +1200,7 @@ export function hydrateChatStorage(): Promise<void> {
         if (normalizedContacts.changed) dbReplaceContacts(normalizedContacts.items);
         if (normalizedSessions.changed || redirectedMessages > 0 || refreshedSessions.changed) dbReplaceSessions(refreshedSessions.items);
         _hydrated = true;
+        markBootStage("CHAT_HYDRATE_DONE");
     }).catch(err => {
         console.warn("[ChatStorage] hydration failed, will retry on next call:", err);
         _hydratePromise = null;

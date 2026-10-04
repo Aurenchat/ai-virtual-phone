@@ -1,4 +1,5 @@
 "use client";
+import { markBootStage } from "@/lib/boot-diagnostics";
 
 import { Component, memo, useCallback, useEffect, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ErrorInfo, type ReactNode } from "react";
 
@@ -1056,6 +1057,9 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   // 拖拽悬停到某图标中心足够久 → 该图标高亮为“松手成组”目标
   const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
   const [desktopReady, setDesktopReady] = useState(false);
+  useEffect(() => {
+    if (desktopReady) markBootStage("SHELL_INTERACTIVE");
+  }, [desktopReady]);
   const [glassPaintPass, setGlassPaintPass] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [activeApp, setActiveApp] = useState<DesktopIconId | null>(null);
@@ -1771,6 +1775,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
 
     void (async () => {
       try {
+        markBootStage("AUX_STORAGE_BEGIN");
         await Promise.all([
           hydrateKvDb(),
           hydrateChatStorage(),
@@ -1781,6 +1786,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
           hydrateDwellingStorage(),
           hydrateCheckPhoneStorage(),
         ]);
+        markBootStage("AUX_STORAGE_DONE");
       } catch (err) {
         console.warn("[Desktop] storage hydration error:", err);
       }

@@ -10,6 +10,7 @@
 //  - URL 加 ?plugin-safe-mode=1 手动进入安全模式（逃生舱）
 
 import { kvGet, kvSet, kvRemove, hydrateKvDb, kvUpdateAtomic } from "./kv-db";
+import { markBootStage } from "./boot-diagnostics";
 import { registerNativeGiftProvider, openNativeGift, notifyNativeGiftsChanged } from "./native-gift-bridge";
 import { loadShoppingState } from "./shopping-storage";
 import { hydrateChatStorage, loadChatMessages, loadChatSessions, loadChatContacts, pushChatMessage, updateChatMessage, getChatSessionRevision, type ChatMessage } from "./chat-storage";
@@ -106,10 +107,12 @@ class ChatPluginRuntime {
 
     private async start(): Promise<void> {
         await Promise.allSettled([hydrateKvDb(), hydrateChatStorage()]);
+        markBootStage("PLUGIN_BEGIN");
 
         if (isChatPluginSafeMode()) {
             recordChatPluginLog({ pluginId: "*", where: "runtime", message: "安全模式：已跳过全部插件加载", level: "info" });
             this.finishStart();
+            markBootStage("PLUGIN_SKIPPED_SAFE");
             return;
         }
         // 崩溃循环保护：连续三次启动未走完插件加载 → 自动进入安全模式。
@@ -125,6 +128,7 @@ class ChatPluginRuntime {
             });
             emitDom(CHAT_PLUGIN_TOAST_EVENT, { text: "插件疑似导致崩溃，已进入安全模式" });
             this.finishStart();
+            markBootStage("PLUGIN_SKIPPED_SAFE");
             return;
         }
         kvSet(BOOT_GUARD_KEY, String(guard + 1));
@@ -138,6 +142,7 @@ class ChatPluginRuntime {
         kvRemove(BOOT_GUARD_KEY);
         this.finishStart();
         bus.emitEvent("app.ready", {});
+        markBootStage("PLUGIN_DONE");
     }
 
     private finishStart(): void {

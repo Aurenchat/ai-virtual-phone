@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { bootDiagnosticsScript } from "@/lib/boot-diagnostics";
 
 import { ChatPluginBootstrap } from "@/components/chat-plugin-bootstrap";
 import { ChatReasoningVisibilityController } from "@/components/chat-reasoning-visibility-controller";
@@ -103,6 +104,7 @@ export default function RootLayout({
     <html lang="zh-CN">
       <head>
         <meta name="float-build-id" content={pwaBuildId} />
+        <script id="float-boot-diagnostics" dangerouslySetInnerHTML={{ __html: bootDiagnosticsScript(pwaBuildId) }} />
         <script id="float-pwa-bootstrap" dangerouslySetInnerHTML={{ __html: pwaRecoveryBootstrap(pwaBuildId) }} />
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
         <meta name="theme-color" content="#f8f7f2" />

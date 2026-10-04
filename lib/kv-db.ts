@@ -3,6 +3,7 @@
 // Replaces all localStorage usage to avoid the ~5-10MB quota limit.
 
 import Dexie from "dexie";
+import { markBootStage } from "./boot-diagnostics";
 
 class KvDatabase extends Dexie {
     entries!: Dexie.Table<{ key: string; value: string }, string>;
@@ -120,7 +121,9 @@ export function hydrateKvDb(): Promise<void> {
     if (_hydratePromise) return _hydratePromise;
     _hydratePromise = (async () => {
         // Load existing IDB data into cache
+        markBootStage("KV_READ_BEGIN");
         const all = await kvDb.entries.toArray();
+        markBootStage("KV_READ_DONE");
         for (const { key, value } of all) {
             if (!_cache.has(key)) _cache.set(key, value);
         }
@@ -160,6 +163,7 @@ export function hydrateKvDb(): Promise<void> {
         _hydrated = true;
         _hydrateError = null;
         _hydratePromise = null;
+        markBootStage("KV_CACHE_DONE");
     }).catch(err => {
         // 不向上抛：既有调用方大多不接 catch。失败状态通过 isKvHydrated() /
         // getKvHydrationError() 暴露，入口（MainApp）负责拦住用户并提供重试。

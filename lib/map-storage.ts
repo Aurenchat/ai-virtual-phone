@@ -2,6 +2,7 @@
 // RPG Map Mode — IndexedDB storage
 
 import Dexie from "dexie";
+import { markBootStage } from "./boot-diagnostics";
 import type { MapWorld, GameSave, CharacterAgent, StoryDirector, CharStats } from "./map-types";
 import { formatChatTimestamp } from "./llm-prompt-assembler";
 import { kvGet, kvSet, kvRemove, registerKvMigration, registerDynamicPrefix } from "./kv-db";
@@ -58,6 +59,7 @@ let _hydrated = false;
 
 export async function hydrateMapStorage(): Promise<void> {
   if (_hydrated || typeof window === "undefined") return;
+  markBootStage("MAP_BEGIN");
   try {
     _worldsCache = await mapDb.worlds.toArray();
     _savesCache = await mapDb.saves.toArray();
@@ -65,6 +67,7 @@ export async function hydrateMapStorage(): Promise<void> {
   // Hydrate theme blobs from IDB into memory cache
   try { await hydrateThemeBlobs(); } catch { /* ignore */ }
   _hydrated = true;
+  markBootStage("MAP_DONE");
 }
 
 // Auto-hydrate

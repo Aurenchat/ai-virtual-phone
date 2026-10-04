@@ -3,6 +3,7 @@
 // Provides async persistence behind the synchronous in-memory cache in chat-storage.ts.
 
 import Dexie from "dexie";
+import { markBootStage } from "./boot-diagnostics";
 import type { ChatMessage, ChatSession, ChatContact } from "./chat-storage";
 
 // ── Database Schema ──────────────────────────────
@@ -44,6 +45,7 @@ export async function initChatDb(): Promise<{
         return { messages: [], sessions: [], contacts: [] };
     }
 
+    markBootStage("CHAT_DB_BEGIN");
     const alreadyMigrated = window.localStorage.getItem(LS_MIGRATED_FLAG);
 
     if (!alreadyMigrated) {
@@ -61,8 +63,9 @@ export async function initChatDb(): Promise<{
                 (await chatDb.contacts.count());
             if (existingCount > 0) {
                 window.localStorage.setItem(LS_MIGRATED_FLAG, "1");
+                markBootStage("CHAT_MESSAGES_BEGIN");
                 const [messages, sessions, contacts] = await Promise.all([
-                    chatDb.messages.toArray(),
+                    chatDb.messages.toArray().then(messages => { markBootStage("CHAT_MESSAGES_DONE"); return messages; }),
                     chatDb.sessions.toArray(),
                     chatDb.contacts.toArray(),
                 ]);
@@ -75,11 +78,13 @@ export async function initChatDb(): Promise<{
 
         // First run after migration: move localStorage data → IndexedDB
         try {
+            markBootStage("CHAT_MESSAGES_BEGIN");
             const rawMessages = window.localStorage.getItem(LS_MESSAGES_KEY);
             const rawSessions = window.localStorage.getItem(LS_SESSIONS_KEY);
             const rawContacts = window.localStorage.getItem(LS_CONTACTS_KEY);
 
             const lsMessages: ChatMessage[] = rawMessages ? JSON.parse(rawMessages) : [];
+            markBootStage("CHAT_MESSAGES_DONE");
             const lsSessions: ChatSession[] = rawSessions ? JSON.parse(rawSessions) : [];
             const lsContacts: ChatContact[] = rawContacts ? JSON.parse(rawContacts) : [];
 
@@ -105,7 +110,9 @@ export async function initChatDb(): Promise<{
         } catch (err) {
             console.error("[ChatDB] Migration failed, falling back to localStorage:", err);
             // If migration fails, load from localStorage as fallback
+            markBootStage("CHAT_MESSAGES_BEGIN");
             const fallbackMessages: ChatMessage[] = safeParse(window.localStorage.getItem(LS_MESSAGES_KEY));
+            markBootStage("CHAT_MESSAGES_DONE");
             const fallbackSessions: ChatSession[] = safeParse(window.localStorage.getItem(LS_SESSIONS_KEY));
             const fallbackContacts: ChatContact[] = safeParse(window.localStorage.getItem(LS_CONTACTS_KEY));
             return { messages: fallbackMessages, sessions: fallbackSessions, contacts: fallbackContacts };
@@ -116,8 +123,9 @@ export async function initChatDb(): Promise<{
     let lastErr: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
         try {
+            markBootStage("CHAT_MESSAGES_BEGIN");
             const [messages, sessions, contacts] = await Promise.all([
-                chatDb.messages.toArray(),
+                chatDb.messages.toArray().then(messages => { markBootStage("CHAT_MESSAGES_DONE"); return messages; }),
                 chatDb.sessions.toArray(),
                 chatDb.contacts.toArray(),
             ]);

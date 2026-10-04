@@ -10,7 +10,7 @@ function fixture(M = 100, S = 5) {
     return { messages, sessions, contacts: sessions.filter(s => !s.isGroup).map(s => ({ id: 'contact-' + s.id, characterId: s.contactId, addedAt: s.updatedAt })) };
 }
 const sourceCache = new Map();
-function load(data = fixture(), baseline = false) {
+function load(data = fixture(), baseline = false, bootDiagnostics = { markBootStage() {} }) {
     const writes = [], events = [], listeners = new Map(), disk = new Map(data.messages.map(m => [m.id, m]));
     const window = { dispatchEvent(e) { events.push(e); for (const fn of listeners.get(e.type) || []) fn(e); }, addEventListener(k, fn) { if (!listeners.has(k)) listeners.set(k, []); listeners.get(k).push(fn); }, removeEventListener() {} };
     let seq = 0;
@@ -20,6 +20,7 @@ function load(data = fixture(), baseline = false) {
     const db = { initChatDb: async () => structuredClone(data), chatDb: { messages: { get: async id => disk.get(id), put: async m => { disk.set(m.id, m); writes.push(['put', m]); } } } };
     for (const name of ['dbPutMessage', 'dbPutMessages', 'dbDeleteMessage', 'dbDeleteMessagesBySession', 'dbDeleteMessagesByIds', 'dbPutSessions', 'dbPutContacts', 'dbDeleteSession', 'dbReplaceContacts', 'dbReplaceSessions']) db[name] = x => writes.push([name, x]);
     const mocks = {
+        './boot-diagnostics': bootDiagnostics,
         './chat-db': db, './settings-storage': { resolveUserIdentity: () => ({ name: data.userName || 'User' }) },
         './character-storage': { loadCharacters: () => data.sessions.map(s => ({ id: s.contactId, name: data.characterName || s.contactId })) },
         './kv-db': { kvGet: () => null, kvSet() {}, registerKvMigration() {} },

@@ -25,9 +25,10 @@ const bridge=fs.readFileSync(baseline?'scripts/chat-performance/bridge-before.js
  const run=(code,require)=>{const exports={};new Function('exports','require',code)(exports,require);return exports;};
  const noop=()=>{};
  const protocolApi=run(protocol,()=>{throw Error('unexpected import')});
- const dbApi=run(db,()=>({default:window.Dexie}));
+ const dbApi=run(db,p=>p==='./boot-diagnostics'?{markBootStage(){}}:{default:window.Dexie});
  let chars=[];
  const mocks={
+ './boot-diagnostics':{markBootStage(){}},
  './chat-db':{...dbApi,dbPutMessages:noop,dbPutSessions:noop,dbReplaceSessions:noop,dbReplaceContacts:noop},
  './settings-storage':{resolveUserIdentity:()=>({name:'User'})},
  './character-storage':{loadCharacters:()=>chars},

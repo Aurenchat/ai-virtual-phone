@@ -1,4 +1,5 @@
 "use client";
+import { markBootStage } from "@/lib/boot-diagnostics";
 
 import { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
@@ -219,10 +220,13 @@ function preloadImageDataUrl(url: string): Promise<void> {
 }
 
 async function prepareDesktopThemeForFirstPaint(): Promise<PreparedDesktopTheme> {
+  markBootStage("THEME_READ_BEGIN");
   const profile = readThemeProfile();
   const assetIds = collectFirstPaintThemeAssetIds(profile);
   const assets = assetIds.length ? await getThemeAssetMap(assetIds) : {};
+  markBootStage("THEME_READ_DONE");
   await Promise.all(Object.values(assets).map(preloadImageDataUrl));
+  markBootStage("THEME_DECODE_DONE");
   return { profile, assets };
 }
 
@@ -234,6 +238,7 @@ export function MainApp() {
   const [initAttempt, setInitAttempt] = useState(0);
 
   useEffect(() => {
+    markBootStage("MODULES_READY");
     let cancelled = false;
 
     // 申请持久化存储：批准后 iOS/安卓不会再因存储压力擅自回收 IndexedDB

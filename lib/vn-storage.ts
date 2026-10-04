@@ -1,4 +1,5 @@
 import Dexie from "dexie";
+import { markBootStage } from "./boot-diagnostics";
 import { formatChatTimestamp } from "./llm-prompt-assembler";
 import type { VnSession, VnMessage, VnChapterMeta, VnLayoutPrefs, VnBeat, VnFrameAudio } from "./vn-types";
 export type { VnSession, VnMessage, VnChapterMeta, VnLayoutPrefs, VnBeat };
@@ -96,6 +97,7 @@ function persistVnSessionsSnapshot(sessions: VnSession[]): void {
 
 export async function hydrateVnStorage(): Promise<void> {
   if (_hydrated || typeof window === "undefined") return;
+  markBootStage("VN_BEGIN");
   const [sessions, messages] = await Promise.all([
     vnDb.sessions.toArray().catch(() => []),
     vnDb.messages.toArray().catch(() => []),
@@ -401,6 +403,7 @@ async function hydrateConfig(): Promise<void> {
     for (const r of rows) _configCache[r.key] = r.value;
   } catch { /* table may not exist yet */ }
   _configHydrated = true;
+  markBootStage("VN_DONE");
 }
 
 // Call during app init (alongside hydrateVnStorage)
