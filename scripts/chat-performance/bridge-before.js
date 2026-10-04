@@ -5,7 +5,7 @@ export default {
     id: "imessage-native-message-bridge",
     name: "iMessage · 分组与原生外观适配",
     apiVersion: 1,
-    version: "1.1.0-alpha.7-music.2",
+    version: "1.1.0-alpha.7-music.1",
     author: "Auren · Chloe 自用适配",
     description: "只处理已导入 iMessage Native Day CSS 的聊天室；动态头像、独立消息分组、真实状态、语音外观。",
     permissions: ["chat.read", "ui"],
@@ -31,7 +31,7 @@ export default {
       if (!disposed && !geometryFrame) geometryFrame=requestAnimationFrame(() => {
         geometryFrame=0;
         resized.forEach((state,bubble) => {
-          if (bubble.isConnected && bubble.getClientRects().length && state.outlines.has(bubble)) outline(bubble,state,true);
+          if (bubble.isConnected && state.outlines.has(bubble)) outline(bubble,state,true);
         });
         resized.clear();
       });
@@ -45,7 +45,6 @@ export default {
     const own = (el, state) => { el.dataset.imOwned = 'message'; state.nodes.add(el); return el; };
     const text = (el, value) => { if (el.textContent !== value) el.textContent = value; };
     const isEnabled = room => getComputedStyle(room).getPropertyValue('--im-theme').trim() === '1';
-    const isVisible = room => !!room.getClientRects().length && getComputedStyle(room).visibility !== 'hidden';
     const getId = room => Array.from(room.classList).find(c => c.startsWith('session-'))?.slice(8);
     const listen = (state, el, event, fn) => {
       el.addEventListener(event, fn);
@@ -58,7 +57,7 @@ export default {
       if (!attrs.has(name)) attrs.set(name, el.getAttribute(name));
       attr(el, name, value);
     };
-    const newState = () => ({ nodes: new Set(), attrs: new Map(), handlers: new Map(), off: [], header: null, outlines: new Map(), marked: new Set(), records: new Map(), domIds: new Set(), session: null, revision: undefined, dirty: true, visible: false, syncedAt: 0 });
+    const newState = () => ({ nodes: new Set(), attrs: new Map(), handlers: new Map(), off: [], header: null, outlines: new Map(), marked: new Set() });
     const messageClasses = ['im-message-block','im-follow','im-message-row','im-bubble','im-kind-text','im-kind-plain','im-kind-voice','im-kind-media','im-time-wrap','im-geometry-ready'];
     const messageAttrs = ['data-im-last','data-im-first','data-im-group','data-im-plain','data-im-text-gap','data-im-single-image'];
     function clearMessage(el) {
@@ -224,7 +223,7 @@ export default {
       header(room,state,session);
       const body = room.querySelector(':scope > .page-body.chat-room-main-pane');
       if (!body) return;
-      const records = state.records;
+      const records = new Map(ctx.data.messages.list(session.id).map(msg => [msg.id,msg]));
       // Only main flow rows. Nested call transcripts/plugin cards are not messages.
       const rows = [...body.querySelectorAll(':scope > .chat-msg-wrapper, :scope > div > .chat-msg-wrapper')].filter(row =>
         (row.id.startsWith('message-') || row.querySelector('.chat-stream-bubble')) &&
@@ -327,10 +326,6 @@ export default {
         return true;
       }
       if (el.closest('.chat-input-bar')) return false;
-      // Text replacement changes size, not message identity/grouping. The
-      // ResizeObserver handles body geometry; title/duration have exact watches.
-      if (m.type==='childList' && el.closest(bubbleSelector) &&
-          [...m.addedNodes,...m.removedNodes].every(n=>n.nodeType===Node.TEXT_NODE)) return false;
       // ChatRoom adjusts the scroll pane's padding when the composer grows;
       // this does not alter sender boundaries or bubble widths.
       if (m.attributeName==='style' && el.matches('.page-body.chat-room-main-pane')) return false;
@@ -346,41 +341,7 @@ export default {
       return !!el.closest('.page-body.chat-room-main-pane, .page-header.chat-room-main-pane');
     }
     const observer = new MutationObserver(records => { if(records.some(relevantMutation)) schedule(); });
-    const observe = () => observer.observe(document.documentElement,{childList:true,subtree:true,attributes:true,attributeOldValue:true,attributeFilter:['id','data-msg-id','data-consecutive','data-role','data-playing','data-has-bg-image','class','style']});
-    const textObserver = new MutationObserver(records => {
-      const touched = new Set();
-      for (const mutation of records) {
-        const el = mutation.target.nodeType===Node.ELEMENT_NODE ? mutation.target : mutation.target.parentElement;
-        if (!el || el.closest('[data-im-owned]')) continue;
-        const room=el.closest('.chat-room-wrapper'), state=rooms.get(room);
-        if (!state?.session || !isVisible(room)) continue;
-        const duration=el.closest('.voice-msg-dur');
-        const target=duration?.closest(bubbleSelector) || room;
-        if (touched.has(target)) continue;
-        touched.add(target);
-        if (duration && target!==room) voice(target,state);
-        else if (el.closest('.page-title')) header(room,state,state.session);
-      }
-    });
-    function observeTextTargets() {
-      textObserver.disconnect();
-      rooms.forEach((state,room) => {
-        if (!state.visible) return;
-        room.querySelectorAll('.page-header .page-title, .voice-msg-dur').forEach(el =>
-          textObserver.observe(el,{subtree:true,childList:true,characterData:true}));
-      });
-    }
-    const revisionOf = id => ctx.data.messages.revision?.(id) ?? ctx.data.sessions.revision?.(id);
-    function syncMetadata(room,state) {
-      const id=getId(room);
-      const session=ctx.data.sessions.get(id);
-      if (!session) { state.session=null; state.records.clear(); return; }
-      state.session=session;
-      state.records=new Map(ctx.data.messages.list(id).map(msg=>[msg.id,msg]));
-      state.revision=revisionOf(id);
-      state.dirty=false;
-      state.syncedAt=performance.now();
-    }
+    const observe = () => observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeOldValue:true,attributeFilter:['id','data-msg-id','data-consecutive','data-role','data-playing','data-has-bg-image','class','style']});
     function refresh() {
       frame=0; if(disposed) return;
       observer.disconnect();
@@ -388,64 +349,21 @@ export default {
         rooms.forEach((state,room) => { if(!room.isConnected || !isEnabled(room)) { clean(room,state); rooms.delete(room); } });
         document.querySelectorAll('.chat-room-wrapper').forEach(room => {
           if(!isEnabled(room)) return;
+          const session=ctx.data.sessions.get(getId(room));
+          if(!session) return;
           if(!rooms.has(room)) rooms.set(room,newState());
-          const state=rooms.get(room);
-          if (!isVisible(room)) {
-            // Hidden rooms keep their DOM, but need not retain an entire old
-            // metadata snapshot. Showing the room always resynchronizes it.
-            state.visible=false; state.dirty=true; state.session=null;
-            state.records.clear(); state.domIds.clear();
-            return;
-          }
-          if (!state.visible || state.session?.id!==getId(room)) state.dirty=true;
-          state.visible=true;
-          const revision=revisionOf(getId(room));
-          if (revision!==undefined && revision!==state.revision) state.dirty=true;
-          // Old hosts have no revision token. A newly mounted stored message is
-          // a precise fallback; unrelated appearance changes never reread data.
-          if (revision===undefined && !state.dirty) {
-            const ids=new Set([...room.querySelectorAll('.chat-msg-wrapper[id^="message-"] [data-msg-id]')].map(el=>el.getAttribute('data-msg-id')));
-            state.dirty=[...ids].some(id=>!state.records.has(id) && !state.domIds.has(id));
-            state.domIds=ids;
-          }
-          if (state.dirty) syncMetadata(room,state);
-          if (state.session) updateRoom(room,state,state.session);
+          updateRoom(room,rooms.get(room),session);
         });
-      } finally { if(!disposed) { observe(); observeTextTargets(); } }
+      } finally { if(!disposed) observe(); }
     }
     function schedule() { if(!disposed && !frame) frame=requestAnimationFrame(refresh); }
     // Stream DOM changes already schedule the corresponding render. The hook
     // would also scan while a chunk has not yet produced any visible change.
-    function dataChanged(payload={}) {
-      const ids=payload.sessionIds || [payload.sessionId || payload.message?.sessionId].filter(Boolean);
-      rooms.forEach((state,room)=>{
-        if (ids.length ? ids.includes(getId(room)) : (!payload.id || state.records.has(payload.id))) state.dirty=true;
-      });
-      schedule();
-    }
-    ['session.opened','message.persisted','message.updated','message.deleted'].forEach(event => off.push(ctx.hooks.on(event,dataChanged)));
-    off.push(ctx.system.settings.onChange(()=>dataChanged()));
-    const onData=e=>dataChanged(e.detail || {});
-    ['chat-session-data-updated','chat-response-batch-replaced','chat-messages-updated','weixin-messages-updated'].forEach(event=>{
-      window.addEventListener(event,onData); off.push(()=>window.removeEventListener(event,onData));
-    });
-    // Missing hooks on older hosts: bounded visible-room reconciliation, never
-    // per DOM mutation. New hosts only read the O(1) revision token here.
-    const reconcile=setInterval(()=>{
-      if (document.hidden) return;
-      let changed=false;
-      rooms.forEach((state,room)=>{
-        if (!isVisible(room)) return;
-        const revision=revisionOf(getId(room));
-        if (revision===undefined ? performance.now()-state.syncedAt>=2000 : revision!==state.revision) {
-          state.dirty=true; changed=true;
-        }
-      });
-      if (changed) schedule();
-    },2000);
+    ['session.opened','message.persisted','message.updated','message.deleted'].forEach(event => off.push(ctx.hooks.on(event,schedule)));
+    off.push(ctx.system.settings.onChange(schedule));
     refresh();
     return () => {
-      disposed=true; clearInterval(reconcile); textObserver.disconnect(); cancelAnimationFrame(frame); cancelAnimationFrame(geometryFrame); resized.clear(); resizeObserver.disconnect(); observer.disconnect(); off.forEach(fn=>fn());
+      disposed=true; cancelAnimationFrame(frame); cancelAnimationFrame(geometryFrame); resized.clear(); resizeObserver.disconnect(); observer.disconnect(); off.forEach(fn=>fn());
       rooms.forEach((state,room)=>clean(room,state)); rooms.clear();
     };
   }

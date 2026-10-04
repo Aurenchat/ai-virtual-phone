@@ -81,6 +81,7 @@ export function saveCharacters(chars: Character[]): void {
   if (typeof window === "undefined") return;
   kvSet(STORAGE_KEY, JSON.stringify(chars));
   _charsCache = null;
+  window.dispatchEvent(new CustomEvent("chat-preview-context-updated"));
 }
 
 export function loadBackgroundItems(): CanvasBgItem[] {

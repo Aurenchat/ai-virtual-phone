@@ -234,6 +234,8 @@ export type ChatPluginContext = {
         shopping?: { get(): ShoppingState };
         user?: { name(characterId?: string, isGroup?: boolean): string };
         messages: {
+            /** Optional cheap invalidation token; older hosts may omit it. */
+            revision?(sessionId: string): number;
             list(sessionId: string): ChatMessage[];
             push(input: { sessionId: string; role: "user" | "assistant" | "system"; content: string;[k: string]: unknown }): ChatMessage;
             update(id: string, patch: Partial<ChatMessage>): void;
@@ -250,6 +252,8 @@ export type ChatPluginContext = {
             } | null>;
         };
         sessions: {
+            /** Changes after message metadata or session settings change. */
+            revision?(sessionId: string): number;
             list(): ChatSession[];
             get(id: string): ChatSession | null;
         };

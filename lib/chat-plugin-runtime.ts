@@ -12,7 +12,7 @@
 import { kvGet, kvSet, kvRemove, hydrateKvDb, kvUpdateAtomic } from "./kv-db";
 import { registerNativeGiftProvider, openNativeGift, notifyNativeGiftsChanged } from "./native-gift-bridge";
 import { loadShoppingState } from "./shopping-storage";
-import { hydrateChatStorage, loadChatMessages, loadChatSessions, loadChatContacts, pushChatMessage, updateChatMessage, type ChatMessage } from "./chat-storage";
+import { hydrateChatStorage, loadChatMessages, loadChatSessions, loadChatContacts, pushChatMessage, updateChatMessage, getChatSessionRevision, type ChatMessage } from "./chat-storage";
 import { isMediaStoreRef, loadMediaBlob } from "./media-cache-storage";
 import { loadCharacters } from "./character-storage";
 import { loadApiConfigs, loadBindingConfig, resolveUserIdentity } from "./settings-storage";
@@ -344,6 +344,7 @@ class ChatPluginRuntime {
                 shopping: { get: () => loadShoppingState() },
                 user: { name: (characterId, isGroup) => resolveUserIdentity(characterId, isGroup ? "group_chat" : "chat")?.name || "用户" },
                 messages: {
+                    revision: (sessionId) => getChatSessionRevision(sessionId),
                     list: (sessionId) => loadChatMessages(sessionId),
                     push: (input) => pushChatMessage(input as Parameters<typeof pushChatMessage>[0]),
                     update: (id, patch) => {
@@ -352,6 +353,7 @@ class ChatPluginRuntime {
                     resolveMedia: (msg) => resolveChatMessageMedia(msg),
                 },
                 sessions: {
+                    revision: (sessionId) => getChatSessionRevision(sessionId),
                     list: () => loadChatSessions(),
                     get: (id) => loadChatSessions().find(s => s.id === id) ?? null,
                 },

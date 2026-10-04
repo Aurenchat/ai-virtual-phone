@@ -903,6 +903,7 @@ export function loadBindingConfig(): BindingConfig {
 export function saveBindingConfig(config: BindingConfig, notify: boolean = true): void {
     if (typeof window === "undefined") return;
     kvSet(BINDINGS_KEY, JSON.stringify(config));
+    window.dispatchEvent(new CustomEvent("chat-preview-context-updated"));
     if (notify) window.dispatchEvent(new CustomEvent("settings-bindings-updated"));
 }
 
@@ -1183,6 +1184,7 @@ export function loadUserIdentities(): UserIdentity[] {
 export function saveUserIdentities(identities: UserIdentity[]): void {
     if (typeof window === "undefined") return;
     kvSet(USER_IDENTITIES_KEY, JSON.stringify(identities));
+    window.dispatchEvent(new CustomEvent("chat-preview-context-updated"));
 }
 
 /**
