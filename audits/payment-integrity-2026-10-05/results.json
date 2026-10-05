@@ -1,0 +1,108 @@
+{
+  "results": [
+    {
+      "name": "empty/new wallet and concurrent collect",
+      "passed": true
+    },
+    {
+      "name": "sequential retry and old wallet writer preserve ledger",
+      "passed": true
+    },
+    {
+      "name": "wallet transaction abort rolls back balance and marker",
+      "passed": true
+    },
+    {
+      "name": "ChatDB failure after wallet commit; retry reconciles without credit",
+      "passed": true
+    },
+    {
+      "name": "message completed but prepared wallet operation missing",
+      "passed": true
+    },
+    {
+      "name": "legacy terminal no replay; legacy pending collects",
+      "passed": true
+    },
+    {
+      "name": "send/refund concurrent exactly once and illegal collect",
+      "passed": true
+    },
+    {
+      "name": "legacy refund verified debit / missing debit fails closed",
+      "passed": true
+    },
+    {
+      "name": "failed send publication recovers with stable ID and no second debit",
+      "passed": true
+    },
+    {
+      "name": "insufficient funds does not reserve a monetary record; draft remains editable",
+      "passed": true
+    },
+    {
+      "name": "out-of-order message projection cannot revert completed state",
+      "passed": true
+    },
+    {
+      "name": "wrong legacy debit direction / amount and refund receipt are rejected",
+      "passed": true
+    },
+    {
+      "name": "all older wallet mutation entrances retain operations",
+      "passed": true
+    },
+    {
+      "name": "history trims to 300; permanent ledger survives",
+      "passed": true
+    },
+    {
+      "allocations": 509993
+    },
+    {
+      "name": "integer packet allocation boundaries and 10000 randomized packets",
+      "passed": true
+    },
+    {
+      "name": "group packet concurrent claims, receive once, no negative shares",
+      "passed": true
+    },
+    {
+      "name": "backup exports durable snapshot; restore preserves operation",
+      "passed": true
+    },
+    {
+      "name": "old version-1 wallet snapshot restores without balance rewrite",
+      "passed": true
+    },
+    {
+      "name": "AI packet creation rejects insufficient minimum and preserves valid packets",
+      "passed": true
+    },
+    {
+      "name": "partial restore missing new protocol ledger fails closed",
+      "passed": true
+    },
+    {
+      "name": "real MediaDetailModal double click, one credit and notification",
+      "passed": true
+    },
+    {
+      "name": "real RedPacketModal rejects 0.01/4; double-click 0.04/4 sends once",
+      "passed": true
+    },
+    {
+      "name": "reload retry",
+      "passed": true
+    },
+    {
+      "name": "two-tab IndexedDB concurrency",
+      "passed": true
+    },
+    {
+      "name": "stale-tab export reads durable wallet",
+      "passed": true
+    }
+  ],
+  "pageErrors": []
+}

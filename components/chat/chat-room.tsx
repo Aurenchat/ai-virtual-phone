@@ -64,7 +64,7 @@ import type { MemoryWriteRequest, ToolResult } from "@/lib/tool-executor";
 import { formatChatUiTime } from "@/lib/chat-time";
 import { parseActionTags } from "@/lib/action-parser";
 import { kvGet, kvSet, kvRemove } from "@/lib/kv-db";
-import { creditWalletBalance, payWithWalletBalance } from "@/lib/wallet-storage";
+import { settleChatPayment, sendChatPayment, reconcilePaymentMessage, recoverPaymentPublications } from "@/lib/payment-chat";
 import { sendNativeGift, takeNativeGift, NATIVE_GIFT_QUEUED, type NativeGiftCandidate } from "@/lib/native-gift-bridge";
 import { settleShoppingPaymentRequest } from "@/lib/shopping-payment-request";
 import type { RegexConfig } from "@/lib/settings-types";
@@ -2118,12 +2118,12 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         rawResponseText,
     });
 
-    const handleAIMediaAction = (actionType: string, charN: string, userN: string) => {
+    const handleAIMediaAction = async (actionType: string, charN: string, userN: string) => {
         // Find the target message in current messages (most recent matching user message with pending status)
         const targetMediaType = actionType.includes("payment_request")
             ? "payment_request"
             : actionType.includes("red_packet") ? "red_packet" : "transfer";
-        const targetMsg = [...messages].reverse().find(
+        const targetMsg = [...loadChatMessages(session.id)].reverse().find(
             m => m.role === "user" && m.mediaType === targetMediaType && m.mediaData?.status === "pending"
         );
         if (!targetMsg) return;
@@ -2175,7 +2175,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
         const refundReason = actionType === "decline_red_packet" ? "红包退回" : actionType === "decline_transfer" ? "转账退回" : null;
         const updatedMediaData = {
-            ...(refundReason ? refundOutgoingMoneyMessage(targetMsg, refundReason) : targetMsg.mediaData),
+            ...(targetMediaType === "payment_request" ? targetMsg.mediaData : (await settleChatPayment(targetMsg, refundReason ? "return" : targetMediaType === "red_packet" ? "claim" : "collect", { id: session.contactId!, name: charN, isUser: false })).mediaData),
             status: newStatus,
             ...(targetMediaType === "payment_request" ? {
                 paymentResolvedAt: new Date().toISOString(),
@@ -2183,7 +2183,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 paymentPayerName: charN,
             } : {}),
         };
-        updateMessageMediaData(targetMsg.id, updatedMediaData);
+        if (targetMediaType === "payment_request") updateMessageMediaData(targetMsg.id, updatedMediaData);
         setMessages(prev => prev.map(m =>
             m.id === targetMsg.id ? { ...m, mediaData: updatedMediaData } : m
         ));
@@ -2203,21 +2203,15 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     const getMsgSender = (m: ChatMessage) =>
         m.role === "user" ? (userIdentity?.name || "你") : (m.senderName || "未知");
 
-    // 红包：按 ownerName 匹配发送人，领取/退回
-    // 拼手气红包：随机分配金额（二倍均值法）
-    const calcRedPacketShare = (totalAmount: number, claimedAmounts: Record<string, number>, totalRecipients: number): number => {
-        const claimedTotal = Object.values(claimedAmounts).reduce((s, v) => s + v, 0);
-        const remaining = totalAmount - claimedTotal;
-        const claimedCount = Object.keys(claimedAmounts).length;
-        const leftCount = totalRecipients - claimedCount;
-        if (leftCount <= 1) return Math.round(remaining * 100) / 100; // 最后一个人拿剩余
-        const avg = remaining / leftCount;
-        const max = avg * 2;
-        const share = Math.max(0.01, Math.random() * max);
-        return Math.round(Math.min(share, remaining - 0.01 * (leftCount - 1)) * 100) / 100;
+    const paymentActorId = (name: string, speaker: { characterName: string; characterId: string }): string => {
+        if (name === speaker.characterName) return speaker.characterId;
+        const matches = groupCharacters.filter(member => member.name === name);
+        if (matches.length !== 1) throw new Error("无法唯一确认支付操作人，操作已停止");
+        return matches[0].id;
     };
 
-    const handleGroupRedPacketAction = (action: "accept" | "decline", claimerName: string, ownerName?: string) => {
+    // 红包：按 ownerName 匹配发送人，领取/退回
+    const handleGroupRedPacketAction = async (action: "accept" | "decline", claimerName: string, actorId: string, ownerName?: string) => {
         // 从 localStorage 读最新数据，避免 processGroupParts 循环中多人领取时闭包过期
         const freshMessages = loadChatMessages(session.id);
         const targetMsg = [...freshMessages].reverse().find(m => {
@@ -2242,15 +2236,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         // 已领满则拒绝
         if ((targetMsg.mediaData?.claimedBy?.length || 0) >= totalRecipients) return;
         if (action === "accept") {
-            const prevAmounts = targetMsg.mediaData?.claimedAmounts || {};
-            const share = calcRedPacketShare(targetMsg.mediaData?.amount || 0, prevAmounts, totalRecipients);
-            const claimedBy = [...(targetMsg.mediaData?.claimedBy || []), claimerName];
-            const claimedAmounts = { ...prevAmounts, [claimerName]: share };
-            // 所有人都领完才标记 opened，否则保持 pending 让其他人继续领
-            const allClaimed = claimedBy.length >= totalRecipients;
-            const newStatus = allClaimed ? "opened" as const : "pending" as const;
-            const updatedData = { ...targetMsg.mediaData, status: newStatus, claimedBy, claimedAmounts };
-            updateMessageMediaData(targetMsg.id, updatedData);
+            const settled = await settleChatPayment(targetMsg, "claim", { id: actorId, name: claimerName, isUser: false });
+            const updatedData = settled.mediaData;
+            const share = updatedData?.claimedAmounts?.[claimerName] || 0;
             setMessages(prev => prev.map(m => m.id === targetMsg.id ? { ...m, mediaData: updatedData } : m));
             const sysMsg = pushChatMessage({
                 sessionId: session.id,
@@ -2277,7 +2265,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     };
 
     // 转账：按 ownerName 匹配发送人，且验证 claimerName === recipientName
-    const handleGroupTransferAction = (action: "accept" | "decline", claimerName: string, ownerName?: string) => {
+    const handleGroupTransferAction = async (action: "accept" | "decline", claimerName: string, actorId: string, ownerName?: string) => {
         const freshMessages = loadChatMessages(session.id);
         const targetMsg = [...freshMessages].reverse().find(m => {
             if (m.mediaType !== "transfer" || m.mediaData?.status !== "pending") return false;
@@ -2291,12 +2279,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         if (recipient && recipient !== claimerName) return; // 非收款人，操作无效
         const owner = ownerName || targetMsg.mediaData?.senderName || getMsgSender(targetMsg);
         const ownerDisplay = owner === (userIdentity?.name) ? "你" : owner;
-        const newStatus = action === "accept" ? "received" as const : "declined" as const;
-        const refundData = action === "decline" && targetMsg.role === "user"
-            ? refundOutgoingMoneyMessage(targetMsg, "转账退回")
-            : targetMsg.mediaData;
-        const updatedData = { ...refundData, status: newStatus };
-        updateMessageMediaData(targetMsg.id, updatedData);
+        const settled = await settleChatPayment(targetMsg, action === "accept" ? "collect" : "return", { id: actorId, name: claimerName, isUser: false });
+        const updatedData = settled.mediaData;
         setMessages(prev => prev.map(m => m.id === targetMsg.id ? { ...m, mediaData: updatedData } : m));
         const isAccept = action === "accept";
         const sysText = isAccept
@@ -2455,28 +2439,28 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     throwIfGenerationStopped(guard);
                     const claimer = part.mediaData?.claimer || r.characterName;
                     const owner = part.mediaData?.owner;
-                    handleGroupRedPacketAction("accept", claimer, owner);
+                    await handleGroupRedPacketAction("accept", claimer, paymentActorId(claimer, r), owner);
                     continue;
                 }
                 if (part.mediaType === "decline_red_packet") {
                     throwIfGenerationStopped(guard);
                     const claimer = part.mediaData?.claimer || r.characterName;
                     const owner = part.mediaData?.owner;
-                    handleGroupRedPacketAction("decline", claimer, owner);
+                    await handleGroupRedPacketAction("decline", claimer, paymentActorId(claimer, r), owner);
                     continue;
                 }
                 if (part.mediaType === "accept_transfer") {
                     throwIfGenerationStopped(guard);
                     const claimer = part.mediaData?.claimer || r.characterName;
                     const owner = part.mediaData?.owner;
-                    handleGroupTransferAction("accept", claimer, owner);
+                    await handleGroupTransferAction("accept", claimer, paymentActorId(claimer, r), owner);
                     continue;
                 }
                 if (part.mediaType === "decline_transfer") {
                     throwIfGenerationStopped(guard);
                     const claimer = part.mediaData?.claimer || r.characterName;
                     const owner = part.mediaData?.owner;
-                    handleGroupTransferAction("decline", claimer, owner);
+                    await handleGroupTransferAction("decline", claimer, paymentActorId(claimer, r), owner);
                     continue;
                 }
                 if (part.mediaType === "accept_payment_request") {
@@ -2857,7 +2841,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     hasDecline = true;
                 }
                 throwIfGenerationStopped(options);
-                handleAIMediaAction(p.mediaType, charN, userN);
+                await handleAIMediaAction(p.mediaType, charN, userN);
                 continue;
             }
             // Music: convert to plain text [音乐:xxx] (stays in history for AI), auto-play
@@ -3359,78 +3343,26 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         await runManagedGeneration({ history: latestMessages });
     };
 
+    useEffect(() => {
+        let active = true;
+        void recoverPaymentPublications(session.id).then(recovered => {
+            if (active && recovered.length) applyStoredMessageWindow(loadChatMessages(session.id));
+        }).catch(error => { if (active) showChatToast(error instanceof Error ? error.message : "支付消息恢复失败"); });
+        return () => { active = false; };
+    }, [session.id]);
+
     // ── Rich media send helpers ──
-    const getMoneyMediaAmount = (mediaData: ChatMessage["mediaData"]): number => {
-        const amount = Number(mediaData?.amount ?? 0);
-        return Number.isFinite(amount) ? Math.max(0, Math.round(amount * 100) / 100) : 0;
-    };
-
-    const debitOutgoingMoneyMessage = (
-        mediaType: ChatMessage["mediaType"],
-        mediaData: ChatMessage["mediaData"],
-    ): { ok: boolean; mediaData?: ChatMessage["mediaData"] } => {
-        if (mediaType !== "red_packet" && mediaType !== "transfer") return { ok: true, mediaData };
-        const amount = getMoneyMediaAmount(mediaData);
-        if (amount <= 0) {
-            showChatToast("金额无效");
-            return { ok: false };
-        }
-        const isRedPacket = mediaType === "red_packet";
-        const result = payWithWalletBalance({
-            amount,
-            title: isRedPacket ? "发红包" : "发转账",
-            detail: `${session.isGroup ? session.groupName || "群聊" : character?.name || "聊天"}：${isRedPacket ? "发红包" : "发转账"} ${amount.toFixed(2)} 元`,
-            category: isRedPacket ? "红包" : "转账",
-        });
-        if (!result.ok || !result.transaction) {
-            showChatToast(result.error ?? "余额不足");
-            return { ok: false };
-        }
-        return {
-            ok: true,
-            mediaData: {
-                ...mediaData,
-                walletTransactionId: result.transaction.id,
-            },
-        };
-    };
-
-    const refundOutgoingMoneyMessage = (msg: ChatMessage, reason: "红包退回" | "转账退回"): ChatMessage["mediaData"] => {
-        const data = msg.mediaData;
-        if (!data?.walletTransactionId || data.walletRefundTransactionId) return data;
-        const amount = getMoneyMediaAmount(data);
-        if (amount <= 0) return data;
-        const result = creditWalletBalance(amount, reason, `${reason}：${data.label || msg.content || "聊天款项"}`, "聊天退款");
-        if (!result.ok || !result.transaction) return data;
-        return {
-            ...data,
-            walletRefundTransactionId: result.transaction.id,
-        };
-    };
-
-    const creditIncomingMoneyMessage = (msg: ChatMessage, actionType: string): ChatMessage => {
-        if (actionType !== "accept_red_packet" && actionType !== "accept_transfer") return msg;
-        const data = msg.mediaData;
-        if (data?.walletDepositTransactionId) return msg;
-        const userName = userIdentity?.name || "你";
-        const amount = actionType === "accept_red_packet"
-            ? Number(data?.claimedAmounts?.[userName] ?? data?.amount ?? 0)
-            : Number(data?.amount ?? 0);
-        const safeAmount = Number.isFinite(amount) ? Math.max(0, Math.round(amount * 100) / 100) : 0;
-        if (safeAmount <= 0) return msg;
-        const result = creditWalletBalance(
-            safeAmount,
-            actionType === "accept_red_packet" ? "领取红包" : "收款",
-            `${actionType === "accept_red_packet" ? "领取红包" : "收款"}：${data?.label || msg.content || "聊天款项"}`,
-            actionType === "accept_red_packet" ? "红包" : "转账",
-        );
-        if (!result.ok || !result.transaction) return msg;
-        const updatedData = {
-            ...data,
-            walletDepositTransactionId: result.transaction.id,
-        };
-        updateMessageMediaData(msg.id, updatedData);
-        return { ...msg, mediaData: updatedData };
+    const sendMoneyMessage = async (kind: "transfer" | "red_packet", data: NonNullable<ChatMessage["mediaData"]>, id: string): Promise<boolean> => {
+        if (!ensureGroupSpeakPermission()) return false;
+        if (isGenerating) { showChatToast("请先等待对方回复"); return false; }
+        const msg = await sendChatPayment({ id, sessionId: session.id, kind, fromUser: true,
+            amount: data.amount || 0, count: data.count, label: data.label,
+            senderName: userIdentity?.name || "你", recipientId: data.recipientId, recipientName: data.recipientName,
+        }, userIdentity?.name || "你");
+        cancelFollowUp(session.id);
+        setMessages(prev => prev.some(m => m.id === msg.id) ? prev.map(m => m.id === msg.id ? msg : m) : [...prev, msg]);
+        setPendingGenerate(true);
+        return true;
     };
 
     const sendRichMessage = (mediaType: ChatMessage["mediaType"], mediaData: ChatMessage["mediaData"], content: string = "", mediaUrl?: string): boolean => {
@@ -3456,15 +3388,15 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             return true;
         }
 
-        const walletDebit = debitOutgoingMoneyMessage(mediaType, mediaData);
-        if (!walletDebit.ok) return false;
+        // Monetary messages must go through the durable payment path.
+        if (mediaType === "transfer" || mediaType === "red_packet") throw new Error("支付消息必须通过支付凭据提交");
 
         const newMsg = pushChatMessage({
             sessionId: session.id,
             role: "user",
             content,
             mediaType,
-            mediaData: walletDebit.mediaData,
+            mediaData,
             ...(mediaUrl ? { mediaUrl } : {}),
         });
         setMessages(prev => [...prev, newMsg]);
@@ -6093,7 +6025,11 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                                 charName={character?.name}
                                                 userName={userIdentity?.name || "你"}
                                                 groupSize={session.isGroup ? (session.participantIds?.length || 0) + (session.isSpectator ? 0 : 1) : undefined}
-                                                onShowDetail={setMediaDetailMsg}
+                                                onShowDetail={msg => {
+                                                    if (msg.mediaType === "transfer" || msg.mediaType === "red_packet") {
+                                                        void reconcilePaymentMessage(msg).then(setMediaDetailMsg).catch(error => showChatToast(error instanceof Error ? error.message : "支付状态读取失败"));
+                                                    } else setMediaDetailMsg(msg);
+                                                }}
                                                 characterId={msg.senderCharacterId || session.contactId}
                                                 onUpdate={(updated) => setMessages(prev => prev.map(m => m.id === updated.id ? updated : m))}
                                                 onSystemMessage={(text) => {
@@ -6503,10 +6439,11 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             )}
             {richModal === "red_packet" && (
                 <RedPacketModal
+                    sessionId={session.id}
                     mode="red_packet"
                     isGroup={session.isGroup}
-                    onSend={(amount, label, count) => {
-                        const sent = sendRichMessage("red_packet", { amount, label, status: "pending", count: count || 1 });
+                    onSend={async (amount, label, count, paymentId) => {
+                        const sent = await sendMoneyMessage("red_packet", { amount, label, status: "pending", count: count || 1 }, paymentId!);
                         if (sent) setRichModal(null);
                     }}
                     onClose={() => setRichModal(null)}
@@ -6524,21 +6461,22 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             )}
             {richModal === "transfer" && (
                 <RedPacketModal
+                    sessionId={session.id}
                     mode="transfer"
-                    onSend={(amount, label) => {
+                    onSend={async (amount, label, _count, paymentId) => {
                         if (session.isGroup && transferTarget) {
-                            const sent = sendRichMessage("transfer", {
+                            const sent = await sendMoneyMessage("transfer", {
                                 amount, label, status: "pending",
                                 senderName: userIdentity?.name || "你",
                                 recipientId: transferTarget.id,
                                 recipientName: transferTarget.name,
-                            });
+                            }, paymentId!);
                             if (sent) {
                                 setRichModal(null);
                                 setTransferTarget(null);
                             }
                         } else {
-                            const sent = sendRichMessage("transfer", { amount, label, status: "pending" });
+                            const sent = await sendMoneyMessage("transfer", { amount, label, status: "pending" }, paymentId!);
                             if (sent) setRichModal(null);
                         }
                     }}
@@ -6632,9 +6570,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     userName={userIdentity?.name || "你"}
                     groupSize={session.isGroup ? (session.participantIds?.length || 0) + (session.isSpectator ? 0 : 1) : undefined}
                     onAccept={(updatedMsg, sysText, actionType) => {
-                        const walletUpdatedMsg = updatedMsg.role === "assistant"
-                            ? creditIncomingMoneyMessage(updatedMsg, actionType)
-                            : updatedMsg;
+                        const walletUpdatedMsg = updatedMsg;
                         setMessages(prev => prev.map(m => m.id === walletUpdatedMsg.id ? walletUpdatedMsg : m));
                         setMediaDetailMsg(null);
                         const claimerN = userIdentity?.name || "你";

@@ -1,4 +1,6 @@
 "use client";
+import { reservePaymentDraft } from "@/lib/payment-ledger";
+import { toFen, validatePacket } from "@/lib/payment-money";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { CallSttWarningDialog, hideCallSttWarningPermanently, isCallSttWarningHidden } from "./call-stt-warning-dialog";
@@ -83,16 +85,21 @@ export function PhotoInputModal({ onSend, onClose }: PhotoInputModalProps) {
 // ── Red Packet Modal ─────────────────────────────
 
 interface RedPacketModalProps {
+    sessionId: string;
     mode: "red_packet" | "transfer";
     isGroup?: boolean;
-    onSend: (amount: number, label: string, count?: number) => void;
+    onSend: (amount: number, label: string, count?: number, paymentId?: string) => void | Promise<void>;
     onClose: () => void;
 }
 
-export function RedPacketModal({ mode, isGroup, onSend, onClose }: RedPacketModalProps) {
+export function RedPacketModal({ sessionId, mode, isGroup, onSend, onClose }: RedPacketModalProps) {
     const [amount, setAmount] = useState("");
     const [label, setLabel] = useState("");
     const [count, setCount] = useState("1");
+    const sending = useRef(false);
+    const draft = useRef<Promise<string> | null>(null);
+    useEffect(() => { draft.current = reservePaymentDraft(sessionId, mode); void draft.current.catch(() => {}); }, [sessionId, mode]);
+    const [sendError, setSendError] = useState("");
 
     const isRedPacket = mode === "red_packet";
     const title = isRedPacket ? "发红包" : "转账";
@@ -100,11 +107,19 @@ export function RedPacketModal({ mode, isGroup, onSend, onClose }: RedPacketModa
     // Brand-specific colors: WeChat red packet / transfer (CSS variables)
     const color = isRedPacket ? "var(--c-redpacket)" : "var(--c-transfer)";
 
-    const handleSend = () => {
+    const handleSend = async () => {
+        if (sending.current) return;
         const num = parseFloat(amount);
         if (!num || num <= 0) return;
         const cnt = isRedPacket ? (isGroup ? Math.max(1, parseInt(count, 10) || 1) : 1) : undefined;
-        onSend(num, label.trim() || defaultLabel, cnt);
+        sending.current = true;
+        try {
+            if (isRedPacket) validatePacket(toFen(num), cnt || 1);
+            setSendError("");
+            const id = await (draft.current || (draft.current = reservePaymentDraft(sessionId, mode)));
+            await onSend(num, label.trim() || defaultLabel, cnt, id);
+        } catch (error) { setSendError(error instanceof Error ? error.message : "支付未完成，请重试"); }
+        finally { sending.current = false; }
     };
 
     return (
@@ -164,6 +179,7 @@ export function RedPacketModal({ mode, isGroup, onSend, onClose }: RedPacketModa
                             className="ui-input w-full"
                         />
                     </div>
+                    {sendError && <div role="alert" className="ts-12 text-red-600">{sendError}</div>}
                     <div className="flex gap-3 mt-1">
                         <button
                             onClick={onClose}

@@ -9,6 +9,7 @@
  *   5. Parse each segment for rich-media markers (direct matching, no placeholders)
  */
 
+import { toFen, validatePacket } from "./payment-money";
 import type { ChatMessage } from "./chat-storage";
 import type { StateValue } from "./chat-storage";
 import { parseStateValues, mergeStateValues } from "./state-value-parser";
@@ -596,7 +597,12 @@ function parseSegment(segment: string, parts: ParsedMessagePart[]) {
 
         // `before` is guaranteed marker-free (we chose the earliest marker).
         if (before) parts.push({ content: before });
-        parts.push(best.build());
+        const part = best.build();
+        if (part.mediaType === "red_packet") {
+            try { validatePacket(toFen(part.mediaData?.amount || 0), part.mediaData?.count || 1); }
+            catch { part.mediaType = undefined; part.mediaData = undefined; part.content = "红包总金额不足，每人至少需要0.01元"; }
+        }
+        parts.push(part);
         if (after) parseSegment(after, parts);
         return;
     }

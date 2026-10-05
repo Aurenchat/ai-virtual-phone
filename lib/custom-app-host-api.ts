@@ -2266,9 +2266,9 @@ export function getWalletSnapshot(): Record<string, unknown> {
   };
 }
 
-export function payCustomAppWallet(app: InstalledCustomApp, record: Record<string, unknown>): Record<string, unknown> {
+export async function payCustomAppWallet(app: InstalledCustomApp, record: Record<string, unknown>): Promise<Record<string, unknown>> {
   const amount = numberAmount(record.amount);
-  const result = payWithWalletAccount({
+  const result = await payWithWalletAccount({
     accountId: cleanText(record.accountId ?? record.cardId, 120) || WALLET_BALANCE_ACCOUNT_ID,
     amount,
     title: cleanText(record.title, 120) || app.name,

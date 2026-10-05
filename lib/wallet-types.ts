@@ -33,6 +33,7 @@ export type WalletTransaction = {
 };
 
 export type WalletState = {
+  paymentLedger?: import("./payment-ledger").PaymentLedger;
   balance: number;
   cards: WalletCard[];
   transactions: WalletTransaction[];

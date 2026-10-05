@@ -1,4 +1,5 @@
 "use client";
+import { settleChatPayment } from "@/lib/payment-chat";
 
 import { useState, useEffect, useCallback, useRef, useMemo, useContext, useId, memo } from "react";
 import { ImessagePresentation, TranslationBody } from "./imessage-presentation";
@@ -1687,6 +1688,7 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
     const isTransfer = msg.mediaType === "transfer";
     const isPaymentRequest = msg.mediaType === "payment_request";
     const [paymentError, setPaymentError] = useState("");
+    const paymentBusy = useRef(false);
     if (!isRedPacket && !isTransfer && !isPaymentRequest) return null;
 
     const isFromUser = msg.role === "user";
@@ -1713,55 +1715,33 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
     const canActTransfer = isTransfer && !isFromUser && !transferDone && isRecipient;
     const canActPaymentRequest = isPaymentRequest && !isFromUser && !paymentDone;
 
-    // 拼手气：随机分配（二倍均值法）
-    const calcShare = (): number => {
-        const total = d?.amount || 0;
-        const claimedTotal = Object.values(claimedAmounts).reduce((s, v) => s + v, 0);
-        const remaining = total - claimedTotal;
-        const leftCount = totalRecipients - claimedBy.length;
-        if (leftCount <= 1) return Math.round(remaining * 100) / 100;
-        const max = (remaining / leftCount) * 2;
-        const share = Math.max(0.01, Math.random() * max);
-        return Math.round(Math.min(share, remaining - 0.01 * (leftCount - 1)) * 100) / 100;
+    const settle = async (action: "claim" | "collect" | "return", actionType: string, text: string) => {
+        if (paymentBusy.current) return;
+        paymentBusy.current = true;
+        try {
+            setPaymentError("");
+            const updated = await settleChatPayment(msg, action, { id: "self", name: userName, isUser: true });
+            const suffix = action === "claim" ? `，金额:${updated.mediaData?.claimedAmounts?.[userName] || 0}元` : "";
+            onAccept(updated, text + suffix, actionType);
+        } catch (error) { setPaymentError(error instanceof Error ? error.message : "支付未完成，请重试"); }
+        finally { paymentBusy.current = false; }
     };
+    const handleRedPacketAccept = () => settle("claim", "accept_red_packet", `${userName}领取了${senderDisplay}的红包`);
+    const handleRedPacketDecline = () => settle("return", "decline_red_packet", `${userName}退回了${senderDisplay}的红包`);
+    const handleTransferAccept = () => settle("collect", "accept_transfer", `${userName}领取了${senderDisplay}的转账`);
+    const handleTransferDecline = () => settle("return", "decline_transfer", `${userName}拒收了${senderDisplay}的转账`);
 
-    const handleRedPacketAccept = () => {
-        const share = totalRecipients > 1 ? calcShare() : (d?.amount || 0);
-        const newClaimedBy = [...claimedBy, userName];
-        const newClaimedAmounts = { ...claimedAmounts, [userName]: share };
-        const newAllClaimed = newClaimedBy.length >= totalRecipients;
-        const newStatus = newAllClaimed ? "opened" as const : "pending" as const;
-        const updatedData = { ...d, status: newStatus, claimedBy: newClaimedBy, claimedAmounts: newClaimedAmounts };
-        updateMessageMediaData(msg.id, updatedData);
-        onAccept({ ...msg, mediaData: updatedData }, `${userName}领取了${senderDisplay}的红包，金额:${share}元`, "accept_red_packet");
-    };
-
-    const handleRedPacketDecline = () => {
-        const updatedData = { ...d, status: "declined" as const };
-        updateMessageMediaStatus(msg.id, "declined");
-        onAccept({ ...msg, mediaData: updatedData }, `${userName}退回了${senderDisplay}的红包`, "decline_red_packet");
-    };
-
-    const handleTransferAccept = () => {
-        updateMessageMediaStatus(msg.id, "received");
-        const updatedData = { ...d, status: "received" as const };
-        onAccept({ ...msg, mediaData: updatedData }, `${userName}领取了${senderDisplay}的转账`, "accept_transfer");
-    };
-
-    const handleTransferDecline = () => {
-        updateMessageMediaStatus(msg.id, "declined");
-        const updatedData = { ...d, status: "declined" as const };
-        onAccept({ ...msg, mediaData: updatedData }, `${userName}拒收了${senderDisplay}的转账`, "decline_transfer");
-    };
-
-    const handlePaymentRequestAccept = () => {
+    const handlePaymentRequestAccept = async () => {
+        if (paymentBusy.current) return;
+        paymentBusy.current = true;
+        try {
         const amount = Number(d?.amount ?? d?.paymentRequestAmountLabel ?? 0);
         const safeAmount = Number.isFinite(amount) ? Math.max(0, Math.round(amount * 100) / 100) : 0;
         if (safeAmount <= 0) {
             setPaymentError("金额无效，无法代付。");
             return;
         }
-        const result = payWithWalletBalance({
+        const result = await payWithWalletBalance({
             amount: safeAmount,
             title: "代付",
             detail: formatShoppingPaymentRequestHistory({
@@ -1786,6 +1766,8 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
         };
         updateMessageMediaData(msg.id, updatedData);
         onAccept({ ...msg, mediaData: updatedData }, `${userName}接受了${senderDisplay}的代付请求`, "accept_payment_request");
+        } catch (error) { setPaymentError(error instanceof Error ? error.message : "钱包保存失败，请重试"); }
+        finally { paymentBusy.current = false; }
     };
 
     const handlePaymentRequestDecline = () => {

@@ -127,6 +127,9 @@ export type ChatMessage = {
     origin?: "chat" | "reading_discuss" | "custom_app" | "custom_app_background";
     mediaUrl?: string;
     mediaData?: {
+        paymentProtocol?: 1;
+        paymentRevision?: number; // Wallet-ledger projection, never the monetary truth
+        paymentId?: string;
         amount?: number;          // 红包/转账金额
         count?: number;           // 红包个数
         label?: string;           // 红包留言/转账备注/照片描述/位置名/表情名
@@ -1372,12 +1375,17 @@ export function createToolExecutionId(): string {
 }
 
 export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "status"> & {
+    id?: string; // Stable payment publication/retry identity
     status?: ChatMessageStatus;
     createdAt?: string;
-}): ChatMessage {
+}, options?: { deferPaymentWrite?: boolean }): ChatMessage {
+    if (msg.id) {
+        const existing = _messagesCache.find(item => item.id === msg.id);
+        if (existing) return existing;
+    }
     let newMsg: ChatMessage = {
         ...msg,
-        id: createMessageId(),
+        id: msg.id || createMessageId(),
         createdAt: msg.createdAt || new Date().toISOString(),
         order: getNextMessageOrder(msg.sessionId),
         status: msg.status || "sent"
@@ -1395,7 +1403,7 @@ export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "sta
     }
 
     appendCachedMessage(newMsg, false);
-    dbPutMessage(newMsg);
+    if (!options?.deferPaymentWrite) dbPutMessage(newMsg);
 
     // Auto update session last message only for records that can produce a list preview.
     // 优化：直接增量更新内存会话缓存并异步写单条，避免每次发送都走 loadChatSessions +
@@ -1970,6 +1978,21 @@ export function updateMessageMediaData(messageId: string, data: ChatMessage["med
         replaceCachedMessage(idx, { ..._messagesCache[idx], mediaData: data });
         dbPutMessage(_messagesCache[idx]);
     }
+}
+
+/** Payment projection only: acknowledge durable storage before announcing completion. */
+export async function persistPaymentMediaData(messageId: string, data: ChatMessage["mediaData"]): Promise<ChatMessage["mediaData"]> {
+    const saved = await chatDb.transaction("rw", chatDb.messages, async () => {
+        const current = await chatDb.messages.get(messageId);
+        if (!current) throw new Error("支付消息尚未保存，请稍后重试");
+        if ((current.mediaData?.paymentRevision ?? -1) > (data?.paymentRevision ?? -1)) return current;
+        const next = { ...current, mediaData: { ...current.mediaData, ...data } };
+        await chatDb.messages.put(next);
+        return next;
+    });
+    const idx = _messagesCache.findIndex(m => m.id === messageId);
+    if (idx !== -1) replaceCachedMessage(idx, { ..._messagesCache[idx], mediaData: saved.mediaData });
+    return saved.mediaData;
 }
 
 export function updateMessageMediaUrl(messageId: string, mediaUrl: string) {

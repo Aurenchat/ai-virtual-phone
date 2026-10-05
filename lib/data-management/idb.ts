@@ -20,7 +20,7 @@ import {
   type MediaCollector,
   type MediaResolver,
 } from "./serializers";
-import { kvEntries, kvGet, kvRemove, kvSetAsync } from "../kv-db";
+import { kvEntries, kvGet, kvRemove, kvSetAsync, kvUpdateAtomic } from "../kv-db";
 
 type SourceStats = {
   records: number;
@@ -331,7 +331,8 @@ async function readKvRecords(source: KvSource): Promise<{ key: string; value: st
 
   // 内存缓存仍然要并进来：kvSet 是先写缓存再异步落盘，缓存可能比 IndexedDB 新
   for (const record of kvEntries()) {
-    if (matchesKey(record.key, source)) byKey.set(record.key, record);
+    // Wallet monetary snapshots always come from durable storage, including in stale tabs.
+    if (record.key !== "ai_phone_wallet_state_v1" && matchesKey(record.key, source)) byKey.set(record.key, record);
   }
   return Array.from(byKey.values()).sort((a, b) => a.key.localeCompare(b.key));
 }
@@ -558,6 +559,18 @@ export async function importSource(
       // 静默丢弃——正是「恢复内容不全」的来源之一。
       try {
         const incoming = await deserializeStorageString(record.value, resolver);
+        if (record.key === "ai_phone_wallet_state_v1") {
+          const parsed = JSON.parse(incoming);
+          if (!parsed || !Array.isArray(parsed.cards) || !Array.isArray(parsed.transactions)
+            || (parsed.paymentLedger && (parsed.paymentLedger.version !== 1 || !parsed.paymentLedger.records || !parsed.paymentLedger.drafts))) throw new Error("钱包备份无效");
+          // Restore one complete monetary snapshot; never merge a ledger independently of its balance.
+          const outcome = await kvUpdateAtomic(record.key, existing => ({
+            value: existing !== null && !overwrite ? existing : incoming,
+            result: existing === null ? "added" as const : overwrite ? "overwritten" as const : "skipped" as const,
+          }));
+          result[outcome] += 1;
+          continue;
+        }
         const existing = kvGet(record.key);
         const exists = existing !== null;
         if (!exists) {

@@ -227,13 +227,17 @@ export function WalletPanel({ onBack }: WalletPanelProps) {
     setTransferLockedCardId(null);
   }
 
-  function handleBalanceTransfer() {
+  const walletBusy = useRef(false);
+  async function handleBalanceTransfer() {
+    if (walletBusy.current) return;
+    walletBusy.current = true;
+    try {
     if (!selectedTransferCard || !balanceTransferMode) return;
     const result = transferScope === "card"
-      ? adjustWalletCardAccount(selectedTransferCard.id, Number(transferAmount), balanceTransferMode === "deposit" ? "in" : "out")
+      ? await adjustWalletCardAccount(selectedTransferCard.id, Number(transferAmount), balanceTransferMode === "deposit" ? "in" : "out")
       : balanceTransferMode === "deposit"
-        ? transferCardToWalletBalance(selectedTransferCard.id, Number(transferAmount))
-        : transferWalletBalanceToCard(selectedTransferCard.id, Number(transferAmount));
+        ? await transferCardToWalletBalance(selectedTransferCard.id, Number(transferAmount))
+        : await transferWalletBalanceToCard(selectedTransferCard.id, Number(transferAmount));
     if (!result.ok) {
       setError(result.error ?? (
         transferScope === "card"
@@ -245,11 +249,17 @@ export function WalletPanel({ onBack }: WalletPanelProps) {
     setError(null);
     refresh(result.state);
     closeBalanceTransfer();
+
+    } catch (error) { setError(error instanceof Error ? error.message : "钱包保存失败，请重试"); }
+    finally { walletBusy.current = false; }
   }
 
-  function handleAddCard() {
+  async function handleAddCard() {
+    if (walletBusy.current) return;
+    walletBusy.current = true;
+    try {
     const tail = newCardTail.replace(/\D/g, "").slice(-4);
-    const next = createWalletCard({
+    const next = await createWalletCard({
       title: newCardTitle,
       maskedNumber: tail ? `**** **** **** ${tail}` : undefined,
       balance: Number(newCardBalance),
@@ -267,11 +277,17 @@ export function WalletPanel({ onBack }: WalletPanelProps) {
     setNewCardTail("");
     setNewCardBalance("0");
     setNewCardStyle("graphite");
+
+    } catch (error) { setError(error instanceof Error ? error.message : "钱包保存失败，请重试"); }
+    finally { walletBusy.current = false; }
   }
 
-  function handleDeleteCard() {
+  async function handleDeleteCard() {
+    if (walletBusy.current) return;
+    walletBusy.current = true;
+    try {
     if (!deleteCardId) return;
-    const result = deleteWalletCard(deleteCardId);
+    const result = await deleteWalletCard(deleteCardId);
     if (!result.ok) {
       setError(result.error ?? "删除失败。");
       setDeleteCardId(null);
@@ -280,6 +296,9 @@ export function WalletPanel({ onBack }: WalletPanelProps) {
     setError(null);
     refresh(result.state);
     setDeleteCardId(null);
+
+    } catch (error) { setError(error instanceof Error ? error.message : "钱包保存失败，请重试"); }
+    finally { walletBusy.current = false; }
   }
 
   const transferCardLocked = transferScope === "card" || Boolean(transferLockedCardId);

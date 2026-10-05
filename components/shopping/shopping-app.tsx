@@ -963,7 +963,11 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
     setPaymentRequestError(null);
   }
 
-  function handleCheckout() {
+  const checkoutBusy = useRef(false);
+  async function handleCheckout() {
+    if (checkoutBusy.current) return;
+    checkoutBusy.current = true;
+    try {
     if (state.cartItems.length === 0) return;
     const order = buildOrderFromCart(state.cartItems, formatShoppingAmount(cartTotals.totalPayment), state.settings);
     const paymentSource = selectedPaymentSource;
@@ -971,7 +975,7 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
       setPaymentError("请选择付款方式。");
       return;
     }
-    const paymentResult = payWithWalletAccount({
+    const paymentResult = await payWithWalletAccount({
       accountId: paymentSource.id,
       amount: cartTotals.totalPayment,
       title: "购物付款",
@@ -1001,6 +1005,9 @@ export function ShoppingApp({ onClose, visible = true, onIdle, onBusyChange }: S
     setSelectedOrderId(paidOrder.id);
     setPaymentError(null);
     setConfirmCheckoutOpen(false);
+
+    } catch (error) { setPaymentError(error instanceof Error ? error.message : "钱包保存失败，请重试"); }
+    finally { checkoutBusy.current = false; }
   }
 
   function openProduct(product: ShoppingProduct | ShoppingCartItem | ShoppingOrder["items"][number], defaults?: { tagLabel?: string; detailLabel?: string }) {
