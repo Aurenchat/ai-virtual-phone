@@ -1,7 +1,9 @@
 import { kvReadFresh } from "./kv-db";
 import { mutateWallet, WALLET_STATE_KEY, WALLET_BALANCE_ACCOUNT_ID } from "./wallet-storage";
 import type { WalletState, WalletTransaction } from "./wallet-types";
-import { allocatePacketFen, toFen, validatePacket } from "./payment-money";
+import { allocatePacketFen, toFen } from "./payment-money";
+import { convertToCnyFen, normalizeCurrency, paymentMinor, validateCurrencyPacket, type PaymentCurrency } from "./payment-currency";
+import { validateFxQuote, type PaymentFxQuote, type PaymentSettlement } from "./payment-fx";
 
 export const LEGACY_REFUND_ERROR = "该旧交易缺少可验证的原始扣款记录，无法安全自动退款，请人工核对。";
 export type PaymentKind = "transfer" | "red_packet";
@@ -13,18 +15,22 @@ export type PaymentInput = {
   status?: PaymentStatus; protocol?: 1; createdAt?: string;
   walletTransactionId?: string; walletRefundTransactionId?: string; walletDepositTransactionId?: string;
   claimedAmounts?: Record<string, number>;
+  currency?: PaymentCurrency;
 };
 export type PaymentOperation = {
   key: string; paymentId: string; action: PaymentAction; actorId: string; deltaFen: number;
   amountFen: number; committedAt: string; transactionId?: string;
+  settlement?: PaymentSettlement;
 };
 export type PaymentRecord = {
   id: string; sessionId: string; kind: PaymentKind; fromUser: boolean; totalFen: number; count: number;
   label: string; senderName?: string; recipientId?: string; recipientName?: string; createdAt: string;
   status: PaymentStatus; legacyTerminal: boolean; published?: boolean;
-  claims: Array<{ actorId: string | null; name: string; fen: number }>;
+  claims: Array<{ actorId: string | null; name: string; fen: number; originalMinor?: number }>;
   operations: Record<string, PaymentOperation>;
   legacyDebitId?: string; legacyDepositId?: string; legacyRefundId?: string;
+  currency?: PaymentCurrency; originalMinor?: number; fxQuote?: PaymentFxQuote;
+  // Foreign claims retain original units separately; fen remains CNY only.
 };
 export type PaymentLedger = { version: 1; records: Record<string, PaymentRecord>; drafts: Record<string, string> };
 const recordKey = (id: string) => JSON.stringify([id]);
@@ -37,20 +43,23 @@ function ledger(state: WalletState): PaymentLedger {
 }
 function ensure(state: WalletState, input: PaymentInput): PaymentRecord {
   const store = ledger(state), key = recordKey(input.id);
+  const currency = normalizeCurrency(input.currency);
+  const minor = currency === "CNY" ? toFen(input.amount) : paymentMinor(input.amount, currency);
   const existing = store.records[key];
   if (existing) {
     if (existing.sessionId !== input.sessionId || existing.kind !== input.kind || existing.fromUser !== input.fromUser
-      || existing.totalFen !== toFen(input.amount) || existing.count !== (input.count || 1)) throw new Error("支付信息与已保存凭据不一致");
+      || (existing.originalMinor ?? existing.totalFen) !== minor || normalizeCurrency(existing.currency) !== currency
+      || existing.count !== (input.count || 1)) throw new Error("支付信息与已保存凭据不一致");
     return existing;
   }
   if (!input.id || !input.sessionId) throw new Error("缺少稳定支付标识");
-  const totalFen = toFen(input.amount), count = input.kind === "red_packet" ? input.count || 1 : 1;
-  if (totalFen <= 0) throw new Error("金额无效");
+  const totalFen = currency === "CNY" ? minor : 0, count = input.kind === "red_packet" ? input.count || 1 : 1;
+  if (minor <= 0) throw new Error("金额无效");
   const terminal = input.status && input.status !== "pending";
   // Any new-protocol message without its ledger may be a partial restore.
   // Never infer a missing monetary commit from the display state.
   if (input.protocol === 1) throw new Error("支付凭据缺失，请恢复包含钱包的完整备份后重试");
-  if (!terminal && input.kind === "red_packet") validatePacket(totalFen, count);
+  if (!terminal && input.kind === "red_packet") validateCurrencyPacket(minor, count, currency);
   const claims = Object.entries(input.claimedAmounts || {}).map(([name, amount]) => ({ actorId: null, name, fen: toFen(amount) }));
   const record: PaymentRecord = {
     id: input.id, sessionId: input.sessionId, kind: input.kind, fromUser: input.fromUser, totalFen, count,
@@ -58,6 +67,7 @@ function ensure(state: WalletState, input: PaymentInput): PaymentRecord {
     createdAt: input.createdAt || new Date().toISOString(), status: input.status || "pending", legacyTerminal: Boolean(terminal),
     claims, operations: {}, legacyDebitId: input.walletTransactionId, legacyDepositId: input.walletDepositTransactionId,
     legacyRefundId: input.walletRefundTransactionId,
+    currency, originalMinor: minor,
   };
   store.records[key] = record;
   return record;
@@ -77,7 +87,7 @@ export async function preparePayment(input: PaymentInput): Promise<PaymentRecord
   return mutateWallet((state, save) => { const record = ensure(state, input); save(state); return record; });
 }
 
-export async function executePayment(input: PaymentInput, action: PaymentAction, actor: { id: string; name: string; isUser: boolean }): Promise<PaymentRecord> {
+export async function executePayment(input: PaymentInput, action: PaymentAction, actor: { id: string; name: string; isUser: boolean }, quote?: PaymentFxQuote): Promise<PaymentRecord> {
   return mutateWallet((state, save) => {
     const record = ensure(state, input), key = operationKey(record.id, action, actor.id);
     if (!actor.id || actor.isUser !== (actor.id === "self")) throw new Error("操作人身份无效");
@@ -88,8 +98,22 @@ export async function executePayment(input: PaymentInput, action: PaymentAction,
       if (record.recipientId && record.recipientId !== actor.id) throw new Error("不是指定收款人");
       if (!record.recipientId && record.recipientName && record.recipientName !== actor.name) throw new Error("不是指定收款人");
     }
-    let deltaFen = 0, amountFen = record.totalFen;
+    const currency = normalizeCurrency(record.currency), originalMinor = record.originalMinor ?? record.totalFen;
+    let deltaFen = 0, amountFen = record.totalFen, actionMinor = originalMinor;
     const send = Object.values(record.operations).find(op => op.action === "send");
+    // Fetch happens before the transaction. The first packet allocation locks one
+    // package quote, including character claims; later participants reuse it.
+    const needsFx = currency !== "CNY" && action !== "return"
+      && (action === "send" || actor.isUser || record.kind === "red_packet");
+    if (needsFx && !record.fxQuote) {
+      validateFxQuote(quote, currency);
+      record.fxQuote = { ...quote };
+      record.totalFen = convertToCnyFen(originalMinor, currency, quote.rateToCny);
+    }
+    if (record.fxQuote) {
+      validateFxQuote(record.fxQuote, currency, false);
+      amountFen = convertToCnyFen(originalMinor, currency, record.fxQuote.rateToCny);
+    }
     if (action === "send") {
       if (!record.fromUser || !actor.isUser) throw new Error("无效的付款操作");
       deltaFen = -record.totalFen;
@@ -123,8 +147,15 @@ export async function executePayment(input: PaymentInput, action: PaymentAction,
       if (record.kind === "red_packet") {
         if (action !== "claim") throw new Error("红包操作无效");
         if (record.claims.some(c => c.actorId === actor.id || c.actorId === null && c.name === actor.name) || actor.isUser && record.legacyDepositId) { save(state); return record; }
-        amountFen = allocatePacketFen(record.totalFen, record.claims.map(c => c.fen), record.count);
-        record.claims.push({ actorId: actor.id, name: actor.name, fen: amountFen });
+        const previousMinor = record.claims.reduce((sum, c) => sum + (c.originalMinor ?? c.fen), 0);
+        actionMinor = allocatePacketFen(originalMinor, record.claims.map(c => c.originalMinor ?? c.fen), record.count);
+        // Cumulative rounding distributes fractional fen without losing or creating
+        // a fen over the whole package. Every share keeps its original units.
+        amountFen = record.fxQuote
+          ? convertToCnyFen(previousMinor + actionMinor, currency, record.fxQuote.rateToCny)
+            - convertToCnyFen(previousMinor, currency, record.fxQuote.rateToCny)
+          : actionMinor;
+        record.claims.push({ actorId: actor.id, name: actor.name, fen: amountFen, originalMinor: actionMinor });
         if (record.claims.length === record.count) record.status = "opened";
       } else {
         if (action !== "collect") throw new Error("转账操作无效");
@@ -137,6 +168,10 @@ export async function executePayment(input: PaymentInput, action: PaymentAction,
     if (toFen(nextFen / 100) !== nextFen || toFen(deltaFen / 100) !== deltaFen) throw new Error("金额超出可精确保存范围");
     const committedAt = new Date().toISOString();
     const operation: PaymentOperation = { key, paymentId: record.id, action, actorId: actor.id, deltaFen, amountFen, committedAt };
+    if (currency !== "CNY" && record.fxQuote && (action === "send" || action === "return" && record.fromUser || actor.isUser)) {
+      operation.settlement = { currency, originalMinor: actionMinor, rateToCny: record.fxQuote.rateToCny,
+        settledCnyFen: Math.abs(deltaFen), settledAt: committedAt, rateDate: record.fxQuote.rateDate };
+    }
     if (deltaFen !== 0) {
       const title = action === "send" ? (record.kind === "red_packet" ? "发红包" : "发转账")
         : action === "return" ? (record.kind === "red_packet" ? "红包退回" : "转账退回")

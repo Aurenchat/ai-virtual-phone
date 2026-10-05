@@ -1,13 +1,15 @@
 import { chatDb } from "./chat-db";
 import { persistPaymentMediaData, pushChatMessage, type ChatMessage } from "./chat-storage";
 import { executePayment, preparePayment, readPaymentRecords, markPaymentPublished, type PaymentRecord, type PaymentInput, type PaymentAction } from "./payment-ledger";
+import { fromPaymentMinor, normalizeCurrency } from "./payment-currency";
+import { getPaymentFxQuote, type PaymentFxQuote } from "./payment-fx";
 
 export function paymentInput(msg: ChatMessage): PaymentInput {
   if (msg.mediaType !== "transfer" && msg.mediaType !== "red_packet") throw new Error("不是支付消息");
   const data = msg.mediaData || {};
   return {
     id: data.paymentId || msg.id, sessionId: msg.sessionId, kind: msg.mediaType, fromUser: msg.role === "user",
-    amount: data.amount || 0, count: data.count || 1, label: data.label, senderName: data.senderName || msg.senderName,
+    amount: data.amount || 0, currency: normalizeCurrency(data.currency), count: data.count || 1, label: data.label, senderName: data.senderName || msg.senderName,
     recipientId: data.recipientId, recipientName: data.recipientName, createdAt: msg.createdAt,
     status: data.status as PaymentInput["status"], protocol: data.paymentProtocol,
     claimedAmounts: data.claimedAmounts, walletTransactionId: data.walletTransactionId,
@@ -18,10 +20,12 @@ export function paymentInput(msg: ChatMessage): PaymentInput {
 export function paymentProjection(record: PaymentRecord): ChatMessage["mediaData"] {
   const operations = Object.values(record.operations);
   return {
-    paymentId: record.id, paymentProtocol: 1, paymentRevision: operations.length, amount: record.totalFen / 100, count: record.count,
+    paymentId: record.id, paymentProtocol: 1, paymentRevision: operations.length,
+    amount: fromPaymentMinor(record.originalMinor ?? record.totalFen, record.currency), currency: normalizeCurrency(record.currency), count: record.count,
+    paymentFxQuote: record.fxQuote, paymentSettlement: operations.filter(op => op.settlement).at(-1)?.settlement,
     label: record.label, senderName: record.senderName, recipientId: record.recipientId, recipientName: record.recipientName,
     status: record.status,
-    claimedBy: record.claims.map(c => c.name), claimedAmounts: Object.fromEntries(record.claims.map(c => [c.name, c.fen / 100])),
+    claimedBy: record.claims.map(c => c.name), claimedAmounts: Object.fromEntries(record.claims.map(c => [c.name, fromPaymentMinor(c.originalMinor ?? c.fen, record.currency)])),
     walletTransactionId: operations.find(op => op.action === "send")?.transactionId || record.legacyDebitId,
     walletRefundTransactionId: operations.find(op => op.action === "return")?.transactionId || record.legacyRefundId,
     walletDepositTransactionId: operations.find(op => (op.action === "claim" || op.action === "collect") && op.deltaFen > 0)?.transactionId || record.legacyDepositId,
@@ -34,10 +38,13 @@ async function project(msg: ChatMessage, record: PaymentRecord): Promise<ChatMes
   return { ...msg, mediaData: saved };
 }
 
-export async function settleChatPayment(msg: ChatMessage, action: PaymentAction, actor: { id: string; name: string; isUser: boolean }): Promise<ChatMessage> {
+export async function settleChatPayment(msg: ChatMessage, action: PaymentAction, actor: { id: string; name: string; isUser: boolean }, previewQuote?: PaymentFxQuote): Promise<ChatMessage> {
   const input = paymentInput(msg);
-  await preparePayment(input);
-  const committed = await executePayment(input, action, actor);
+  const record = await preparePayment(input);
+  const needsFx = action !== "return" && record.status === "pending" && !record.legacyTerminal
+    && !record.fxQuote && (actor.isUser || record.kind === "red_packet");
+  const quote = needsFx ? previewQuote || await getPaymentFxQuote(input.currency) : undefined;
+  const committed = await executePayment(input, action, actor, quote);
   // Failure here is recoverable: the next call returns the same wallet operation.
   return project(msg, committed);
 }
@@ -59,8 +66,10 @@ async function publish(record: PaymentRecord): Promise<ChatMessage> {
   return projected;
 }
 
-export async function sendChatPayment(input: PaymentInput, userName: string): Promise<ChatMessage> {
-  const committed = await executePayment(input, "send", { id: "self", name: userName, isUser: true });
+export async function sendChatPayment(input: PaymentInput, userName: string, previewQuote?: PaymentFxQuote): Promise<ChatMessage> {
+  const existing = (await readPaymentRecords()).find(r => r.id === input.id);
+  const quote = existing?.fxQuote || previewQuote || await getPaymentFxQuote(input.currency);
+  const committed = await executePayment(input, "send", { id: "self", name: userName, isUser: true }, quote);
   return publish(committed);
 }
 

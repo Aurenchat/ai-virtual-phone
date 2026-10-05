@@ -9,7 +9,7 @@
  *   5. Parse each segment for rich-media markers (direct matching, no placeholders)
  */
 
-import { toFen, validatePacket } from "./payment-money";
+import { normalizeCurrency, paymentMinor, validateCurrencyPacket } from "./payment-currency";
 import type { ChatMessage } from "./chat-storage";
 import type { StateValue } from "./chat-storage";
 import { parseStateValues, mergeStateValues } from "./state-value-parser";
@@ -70,6 +70,21 @@ const RICH_PATTERNS: {
     regex: RegExp;
     build: (m: RegExpMatchArray) => ParsedMessagePart;
 }[] = [
+    {
+        // Additive currency prefix: old amount-first directives remain valid.
+        regex: /\[红包[：:]((?!\d)[^\]：:]+)[：:](\d+(?:\.\d+)?)[：:](?:(\d+)[：:])?([^\]]*)\]/,
+        build: m => {
+            try { return { content: "", mediaType: "red_packet", mediaData: { currency: normalizeCurrency(m[1]), amount: Number(m[2]), count: Number(m[3] || 1), label: m[4] || "恭喜发财", status: "pending" } }; }
+            catch { return { content: "交易币种不受支持，未创建红包" }; }
+        },
+    },
+    {
+        regex: /\[转账[：:]((?!\d)[^\]：:]+)[：:](\d+(?:\.\d+)?)[：:]([^\]：:]*?)(?:[：:]([^\]：:]*?)[：:]([^\]]*?))?\]/,
+        build: m => {
+            try { return { content: "", mediaType: "transfer", mediaData: { currency: normalizeCurrency(m[1]), amount: Number(m[2]), label: m[3]?.trim() || "转账", senderName: m[4]?.trim() || "", recipientName: m[5]?.trim() || "", status: "pending" } }; }
+            catch { return { content: "交易币种不受支持，未创建转账" }; }
+        },
+    },
     {
         // 3段格式：[红包:金额:个数:留言]
         regex: new RegExp(`\\[红包${C}(\\d+(?:\\.\\d+)?)${C}(\\d+)${C}([^\\]]*)\\]`),
@@ -598,9 +613,15 @@ function parseSegment(segment: string, parts: ParsedMessagePart[]) {
         // `before` is guaranteed marker-free (we chose the earliest marker).
         if (before) parts.push({ content: before });
         const part = best.build();
-        if (part.mediaType === "red_packet") {
-            try { validatePacket(toFen(part.mediaData?.amount || 0), part.mediaData?.count || 1); }
-            catch { part.mediaType = undefined; part.mediaData = undefined; part.content = "红包总金额不足，每人至少需要0.01元"; }
+        if (part.mediaType === "red_packet" || part.mediaType === "transfer") {
+            try {
+                const currency = normalizeCurrency(part.mediaData?.currency);
+                const minor = paymentMinor(part.mediaData?.amount || 0, currency);
+                if (minor <= 0) throw new Error("金额无效");
+                if (part.mediaType === "red_packet") validateCurrencyPacket(minor, part.mediaData?.count || 1, currency);
+                part.mediaData = { ...part.mediaData, currency };
+            }
+            catch (error) { part.mediaType = undefined; part.mediaData = undefined; part.content = error instanceof Error ? error.message : "支付金额无效"; }
         }
         parts.push(part);
         if (after) parseSegment(after, parts);

@@ -1,4 +1,5 @@
 // lib/short-term-assembler.ts
+import { paymentDirective } from "./payment-directive";
 // Reads native app data (chat messages, moments posts/comments) and provides
 // a unified timeline. Replaces the old ShortTermEvent IndexedDB approach.
 // Used by: memory-bank-page (UI display), memory-summarizer (summarization input).
@@ -226,17 +227,10 @@ export function loadNativeTimeline(
                 else if (msg.mediaType === "audio") content = `[语音条:${msg.mediaData?.label || "语音消息"}]`;
                 else if (msg.mediaType === "image") content = formatPhotoDirectiveForPrompt(msg);
                 else if (msg.mediaType === "red_packet") {
-                    const cnt = msg.mediaData?.count;
-                    content = cnt && cnt > 1
-                        ? `[红包:${msg.mediaData?.amount ?? 0}:${cnt}:${msg.mediaData?.label || "恭喜发财"}]`
-                        : `[红包:${msg.mediaData?.amount ?? 0}:${msg.mediaData?.label || "恭喜发财"}]`;
+                    content = paymentDirective(msg);
                 }
                 else if (msg.mediaType === "transfer") {
-                    const sn = msg.mediaData?.senderName;
-                    const rn = msg.mediaData?.recipientName;
-                    content = sn && rn
-                        ? `[转账:${msg.mediaData?.amount ?? 0}:${msg.mediaData?.label || "转账"}:${sn}:${rn}]`
-                        : `[转账:${msg.mediaData?.amount ?? 0}:${msg.mediaData?.label || "转账"}]`;
+                    content = paymentDirective(msg);
                 }
                 else if (msg.mediaType === "contact_card") {
                     content = `[名片:${msg.mediaData?.contactCardName || msg.mediaData?.label || "联系人"}]`;
@@ -336,8 +330,7 @@ export function loadNativeTimeline(
                 if (msg.mediaType === "sticker") content = `[表情包:${msg.mediaData?.label || "贴纸"}]`;
                 else if (msg.mediaType === "audio") content = `[语音条:${msg.mediaData?.label || "语音消息"}]`;
                 else if (msg.mediaType === "image") content = formatPhotoDirectiveForPrompt(msg);
-                else if (msg.mediaType === "red_packet") content = `[红包:${msg.mediaData?.amount ?? 0}:${msg.mediaData?.label || "恭喜发财"}]`;
-                else if (msg.mediaType === "transfer") content = `[转账:${msg.mediaData?.amount ?? 0}:${msg.mediaData?.label || "转账"}]`;
+                else if (msg.mediaType === "red_packet" || msg.mediaType === "transfer") content = paymentDirective(msg);
                 else if (msg.mediaType === "contact_card") {
                     content = `[名片:${msg.mediaData?.contactCardName || msg.mediaData?.label || "联系人"}]`;
                 }

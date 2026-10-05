@@ -1,4 +1,5 @@
 // lib/llm-prompt-assembler.ts
+import { paymentDirective } from "./payment-directive";
 
 import { Character } from "./character-types";
 import { ChatMessage } from "./chat-storage";
@@ -1148,17 +1149,10 @@ export function formatRichMediaForHistory(msg: ChatMessage, userName: string, ch
         case "reading_discuss":
             return formatReadingQuoteContent(msg);
         case "red_packet": {
-            const cnt = d?.count;
-            return isGroup && cnt && cnt > 1
-                ? `[红包:${d?.amount ?? 0}:${cnt}:${d?.label ?? "恭喜发财"}]`
-                : `[红包:${d?.amount ?? 0}:${d?.label ?? "恭喜发财"}]`;
+            return paymentDirective(msg, isGroup);
         }
         case "transfer": {
-            const sn = d?.senderName;
-            const rn = d?.recipientName;
-            return isGroup && sn && rn
-                ? `[转账:${d?.amount ?? 0}:${d?.label ?? "转账"}:${sn}:${rn}]`
-                : `[转账:${d?.amount ?? 0}:${d?.label ?? "转账"}]`;
+            return paymentDirective(msg, isGroup);
         }
         case "gift": {
             return formatGiftForPrompt(msg, isGroup);

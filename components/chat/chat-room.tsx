@@ -65,6 +65,7 @@ import { formatChatUiTime } from "@/lib/chat-time";
 import { parseActionTags } from "@/lib/action-parser";
 import { kvGet, kvSet, kvRemove } from "@/lib/kv-db";
 import { settleChatPayment, sendChatPayment, reconcilePaymentMessage, recoverPaymentPublications } from "@/lib/payment-chat";
+import { formatPaymentAmount, normalizeCurrency } from "@/lib/payment-currency";
 import { sendNativeGift, takeNativeGift, NATIVE_GIFT_QUEUED, type NativeGiftCandidate } from "@/lib/native-gift-bridge";
 import { settleShoppingPaymentRequest } from "@/lib/shopping-payment-request";
 import type { RegexConfig } from "@/lib/settings-types";
@@ -2134,7 +2135,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         if (actionType === "accept_red_packet") {
             newStatus = "opened";
             const amt = targetMsg.mediaData?.amount;
-            const amtStr = amt != null ? `，金额:${amt}元` : "";
+            const amtStr = amt != null ? `，金额:${formatPaymentAmount(amt, targetMsg.mediaData?.currency)} ${normalizeCurrency(targetMsg.mediaData?.currency)}` : "";
             sysText = `${charN}领取了${userN}的红包${amtStr}`;
             rawResponseText = `[${charN}领取了${userN}的红包]`;
         } else if (actionType === "decline_red_packet") {
@@ -2243,7 +2244,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             const sysMsg = pushChatMessage({
                 sessionId: session.id,
                 role: "assistant",
-                content: `${claimerName}领取了${ownerDisplay}的红包，金额:${share}元`,
+                content: `${claimerName}领取了${ownerDisplay}的红包，金额:${formatPaymentAmount(share, updatedData?.currency)} ${normalizeCurrency(updatedData?.currency)}`,
                 mediaType: "accept_red_packet",
                 mediaData: { claimer: claimerName, owner: ownerDisplay },
                 senderName: claimerName,
@@ -3356,9 +3357,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         if (!ensureGroupSpeakPermission()) return false;
         if (isGenerating) { showChatToast("请先等待对方回复"); return false; }
         const msg = await sendChatPayment({ id, sessionId: session.id, kind, fromUser: true,
-            amount: data.amount || 0, count: data.count, label: data.label,
+            amount: data.amount || 0, currency: data.currency, count: data.count, label: data.label,
             senderName: userIdentity?.name || "你", recipientId: data.recipientId, recipientName: data.recipientName,
-        }, userIdentity?.name || "你");
+        }, userIdentity?.name || "你", data.paymentFxQuote);
         cancelFollowUp(session.id);
         setMessages(prev => prev.some(m => m.id === msg.id) ? prev.map(m => m.id === msg.id ? msg : m) : [...prev, msg]);
         setPendingGenerate(true);
@@ -6442,8 +6443,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     sessionId={session.id}
                     mode="red_packet"
                     isGroup={session.isGroup}
-                    onSend={async (amount, label, count, paymentId) => {
-                        const sent = await sendMoneyMessage("red_packet", { amount, label, status: "pending", count: count || 1 }, paymentId!);
+                    onSend={async (amount, label, count, paymentId, currency, paymentFxQuote) => {
+                        const sent = await sendMoneyMessage("red_packet", { amount, label, currency, paymentFxQuote, status: "pending", count: count || 1 }, paymentId!);
                         if (sent) setRichModal(null);
                     }}
                     onClose={() => setRichModal(null)}
@@ -6463,10 +6464,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 <RedPacketModal
                     sessionId={session.id}
                     mode="transfer"
-                    onSend={async (amount, label, _count, paymentId) => {
+                    onSend={async (amount, label, _count, paymentId, currency, paymentFxQuote) => {
                         if (session.isGroup && transferTarget) {
                             const sent = await sendMoneyMessage("transfer", {
-                                amount, label, status: "pending",
+                                amount, label, currency, paymentFxQuote, status: "pending",
                                 senderName: userIdentity?.name || "你",
                                 recipientId: transferTarget.id,
                                 recipientName: transferTarget.name,
@@ -6476,7 +6477,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                 setTransferTarget(null);
                             }
                         } else {
-                            const sent = await sendMoneyMessage("transfer", { amount, label, status: "pending" }, paymentId!);
+                            const sent = await sendMoneyMessage("transfer", { amount, label, currency, paymentFxQuote, status: "pending" }, paymentId!);
                             if (sent) setRichModal(null);
                         }
                     }}

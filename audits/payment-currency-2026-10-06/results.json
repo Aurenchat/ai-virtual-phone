@@ -1,0 +1,231 @@
+{
+  "checks": [
+    "five currency formats, strict units, aliases, legacy CNY",
+    "FX cache/coalescing, timeout, malformed/provider/stale errors, retry, CNY no fetch",
+    "foreign collect concurrency, frozen settlement, no quote replay",
+    "foreign send and refund once; refund uses debit without new FX",
+    "FX missing/stale fails closed with no wallet effect; return allowed",
+    "JPY/KRW integer groups, single packet currency and cumulative CNY rounding",
+    "role to role transfer remains no wallet; group recipient preserved",
+    "foreign wallet commit / ChatDB failure then no-network reconcile",
+    "AI currency directives, legacy syntax and history preserve currency",
+    "foreign backup restore retains quote/settlement and idempotency",
+    "single plain transfer equal size/directional tails",
+    "single plain red_packet equal size/directional tails",
+    "packet collapsed amount hidden",
+    "single wallpaper transfer equal size/directional tails",
+    "single wallpaper red_packet equal size/directional tails",
+    "packet collapsed amount hidden",
+    "group plain transfer equal size/directional tails",
+    "group plain red_packet equal size/directional tails",
+    "packet collapsed amount hidden",
+    "group wallpaper transfer equal size/directional tails",
+    "group wallpaper red_packet equal size/directional tails",
+    "packet collapsed amount hidden",
+    "returned strike through",
+    "long note at most two lines",
+    "FX loading disables collect",
+    "FX loading permits return",
+    "completed detail frozen CNY",
+    "completed detail no actions",
+    "provider failure disables claim",
+    "provider failure permits return",
+    "detail retry restores FX preview",
+    "transfer group=false send confirms CNY debit",
+    "transfer group=true send confirms CNY debit",
+    "red_packet group=false send confirms CNY debit",
+    "red_packet group=true send confirms CNY debit",
+    "send modal persists original currency and frozen quote",
+    "group recipient and packet count preserved",
+    "continuous payment cards only last has tail",
+    "reload settlement replay requires no FX",
+    "no uncaught browser errors"
+  ],
+  "boxes": [
+    {
+      "group": false,
+      "wallpaper": false,
+      "kind": "transfer",
+      "metrics": [
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n$1,000.00\n晚饭钱\n◷ 待收款",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "assistant"
+        },
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n$1,000.00\n晚饭钱\n◷ 待收款",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "user"
+        }
+      ]
+    },
+    {
+      "group": false,
+      "wallpaper": false,
+      "kind": "red_packet",
+      "metrics": [
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n晚饭钱\n红包\n◷ 0/4 已领取",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "assistant"
+        },
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n晚饭钱\n红包\n◷ 0/4 已领取",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "user"
+        }
+      ]
+    },
+    {
+      "group": false,
+      "wallpaper": true,
+      "kind": "transfer",
+      "metrics": [
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n$1,000.00\n晚饭钱\n◷ 待收款",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "assistant"
+        },
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n$1,000.00\n晚饭钱\n◷ 待收款",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "user"
+        }
+      ]
+    },
+    {
+      "group": false,
+      "wallpaper": true,
+      "kind": "red_packet",
+      "metrics": [
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n晚饭钱\n红包\n◷ 0/4 已领取",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "assistant"
+        },
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n晚饭钱\n红包\n◷ 0/4 已领取",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "user"
+        }
+      ]
+    },
+    {
+      "group": true,
+      "wallpaper": false,
+      "kind": "transfer",
+      "metrics": [
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n$1,000.00\n晚饭钱\n◷ 待收款",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "assistant"
+        },
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n$1,000.00\n晚饭钱\n◷ 待收款",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "user"
+        }
+      ]
+    },
+    {
+      "group": true,
+      "wallpaper": false,
+      "kind": "red_packet",
+      "metrics": [
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n晚饭钱\n红包\n◷ 0/4 已领取",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "assistant"
+        },
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n晚饭钱\n红包\n◷ 0/4 已领取",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "user"
+        }
+      ]
+    },
+    {
+      "group": true,
+      "wallpaper": true,
+      "kind": "transfer",
+      "metrics": [
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n$1,000.00\n晚饭钱\n◷ 待收款",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "assistant"
+        },
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n$1,000.00\n晚饭钱\n◷ 待收款",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "user"
+        }
+      ]
+    },
+    {
+      "group": true,
+      "wallpaper": true,
+      "kind": "red_packet",
+      "metrics": [
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n晚饭钱\n红包\n◷ 0/4 已领取",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "assistant"
+        },
+        {
+          "width": 273.359375,
+          "height": 176,
+          "text": "Cash\n晚饭钱\n红包\n◷ 0/4 已领取",
+          "fill": "rgb(34, 34, 37)",
+          "tail": "block",
+          "role": "user"
+        }
+      ]
+    }
+  ],
+  "pageErrors": []
+}

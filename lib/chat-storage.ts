@@ -128,6 +128,9 @@ export type ChatMessage = {
     mediaUrl?: string;
     mediaData?: {
         paymentProtocol?: 1;
+        currency?: import("./payment-currency").PaymentCurrency;
+        paymentFxQuote?: import("./payment-fx").PaymentFxQuote;
+        paymentSettlement?: import("./payment-fx").PaymentSettlement;
         paymentRevision?: number; // Wallet-ledger projection, never the monetary truth
         paymentId?: string;
         amount?: number;          // 红包/转账金额

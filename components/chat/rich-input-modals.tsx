@@ -1,6 +1,8 @@
 "use client";
 import { reservePaymentDraft } from "@/lib/payment-ledger";
-import { toFen, validatePacket } from "@/lib/payment-money";
+import { PAYMENT_CURRENCIES, normalizeCurrency, paymentMinor, validateCurrencyPacket, type PaymentCurrency } from "@/lib/payment-currency";
+import type { PaymentFxQuote } from "@/lib/payment-fx";
+import { PaymentFxLine, usePaymentFx } from "./payment-fx-preview";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { CallSttWarningDialog, hideCallSttWarningPermanently, isCallSttWarningHidden } from "./call-stt-warning-dialog";
@@ -88,7 +90,7 @@ interface RedPacketModalProps {
     sessionId: string;
     mode: "red_packet" | "transfer";
     isGroup?: boolean;
-    onSend: (amount: number, label: string, count?: number, paymentId?: string) => void | Promise<void>;
+    onSend: (amount: number, label: string, count?: number, paymentId?: string, currency?: PaymentCurrency, quote?: PaymentFxQuote) => void | Promise<void>;
     onClose: () => void;
 }
 
@@ -96,6 +98,9 @@ export function RedPacketModal({ sessionId, mode, isGroup, onSend, onClose }: Re
     const [amount, setAmount] = useState("");
     const [label, setLabel] = useState("");
     const [count, setCount] = useState("1");
+    const [currency, setCurrency] = useState<PaymentCurrency>("CNY");
+    useEffect(() => { try { setCurrency(normalizeCurrency(localStorage.getItem("float-payment-currency") || undefined)); } catch { /* CNY default */ } }, []);
+    const fx = usePaymentFx(currency);
     const sending = useRef(false);
     const draft = useRef<Promise<string> | null>(null);
     useEffect(() => { draft.current = reservePaymentDraft(sessionId, mode); void draft.current.catch(() => {}); }, [sessionId, mode]);
@@ -114,10 +119,12 @@ export function RedPacketModal({ sessionId, mode, isGroup, onSend, onClose }: Re
         const cnt = isRedPacket ? (isGroup ? Math.max(1, parseInt(count, 10) || 1) : 1) : undefined;
         sending.current = true;
         try {
-            if (isRedPacket) validatePacket(toFen(num), cnt || 1);
+            const minor = paymentMinor(num, currency);
+            if (isRedPacket) validateCurrencyPacket(minor, cnt || 1, currency);
+            if (!fx.ready) throw new Error("正在查询最新汇率，请稍后再发送。");
             setSendError("");
             const id = await (draft.current || (draft.current = reservePaymentDraft(sessionId, mode)));
-            await onSend(num, label.trim() || defaultLabel, cnt, id);
+            await onSend(num, label.trim() || defaultLabel, cnt, id, currency, fx.quote);
         } catch (error) { setSendError(error instanceof Error ? error.message : "支付未完成，请重试"); }
         finally { sending.current = false; }
     };
@@ -137,13 +144,19 @@ export function RedPacketModal({ sessionId, mode, isGroup, onSend, onClose }: Re
                     <div className="text-white ts-16 font-semibold">{title}</div>
                 </div>
                 <div className="p-5 flex flex-col gap-3.5">
+                    <label className="ts-12">币种
+                        <select aria-label="币种" className="ui-input w-full" value={currency} onChange={e => {
+                            const code = normalizeCurrency(e.target.value); setCurrency(code);
+                            try { localStorage.setItem("float-payment-currency", code); } catch { /* Preference is optional. */ }
+                        }}>{Object.entries(PAYMENT_CURRENCIES).map(([code, info]) => <option key={code} value={code}>{info.name} {code} {info.symbol}</option>)}</select>
+                    </label>
                     <div>
                         <div className="ts-12 text-[var(--c-icon)] mb-1.5">金额</div>
                         <div className="flex items-center gap-2">
                             <span
                                 className="ts-24 font-bold"
                                 style={{ color }}
-                            >¥</span>
+                            >{PAYMENT_CURRENCIES[currency].symbol}</span>
                             <input
                                 value={amount}
                                 onChange={e => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
@@ -179,6 +192,7 @@ export function RedPacketModal({ sessionId, mode, isGroup, onSend, onClose }: Re
                             className="ui-input w-full"
                         />
                     </div>
+                    <PaymentFxLine amount={Number(amount) || 0} currency={currency} quote={fx.quote} error={fx.error} onRetry={fx.retry} />
                     {sendError && <div role="alert" className="ts-12 text-red-600">{sendError}</div>}
                     <div className="flex gap-3 mt-1">
                         <button
@@ -187,7 +201,7 @@ export function RedPacketModal({ sessionId, mode, isGroup, onSend, onClose }: Re
                         >取消</button>
                         <button
                             onClick={handleSend}
-                            disabled={!parseFloat(amount)}
+                            disabled={!parseFloat(amount) || !fx.ready}
                             className="flex-1 py-2.5 rounded-lg border-none text-white ts-14 font-semibold"
                             style={{
                                 background: parseFloat(amount) ? color : "var(--c-icon)",

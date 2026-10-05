@@ -1,11 +1,11 @@
-/** CNY boundaries only. Persist yuan for compatibility; calculate in integer fen. */
-export function toFen(value: number): number {
+/** Decimal boundary, half away from zero. Calculations use integer minor units. */
+export function toMinorUnits(value: number, decimals = 2): number {
   if (!Number.isFinite(value)) throw new Error("金额无效");
   const negative = value < 0;
   const [mantissa, exponent = "0"] = Math.abs(value).toString().toLowerCase().split("e");
   const [whole, fraction = ""] = mantissa.split(".");
   const digits = BigInt(whole + fraction);
-  const shift = 2 + Number(exponent) - fraction.length;
+  const shift = decimals + Number(exponent) - fraction.length;
   let fen: bigint;
   if (shift >= 0) fen = digits * 10n ** BigInt(shift);
   else {
@@ -15,6 +15,8 @@ export function toFen(value: number): number {
   if (fen > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("金额超出安全范围");
   return Number(fen) * (negative ? -1 : 1);
 }
+
+export const toFen = (value: number): number => toMinorUnits(value, 2);
 
 export function validatePacket(totalFen: number, count: number): void {
   if (!Number.isSafeInteger(totalFen) || !Number.isSafeInteger(count) || count < 1 || totalFen < count) {

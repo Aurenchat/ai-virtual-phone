@@ -1,5 +1,8 @@
 "use client";
 import { settleChatPayment } from "@/lib/payment-chat";
+import { CashPaymentCard } from "./cash-payment-card";
+import { PaymentFxLine, usePaymentFx } from "./payment-fx-preview";
+import { formatPaymentAmount, normalizeCurrency, PAYMENT_CURRENCIES } from "@/lib/payment-currency";
 
 import { useState, useEffect, useCallback, useRef, useMemo, useContext, useId, memo } from "react";
 import { ImessagePresentation, TranslationBody } from "./imessage-presentation";
@@ -96,9 +99,9 @@ function PluginKindBubble({ msg, kind }: { msg: ChatMessage; kind: string }) {
 export const MessageBubble = memo(function MessageBubble({ msg, onUpdate, charName, userName, onSystemMessage, groupSize, onShowDetail, characterId, onMusicPlay, onActionSelect, displayContent, defaultTranslationExpanded = false }: MessageBubbleProps) {
     switch (msg.mediaType) {
         case "red_packet":
-            return <RedPacketBubble msg={msg} charName={charName} userName={userName} groupSize={groupSize} onShowDetail={onShowDetail} />;
+            return <CashPaymentCard msg={msg} onShowDetail={onShowDetail} />;
         case "transfer":
-            return <TransferBubble msg={msg} charName={charName} userName={userName} onShowDetail={onShowDetail} />;
+            return <CashPaymentCard msg={msg} onShowDetail={onShowDetail} />;
         case "gift":
             return <GiftBubble msg={msg} />;
         case "contact_card":
@@ -1689,6 +1692,8 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
     const isPaymentRequest = msg.mediaType === "payment_request";
     const [paymentError, setPaymentError] = useState("");
     const paymentBusy = useRef(false);
+    const [settling, setSettling] = useState(false);
+    const fx = usePaymentFx(d?.currency, d?.paymentFxQuote, (isRedPacket || isTransfer) && d?.status === "pending" && !d?.paymentSettlement);
     if (!isRedPacket && !isTransfer && !isPaymentRequest) return null;
 
     const isFromUser = msg.role === "user";
@@ -1718,13 +1723,14 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
     const settle = async (action: "claim" | "collect" | "return", actionType: string, text: string) => {
         if (paymentBusy.current) return;
         paymentBusy.current = true;
+        setSettling(true);
         try {
             setPaymentError("");
-            const updated = await settleChatPayment(msg, action, { id: "self", name: userName, isUser: true });
-            const suffix = action === "claim" ? `，金额:${updated.mediaData?.claimedAmounts?.[userName] || 0}元` : "";
+            const updated = await settleChatPayment(msg, action, { id: "self", name: userName, isUser: true }, fx.quote);
+            const suffix = action === "claim" ? `，金额:${formatPaymentAmount(updated.mediaData?.claimedAmounts?.[userName] || 0, d?.currency)} ${normalizeCurrency(d?.currency)}` : "";
             onAccept(updated, text + suffix, actionType);
         } catch (error) { setPaymentError(error instanceof Error ? error.message : "支付未完成，请重试"); }
-        finally { paymentBusy.current = false; }
+        finally { paymentBusy.current = false; setSettling(false); }
     };
     const handleRedPacketAccept = () => settle("claim", "accept_red_packet", `${userName}领取了${senderDisplay}的红包`);
     const handleRedPacketDecline = () => settle("return", "decline_red_packet", `${userName}退回了${senderDisplay}的红包`);
@@ -1810,6 +1816,35 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
     const modalAmountText = typeof d?.amount === "number" && Number.isFinite(d.amount)
         ? d.amount.toFixed(2)
         : String(d?.paymentRequestAmountLabel || "0.00");
+
+    if (isRedPacket || isTransfer) {
+        const code = normalizeCurrency(d?.currency);
+        const status = isDeclined ? "已退回" : isRedPacket
+            ? alreadyClaimed ? "已领取" : allClaimed ? "红包已领完" : "待领取"
+            : isReceived ? "已收款" : "待收款";
+        return <div className="modal-overlay" onClick={onClose}>
+            <div className="cash-detail" role="dialog" aria-label={isRedPacket ? "红包详情" : "转账详情"} data-returned={isDeclined || undefined} onClick={e => e.stopPropagation()}>
+                <span className="cash-brand">Cash</span>
+                <div className="cash-detail-amount">{formatPaymentAmount(d?.amount || 0, code)}</div>
+                <div className="cash-detail-currency">{PAYMENT_CURRENCIES[code].name} · {code}</div>
+                <PaymentFxLine amount={d?.amount || 0} currency={code} quote={fx.quote} settlement={d?.paymentSettlement}
+                    error={fx.error} onRetry={fx.retry} terminal={isDeclined || isReceived || allClaimed} packageRate={isRedPacket && totalRecipients > 1 && !!d?.paymentFxQuote} />
+                <div className="cash-detail-note">{d?.label || (isRedPacket ? "恭喜发财，大吉大利" : "转账")}</div>
+                <div className="cash-detail-meta"><span>来源</span><span>{senderDisplay}</span></div>
+                {isTransfer && <div className="cash-detail-meta"><span>去向</span><span>{d?.recipientName || (isFromUser ? "对方" : userName)}</span></div>}
+                {isRedPacket && totalRecipients > 1 && <div className="cash-detail-meta"><span>拼手气红包</span><span>{claimedBy.length}/{totalRecipients} 已领取</span></div>}
+                {isRedPacket && claimedBy.length > 0 && <div className="cash-detail-list">{claimedBy.map(name => <div className="cash-detail-meta" key={name}>
+                    <span>{name}</span><span>{formatPaymentAmount(claimedAmounts[name] || 0, code)}</span>
+                </div>)}</div>}
+                <div className="cash-detail-status">{status}</div>
+                {paymentError && <div className="cash-detail-error" role="alert">{paymentError}</div>}
+                {(canClaimRedPacket || canActTransfer) && <div className="cash-detail-actions">
+                    <button disabled={settling || !fx.ready} onClick={isRedPacket ? handleRedPacketAccept : handleTransferAccept}>{isRedPacket ? "领取" : "收款"}</button>
+                    <button disabled={settling} onClick={isRedPacket ? handleRedPacketDecline : handleTransferDecline}>退回</button>
+                </div>}
+            </div>
+        </div>;
+    }
 
     return (
         <div className="modal-overlay" onClick={onClose}>
