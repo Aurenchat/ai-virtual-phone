@@ -38,7 +38,13 @@ import {
   activateCustomAppWorld,
   cancelCustomAppTask,
   cloneCustomAppVoice,
+  createCustomAppCharacter,
+  createCustomAppCharacterRelation,
+  createCustomAppCharacterWorld,
   createCustomAppNotification,
+  deleteCustomAppCharacter,
+  deleteCustomAppCharacterRelation,
+  deleteCustomAppCharacterWorld,
   deleteCustomAppTimelineEvent,
   fetchCustomAppNetwork,
   generateCustomAppGroupText,
@@ -50,7 +56,10 @@ import {
   incrementCustomAppBadge,
   loadCustomAppNotifications,
   loadCustomAppTasks,
+  listCustomAppCharacterSummaries,
+  listCustomAppCharacterWorlds,
   markCustomAppNotificationsRead,
+  moveCustomAppCharacter,
   payCustomAppWallet,
   readCustomAppBridgeState,
   readCustomAppCalendar,
@@ -83,6 +92,9 @@ import {
   suggestCustomAppMemory,
   synthesizeCustomAppSpeech,
   updateCustomAppCard,
+  updateCustomAppCharacter,
+  updateCustomAppCharacterRelation,
+  updateCustomAppCharacterWorld,
   writeCustomAppCalendar,
   writeCustomAppHistoryMessage,
   writeCustomAppCharacterState,
@@ -472,9 +484,23 @@ html, body { min-height: 100%; }
     characters: {
       list: function(){ return request('characters.list'); },
       get: function(id){ return request('characters.get', { id: id }); },
+      listSummaries: function(payload){ return request('characters.listSummaries', payload || {}); },
+      create: function(payload){ return request('characters.create', payload || {}); },
+      update: function(payload){ return request('characters.update', payload || {}); },
+      delete: function(payload){ return request('characters.delete', payload || {}); },
       readState: function(payload){ return request('characters.state.read', payload || {}); },
       writeState: function(payload){ return request('characters.state.write', payload || {}); },
       readRelations: function(payload){ return request('characters.relations.read', payload || {}); }
+    },
+    characterWorlds: {
+      list: function(payload){ return request('characterWorlds.list', payload || {}); },
+      create: function(payload){ return request('characterWorlds.create', payload || {}); },
+      update: function(payload){ return request('characterWorlds.update', payload || {}); },
+      delete: function(payload){ return request('characterWorlds.delete', payload || {}); },
+      moveCharacter: function(payload){ return request('characterWorlds.moveCharacter', payload || {}); },
+      createRelation: function(payload){ return request('characterWorlds.createRelation', payload || {}); },
+      updateRelation: function(payload){ return request('characterWorlds.updateRelation', payload || {}); },
+      deleteRelation: function(payload){ return request('characterWorlds.deleteRelation', payload || {}); }
     },
     ui: {
       toast: function(message){ return request('ui.toast', { message: message }); },
@@ -1105,7 +1131,8 @@ export function CustomAppRunner({
           calendar: ["read", "list", "write", "create", "update", "delete", "replaceWeek"],
           world: ["read", "list", "get", "write", "create", "update", "delete", "activate"],
           media: ["pick", "save", "put", "get", "revoke", "delete"],
-          characters: ["list", "get", "readState", "writeState", "readRelations"],
+          characters: ["list", "get", "listSummaries", "create", "update", "delete", "readState", "writeState", "readRelations"],
+          characterWorlds: ["list", "create", "update", "delete", "moveCharacter", "createRelation", "updateRelation", "deleteRelation"],
           chat: ["getCurrentSession", "readHistory", "sendMessage", "sendCard", "updateCard", "writeHistory", "requestReply", "openConversation", "setContactState"],
           memory: ["readCore", "readLongTerm", "readShortTerm", "search", "add", "addTimeline", "deleteTimeline", "removeTimeline", "suggest", "searchSource", "writeSource", "invalidateSource"],
           notifications: ["create", "list", "markRead", "markAllRead", "getBadge", "setBadge", "incrementBadge", "clearBadge"],
@@ -1644,6 +1671,56 @@ export function CustomAppRunner({
     if (action === "characters.get") {
       requirePermission("characters.read");
       return loadCharacters().find(character => character.id === String(record.id ?? "")) ?? null;
+    }
+    if (action === "characters.listSummaries") {
+      requirePermission("characters.read");
+      return listCustomAppCharacterSummaries(record);
+    }
+    if (action === "characters.create") {
+      requirePermission("characters.write");
+      if (record.worldId) requirePermission("characters.worlds.write");
+      return createCustomAppCharacter(record as unknown as Parameters<typeof createCustomAppCharacter>[0]);
+    }
+    if (action === "characters.update") {
+      requirePermission("characters.write");
+      return updateCustomAppCharacter(record as unknown as Parameters<typeof updateCustomAppCharacter>[0]);
+    }
+    if (action === "characters.delete") {
+      requirePermission("characters.write");
+      return deleteCustomAppCharacter(record as unknown as Parameters<typeof deleteCustomAppCharacter>[0]);
+    }
+    if (action === "characterWorlds.list") {
+      requirePermission("characters.worlds.read");
+      return listCustomAppCharacterWorlds();
+    }
+    if (action === "characterWorlds.create") {
+      requirePermission("characters.worlds.write");
+      return createCustomAppCharacterWorld(record);
+    }
+    if (action === "characterWorlds.update") {
+      requirePermission("characters.worlds.write");
+      return updateCustomAppCharacterWorld(record as unknown as Parameters<typeof updateCustomAppCharacterWorld>[0]);
+    }
+    if (action === "characterWorlds.delete") {
+      requirePermission("characters.worlds.write");
+      return deleteCustomAppCharacterWorld(record as unknown as Parameters<typeof deleteCustomAppCharacterWorld>[0]);
+    }
+    if (action === "characterWorlds.moveCharacter") {
+      requirePermission("characters.worlds.write");
+      requirePermission("characters.write");
+      return moveCustomAppCharacter(record as unknown as Parameters<typeof moveCustomAppCharacter>[0]);
+    }
+    if (action === "characterWorlds.createRelation") {
+      requirePermission("characters.relations.write");
+      return createCustomAppCharacterRelation(record as unknown as Parameters<typeof createCustomAppCharacterRelation>[0]);
+    }
+    if (action === "characterWorlds.updateRelation") {
+      requirePermission("characters.relations.write");
+      return updateCustomAppCharacterRelation(record as unknown as Parameters<typeof updateCustomAppCharacterRelation>[0]);
+    }
+    if (action === "characterWorlds.deleteRelation") {
+      requirePermission("characters.relations.write");
+      return deleteCustomAppCharacterRelation(record as unknown as Parameters<typeof deleteCustomAppCharacterRelation>[0]);
     }
     if (action === "characters.state.read") {
       requirePermission("characters.state.read");

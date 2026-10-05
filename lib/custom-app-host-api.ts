@@ -1,6 +1,20 @@
 "use client";
 
 import type { CustomAppPermission, CustomAppPromptProfile, InstalledCustomApp } from "./custom-app-types";
+export {
+  createCustomAppCharacter,
+  createCustomAppCharacterRelation,
+  createCustomAppCharacterWorld,
+  deleteCustomAppCharacter,
+  deleteCustomAppCharacterRelation,
+  deleteCustomAppCharacterWorld,
+  listCustomAppCharacterSummaries,
+  listCustomAppCharacterWorlds,
+  moveCustomAppCharacter,
+  updateCustomAppCharacter,
+  updateCustomAppCharacterRelation,
+  updateCustomAppCharacterWorld,
+} from "./custom-app-character-library-api";
 import {
   appendCustomAppTimelineEntry,
   deleteCustomAppTimelineEntries,

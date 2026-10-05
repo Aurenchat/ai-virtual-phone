@@ -1,0 +1,26 @@
+{
+  "sdkVersion": "1.0",
+  "id": "auren.target-archives",
+  "name": "Target Archives",
+  "version": "0.1.0",
+  "author": "Aurenchat",
+  "description": "轻量管理 Float 原生角色档案、角色关系与世界卷宗；直接读写原生 Character / CharacterWorldGroup 数据，不维护影子数据库。",
+  "icon": "icon.svg",
+  "entry": "index.html",
+  "primaryTags": [
+    "target_archives"
+  ],
+  "permissions": [
+    "characters.read",
+    "characters.write",
+    "characters.worlds.read",
+    "characters.worlds.write",
+    "characters.relations.write"
+  ],
+  "resources": {
+    "assets": [
+      "assets/app.css",
+      "assets/app.js"
+    ]
+  }
+}
