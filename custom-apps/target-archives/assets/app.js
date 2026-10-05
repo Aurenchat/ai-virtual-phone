@@ -117,7 +117,7 @@
   }
 
   function renderCharacters() {
-    if (state.detail) return renderDetail();
+    if (state.detail || state.detailMode === "create") return renderDetail();
     var items = state.summaries.items || [];
     var list = items.length ? '<div class="archive-list">' + items.map(function (c) {
       var tags = (c.tags || []).slice(0,3).map(function(t){ return '<span class="tag">' + esc(t) + '</span>'; }).join("");
