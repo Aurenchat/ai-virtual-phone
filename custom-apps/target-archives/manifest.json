@@ -13,6 +13,7 @@
   "permissions": [
     "characters.read",
     "characters.write",
+    "ai.generate",
     "characters.worlds.read",
     "characters.worlds.write",
     "characters.relations.write"

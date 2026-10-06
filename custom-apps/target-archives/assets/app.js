@@ -16,7 +16,13 @@
     detailWorldId: "",
     editAvatar: undefined,
     relationWorldId: "",
-    worldExpandedId: ""
+    worldExpandedId: "",
+    npcResults: [],
+    npcHint: "",
+    npcCount: 1,
+    npcAllowAutoPost: false,
+    npcBusy: "",
+    npcError: ""
   };
 
   var app = document.getElementById("app");
@@ -166,6 +172,7 @@
     return '<div class="detail-actions">' +
       '<button class="button" data-action="back-list">← 返回列表</button>' +
       '<button class="button primary" data-action="edit-character">编辑</button>' +
+      '<button class="button" data-action="generate-npcs">生成相关 NPC</button>' +
       '<button class="button danger" data-action="delete-character">删除</button>' +
     '</div>' +
     '<section class="panel">' +
@@ -207,7 +214,9 @@
       '<label class="label">时区<input class="field" name="timeZone" value="' + attr(c.timeZone || "") + '" placeholder="例如 America/New_York；留空=系统"></label>' +
       '<label class="label">Persona / Traits<textarea class="textarea" name="persona">' + esc(c.persona || "") + '</textarea></label>' +
       '<label class="label">Personality<textarea class="textarea" name="personality">' + esc(c.personality || "") + '</textarea></label>' +
-      '<label class="label">Brief Persona<textarea class="textarea" name="briefPersona">' + esc(c.briefPersona || "") + '</textarea></label>' +
+      '<label class="label"><span class="field-label-row"><span>Brief Persona</span>' +
+        (isCreate ? '' : '<button class="button compact" type="button" data-action="generate-brief">' + (c.briefPersona ? "重新生成" : "AI 生成") + '</button>') +
+        '</span><textarea class="textarea" name="briefPersona">' + esc(c.briefPersona || "") + '</textarea></label>' +
       '<div class="detail-actions">' +
         (isCreate ? '<button class="button primary" type="submit" data-save-mode="create">创建档案</button>' :
           '<button class="button primary" type="submit" data-save-mode="overwrite">保存覆盖</button><button class="button" type="submit" data-save-mode="backup">保存并备份旧卡</button>') +
@@ -321,6 +330,33 @@
     };
   }
 
+  async function generateBriefPersonaFromEditor(button) {
+    var form = document.getElementById("character-form");
+    if (!form || !state.detail) return;
+    var fd = new FormData(form);
+    var originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = "生成中…";
+    try {
+      var result = await api().characters.generateBriefPersona({
+        id: state.detail.id,
+        draft: {
+          name: String(fd.get("name") || ""),
+          persona: String(fd.get("persona") || ""),
+          personality: String(fd.get("personality") || "").trim() || null
+        }
+      });
+      form.elements.briefPersona.value = result.briefPersona || "";
+      button.textContent = result.briefPersona ? "重新生成" : originalLabel;
+      toast("AI 简介已写入草稿，保存后才会更新角色档案");
+    } catch (err) {
+      button.textContent = originalLabel;
+      toast(err && err.message ? err.message : String(err));
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   async function submitCharacter(form, mode) {
     var value = editorPayload(form);
     if (!value.name) { toast("姓名不能为空"); return; }
@@ -390,6 +426,125 @@
   }
 
   function closeModal() { modalRoot.innerHTML = ""; }
+
+  function resetNpcModalState() {
+    state.npcResults = [];
+    state.npcHint = "";
+    state.npcCount = 1;
+    state.npcAllowAutoPost = false;
+    state.npcBusy = "";
+    state.npcError = "";
+  }
+
+  function closeNpcModal() {
+    closeModal();
+    resetNpcModalState();
+  }
+
+  function npcFieldName(index, field) { return "npc-" + index + "-" + field; }
+
+  function collectNpcPreviewForm() {
+    var form = document.getElementById("npc-materialize-form");
+    if (!form) return state.npcResults;
+    var fd = new FormData(form);
+    state.npcAllowAutoPost = fd.get("allowAutoPost") === "on";
+    return state.npcResults.map(function (_, index) {
+      return {
+        name: String(fd.get(npcFieldName(index, "name")) || ""),
+        persona: String(fd.get(npcFieldName(index, "persona")) || ""),
+        personality: String(fd.get(npcFieldName(index, "personality")) || ""),
+        briefPersona: String(fd.get(npcFieldName(index, "briefPersona")) || ""),
+        relationLabel: String(fd.get(npcFieldName(index, "relationLabel")) || ""),
+        reverseRelationLabel: String(fd.get(npcFieldName(index, "reverseRelationLabel")) || "")
+      };
+    });
+  }
+
+  function renderNpcModal() {
+    var busy = Boolean(state.npcBusy);
+    var error = state.npcError ? '<div class="error-banner">' + esc(state.npcError) + '</div>' : '';
+    if (!state.npcResults.length) {
+      modalRoot.innerHTML = '<div class="modal-backdrop" data-action="modal-backdrop"><section class="modal" role="dialog" aria-modal="true">' +
+        '<h3 class="modal-title">生成相关 NPC</h3>' + error +
+        '<form id="npc-generate-form" class="form-grid">' +
+          '<label class="label">数量（1–5）<input class="field" name="count" type="number" min="1" max="5" step="1" required value="' + state.npcCount + '"></label>' +
+          '<label class="label">补充要求（可选）<textarea class="textarea" name="hint" placeholder="生成一个损友 / 她的亲妹妹 / 暗恋她的学长…">' + esc(state.npcHint) + '</textarea></label>' +
+          '<div class="modal-actions"><button class="button" type="button" data-action="close-modal"' + (busy ? " disabled" : "") + '>取消</button>' +
+          '<button class="button primary" type="submit"' + (busy ? " disabled" : "") + '>' + (state.npcBusy === "generate" ? "生成中…" : "生成") + '</button></div>' +
+        '</form></section></div>';
+      return;
+    }
+
+    var cards = state.npcResults.map(function (npc, index) {
+      return '<article class="npc-preview-card"><div class="section-title"><span>NPC DRAFT ' + (index + 1) + '</span>' +
+        '<button class="button compact danger" type="button" data-action="remove-npc" data-index="' + index + '"' + (busy ? " disabled" : "") + '>移除</button></div>' +
+        '<div class="form-grid two"><label class="label">Name<input class="field" name="' + npcFieldName(index,"name") + '" value="' + attr(npc.name) + '"></label>' +
+        '<label class="label">Personality<input class="field" name="' + npcFieldName(index,"personality") + '" value="' + attr(npc.personality) + '"></label></div>' +
+        '<label class="label">Persona<textarea class="textarea" name="' + npcFieldName(index,"persona") + '">' + esc(npc.persona) + '</textarea></label>' +
+        '<label class="label">Brief Persona<textarea class="textarea" name="' + npcFieldName(index,"briefPersona") + '">' + esc(npc.briefPersona) + '</textarea></label>' +
+        '<div class="form-grid two"><label class="label">TA 是当前角色的 ___<input class="field" name="' + npcFieldName(index,"relationLabel") + '" value="' + attr(npc.relationLabel) + '"></label>' +
+        '<label class="label">当前角色是 TA 的 ___<input class="field" name="' + npcFieldName(index,"reverseRelationLabel") + '" value="' + attr(npc.reverseRelationLabel) + '"></label></div></article>';
+    }).join("");
+    modalRoot.innerHTML = '<div class="modal-backdrop" data-action="modal-backdrop"><section class="modal" role="dialog" aria-modal="true">' +
+      '<h3 class="modal-title">预览相关 NPC</h3>' + error +
+      '<form id="npc-materialize-form" class="form-grid">' + cards +
+        '<label class="npc-toggle"><input type="checkbox" name="allowAutoPost"' + (state.npcAllowAutoPost ? " checked" : "") + '> 加好友后允许自动发朋友圈</label>' +
+        '<div class="modal-actions"><button class="button" type="button" data-action="close-modal"' + (busy ? " disabled" : "") + '>取消</button>' +
+        '<button class="button" type="button" data-action="regenerate-npcs"' + (busy ? " disabled" : "") + '>' + (state.npcBusy === "generate" ? "重新生成中…" : "重新生成") + '</button>' +
+        '<button class="button primary" type="submit"' + (busy || !state.npcResults.length ? " disabled" : "") + '>' + (state.npcBusy === "materialize" ? "创建中…" : "确认创建") + '</button></div>' +
+      '</form></section></div>';
+  }
+
+  function openNpcModal() {
+    resetNpcModalState();
+    renderNpcModal();
+  }
+
+  async function generateNpcDrafts(count, hint) {
+    state.npcCount = count;
+    state.npcHint = hint;
+    state.npcBusy = "generate";
+    state.npcError = "";
+    renderNpcModal();
+    try {
+      var response = await api().characters.generateSupportingCharacters({
+        targetCharacterId: state.detail.id,
+        hint: hint,
+        count: count
+      });
+      state.npcResults = response.results || [];
+      if (!state.npcResults.length) throw new Error("没有生成可预览的 NPC 草稿。");
+    } catch (err) {
+      state.npcError = err && err.message ? err.message : String(err);
+    } finally {
+      state.npcBusy = "";
+      renderNpcModal();
+    }
+  }
+
+  async function materializeNpcDrafts() {
+    state.npcResults = collectNpcPreviewForm();
+    state.npcBusy = "materialize";
+    state.npcError = "";
+    renderNpcModal();
+    try {
+      var response = await api().characters.materializeSupportingCharacters({
+        targetCharacterId: state.detail.id,
+        results: state.npcResults,
+        allowAutoPost: state.npcAllowAutoPost
+      });
+      await refreshWorlds();
+      await refreshSummaries();
+      var createdCount = (response.created || []).length;
+      closeNpcModal();
+      render();
+      toast("已创建 " + createdCount + " 位相关 NPC");
+    } catch (err) {
+      state.npcError = err && err.message ? err.message : String(err);
+      state.npcBusy = "";
+      renderNpcModal();
+    }
+  }
 
   function relationForm(world, relation) {
     var members = world.members || [];
@@ -518,6 +673,8 @@
         state.detail = null; state.detailMode = "view"; state.editAvatar = undefined; render();
       } else if (action === "edit-character") {
         state.detailMode = "edit"; state.editAvatar = undefined; render();
+      } else if (action === "generate-npcs") {
+        openNpcModal();
       } else if (action === "new-character") {
         state.detail = null; state.detailMode = "create"; state.editAvatar = null; render();
       } else if (action === "cancel-edit") {
@@ -526,6 +683,8 @@
         state.editAvatar = undefined; render();
       } else if (action === "clear-avatar") {
         state.editAvatar = null; render();
+      } else if (action === "generate-brief") {
+        await generateBriefPersonaFromEditor(el);
       } else if (action === "prev-page" && state.page > 1) {
         state.page -= 1; await refreshSummaries(); render();
       } else if (action === "next-page" && state.page < (state.summaries.totalPages || 0)) {
@@ -582,8 +741,35 @@
   modalRoot.addEventListener("click", function(e) {
     var el = e.target.closest("[data-action]");
     if (!el) return;
-    if (el.dataset.action === "close-modal") closeModal();
-    if (el.dataset.action === "modal-backdrop" && e.target === el) closeModal();
+    if (el.dataset.action === "close-modal") {
+      if (document.getElementById("npc-generate-form") || document.getElementById("npc-materialize-form")) closeNpcModal();
+      else closeModal();
+    }
+    if (el.dataset.action === "modal-backdrop" && e.target === el && !state.npcBusy) {
+      if (document.getElementById("npc-generate-form") || document.getElementById("npc-materialize-form")) closeNpcModal();
+      else closeModal();
+    }
+    if (el.dataset.action === "remove-npc" && !state.npcBusy) {
+      state.npcResults = collectNpcPreviewForm();
+      state.npcResults.splice(Number(el.dataset.index), 1);
+      state.npcError = state.npcResults.length ? "" : "至少保留一位 NPC，或点击重新生成。";
+      renderNpcModal();
+    }
+    if (el.dataset.action === "regenerate-npcs" && !state.npcBusy) {
+      generateNpcDrafts(state.npcCount, state.npcHint);
+    }
+  });
+
+  modalRoot.addEventListener("submit", function(e) {
+    if (e.target && e.target.id === "npc-generate-form") {
+      e.preventDefault();
+      var fd = new FormData(e.target);
+      generateNpcDrafts(Number(fd.get("count")), String(fd.get("hint") || ""));
+    }
+    if (e.target && e.target.id === "npc-materialize-form") {
+      e.preventDefault();
+      materializeNpcDrafts();
+    }
   });
 
   refreshAll();

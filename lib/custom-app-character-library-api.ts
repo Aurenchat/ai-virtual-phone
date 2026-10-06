@@ -24,6 +24,12 @@ import {
   clearCharacterVersions,
   overwriteCharacterVersion,
 } from "./character-version-storage";
+import { generateBriefPersonaText } from "./brief-persona";
+import {
+  generateSupportingCharacters as generateNativeSupportingCharacters,
+  materializeSupportingCharacter,
+  type GeneratedSupportingCharacter,
+} from "./npc-generator";
 
 export type CharacterSummaryListInput = {
   page?: number;           // 1-based, default 1
@@ -97,6 +103,11 @@ const UPDATE_KEYS = new Set([
 const CREATE_KEYS = new Set([
   "name", "persona", "avatar", "personality", "briefPersona", "timeZone", "tags", "worldId",
 ]);
+
+const BRIEF_PERSONA_DRAFT_KEYS = new Set(["name", "persona", "personality"]);
+const GENERATED_SUPPORTING_CHARACTER_KEYS = [
+  "name", "persona", "personality", "briefPersona", "relationLabel", "reverseRelationLabel",
+] as const;
 
 const PARK_COLS = 10;
 const PARK_X0 = 120;
@@ -288,6 +299,105 @@ export async function listCustomAppCharacterSummaries(
   })));
 
   return { items, total, page, pageSize, totalPages };
+}
+
+export async function generateCustomAppBriefPersona(input: {
+  id: string;
+  draft?: { name?: string; persona?: string; personality?: string | null };
+}) {
+  const id = String(input.id ?? "").trim();
+  const existing = loadCharacters().find(character => character.id === id);
+  if (!existing) throw new Error("characters.generateBriefPersona 角色不存在。");
+
+  const draft = input.draft === undefined
+    ? {}
+    : input.draft && typeof input.draft === "object" && !Array.isArray(input.draft)
+      ? input.draft as Record<string, unknown>
+      : null;
+  if (!draft) throw new Error("characters.generateBriefPersona draft 无效。");
+  const unknown = Object.keys(draft).filter(key => !BRIEF_PERSONA_DRAFT_KEYS.has(key));
+  if (unknown.length) throw new Error(`characters.generateBriefPersona draft 不允许字段：${unknown.join(", ")}`);
+  if (draft.name !== undefined && typeof draft.name !== "string") throw new Error("characters.generateBriefPersona draft.name 必须是字符串。");
+  if (draft.persona !== undefined && typeof draft.persona !== "string") throw new Error("characters.generateBriefPersona draft.persona 必须是字符串。");
+  if (draft.personality !== undefined && draft.personality !== null && typeof draft.personality !== "string") {
+    throw new Error("characters.generateBriefPersona draft.personality 必须是字符串或 null。");
+  }
+
+  const temporary: Character = {
+    ...existing,
+    ...(draft.name !== undefined ? { name: draft.name } : {}),
+    ...(draft.persona !== undefined ? { persona: draft.persona } : {}),
+    ...(draft.personality !== undefined
+      ? { personality: draft.personality === null ? undefined : draft.personality }
+      : {}),
+  };
+  return { briefPersona: await generateBriefPersonaText(temporary) };
+}
+
+export async function generateCustomAppSupportingCharacters(input: {
+  targetCharacterId: string;
+  hint?: string;
+  count: number;
+}) {
+  const targetCharacterId = String(input.targetCharacterId ?? "").trim();
+  if (!targetCharacterId) throw new Error("characters.generateSupportingCharacters 需要 targetCharacterId。");
+  if (input.hint !== undefined && typeof input.hint !== "string") {
+    throw new Error("characters.generateSupportingCharacters hint 必须是字符串。");
+  }
+  if (!Number.isInteger(input.count) || input.count < 1 || input.count > 5) {
+    throw new Error("characters.generateSupportingCharacters count 必须是 1..5 的整数。");
+  }
+  const results = await generateNativeSupportingCharacters(targetCharacterId, input.hint ?? "", input.count);
+  return { results };
+}
+
+function validateGeneratedSupportingCharacter(value: unknown, index: number): GeneratedSupportingCharacter {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`characters.materializeSupportingCharacters results[${index}] 无效。`);
+  }
+  const record = value as Record<string, unknown>;
+  for (const key of GENERATED_SUPPORTING_CHARACTER_KEYS) {
+    if (typeof record[key] !== "string") {
+      throw new Error(`characters.materializeSupportingCharacters results[${index}].${key} 必须是字符串。`);
+    }
+  }
+  if (!String(record.name).trim() || !String(record.persona).trim()) {
+    throw new Error(`characters.materializeSupportingCharacters results[${index}] 需要非空 name 和 persona。`);
+  }
+  return {
+    name: record.name as string,
+    persona: record.persona as string,
+    personality: record.personality as string,
+    briefPersona: record.briefPersona as string,
+    relationLabel: record.relationLabel as string,
+    reverseRelationLabel: record.reverseRelationLabel as string,
+  };
+}
+
+export function materializeCustomAppSupportingCharacters(input: {
+  targetCharacterId: string;
+  results: GeneratedSupportingCharacter[];
+  allowAutoPost?: boolean;
+}) {
+  const targetCharacterId = String(input.targetCharacterId ?? "").trim();
+  if (!loadCharacters().some(character => character.id === targetCharacterId)) {
+    throw new Error("characters.materializeSupportingCharacters 目标角色不存在。");
+  }
+  if (!Array.isArray(input.results) || input.results.length < 1 || input.results.length > 5) {
+    throw new Error("characters.materializeSupportingCharacters results 数量必须是 1..5。");
+  }
+  if (input.allowAutoPost !== undefined && typeof input.allowAutoPost !== "boolean") {
+    throw new Error("characters.materializeSupportingCharacters allowAutoPost 必须是布尔值。");
+  }
+  const validated = input.results.map(validateGeneratedSupportingCharacter);
+  const created = validated.map((result, index) => {
+    const character = materializeSupportingCharacter(result, targetCharacterId, {
+      allowAutoPost: input.allowAutoPost,
+      placementIndex: index,
+    });
+    return { id: character.id, name: character.name };
+  });
+  return { created };
 }
 
 export async function createCustomAppCharacter(input: CharacterCreateInput) {

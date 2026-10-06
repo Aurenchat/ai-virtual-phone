@@ -37,6 +37,38 @@ function makeCharacters(count = 100) {
   }));
 }
 
+async function loadCharacterLibraryForAi({ characters, briefGenerator, npcGenerator, npcMaterializer, onMutation } = {}) {
+  const chars = characters || makeCharacters(2);
+  const mutation = onMutation || (() => {});
+  return loadTs("../lib/custom-app-character-library-api.ts", {
+    "./character-storage": {
+      createCharacter: value => ({ ...value, id: "created", createdAt: "now", updatedAt: "now" }),
+      loadCharacters: () => chars,
+      saveCharacters: () => mutation("characters"),
+    },
+    "./character-time": { normalizeTimeZone: value => typeof value === "string" && value.trim() ? value.trim() : undefined },
+    "./character-world-storage": {
+      DEFAULT_CHARACTER_WORLD_ID: "world_default",
+      loadCharacterWorldGroups: () => [{ id: "world_default", name: "默认世界", description: "", memberIds: chars.map(c => c.id), relations: [], createdAt: "now", updatedAt: "now" }],
+      saveCharacterWorldGroups: () => mutation("worlds"),
+      createCharacterWorldGroup: () => ({}),
+      deleteCharacterWorldGroup: () => mutation("delete-world"),
+      moveCharacterToWorld: () => mutation("move"),
+    },
+    "./character-chat-cleanup": { removeCharacterChatReferences: async () => mutation("chat") },
+    "./character-version-storage": {
+      backupCharacterVersion: () => mutation("backup"),
+      clearCharacterVersions: () => mutation("versions"),
+      overwriteCharacterVersion: () => mutation("overwrite"),
+    },
+    "./brief-persona": { generateBriefPersonaText: briefGenerator || (async () => "generated brief") },
+    "./npc-generator": {
+      generateSupportingCharacters: npcGenerator || (async () => []),
+      materializeSupportingCharacter: npcMaterializer || (() => ({ id: "npc", name: "NPC" })),
+    },
+  });
+}
+
 await test("permission truth sources include the four new permissions", async () => {
   const types = await readFile(new URL("../lib/custom-app-types.ts", import.meta.url), "utf8");
   const storage = await readFile(new URL("../lib/custom-app-storage.ts", import.meta.url), "utf8");
@@ -53,10 +85,100 @@ await test("SDK wrapper exposes the exact character administration actions", asy
   const runner = await readFile(new URL("../components/app-market/custom-app-runner.tsx", import.meta.url), "utf8");
   for (const action of [
     "characters.listSummaries","characters.create","characters.update","characters.delete",
+    "characters.generateBriefPersona","characters.generateSupportingCharacters","characters.materializeSupportingCharacters",
     "characterWorlds.list","characterWorlds.create","characterWorlds.update","characterWorlds.delete",
     "characterWorlds.moveCharacter","characterWorlds.createRelation",
     "characterWorlds.updateRelation","characterWorlds.deleteRelation",
   ]) assert.ok(runner.includes(`'${action}'`) || runner.includes(`"${action}"`), `runner must include ${action}`);
+});
+
+await test("Character AI actions use the required permission gates", async () => {
+  const runner = await readFile(new URL("../components/app-market/custom-app-runner.tsx", import.meta.url), "utf8");
+  const brief = runner.slice(runner.indexOf('action === "characters.generateBriefPersona"'), runner.indexOf('action === "characters.generateSupportingCharacters"'));
+  assert.match(brief, /requirePermission\("characters\.read"\)/);
+  assert.match(brief, /requirePermission\("ai\.generate"\)/);
+  const generate = runner.slice(runner.indexOf('action === "characters.generateSupportingCharacters"'), runner.indexOf('action === "characters.materializeSupportingCharacters"'));
+  assert.match(generate, /requirePermission\("characters\.read"\)/);
+  assert.match(generate, /requirePermission\("ai\.generate"\)/);
+  const materialize = runner.slice(runner.indexOf('action === "characters.materializeSupportingCharacters"'), runner.indexOf('action === "characterWorlds.list"'));
+  for (const permission of ["characters.write", "characters.worlds.write", "characters.relations.write"]) {
+    assert.ok(materialize.includes(`requirePermission("${permission}")`));
+  }
+});
+
+await test("brief persona generation merges allowed drafts without persistence", async () => {
+  const mutations = [];
+  let received;
+  const api = await loadCharacterLibraryForAi({
+    onMutation: step => mutations.push(step),
+    briefGenerator: async character => { received = character; return "AI BRIEF"; },
+  });
+  const result = await api.generateCustomAppBriefPersona({
+    id: "char_000",
+    draft: { name: "Draft Name", persona: "Draft Persona", personality: null },
+  });
+  assert.deepEqual(result, { briefPersona: "AI BRIEF" });
+  assert.equal(received.name, "Draft Name");
+  assert.equal(received.persona, "Draft Persona");
+  assert.equal(received.personality, undefined);
+  assert.deepEqual(mutations, []);
+  await assert.rejects(
+    api.generateCustomAppBriefPersona({ id: "char_000", draft: { tags: ["forbidden"] } }),
+    /不允许字段/,
+  );
+});
+
+await test("supporting NPC generation returns drafts only and enforces count 1..5", async () => {
+  const calls = [];
+  const draft = { name: "NPC", persona: "Persona", personality: "Kind", briefPersona: "Brief", relationLabel: "损友", reverseRelationLabel: "损友" };
+  const api = await loadCharacterLibraryForAi({
+    npcGenerator: async (...args) => { calls.push(args); return [draft]; },
+    npcMaterializer: () => { throw new Error("must not materialize while generating"); },
+  });
+  await assert.rejects(api.generateCustomAppSupportingCharacters({ targetCharacterId: "char_000", count: 0 }), /1\.\.5/);
+  await assert.rejects(api.generateCustomAppSupportingCharacters({ targetCharacterId: "char_000", count: 6 }), /1\.\.5/);
+  const result = await api.generateCustomAppSupportingCharacters({ targetCharacterId: "char_000", hint: "hint", count: 1 });
+  assert.deepEqual(result, { results: [draft] });
+  assert.deepEqual(calls, [["char_000", "hint", 1]]);
+});
+
+await test("NPC materialization validates the full batch before native helper calls", async () => {
+  const calls = [];
+  const valid = { name: "NPC", persona: "Persona", personality: "Kind", briefPersona: "Brief", relationLabel: "损友", reverseRelationLabel: "损友" };
+  const api = await loadCharacterLibraryForAi({
+    npcMaterializer: (result, targetId, options) => {
+      calls.push({ result, targetId, options });
+      return { id: `npc_${calls.length}`, name: result.name };
+    },
+  });
+  assert.throws(
+    () => api.materializeCustomAppSupportingCharacters({ targetCharacterId: "char_000", results: [valid, { ...valid, persona: "" }] }),
+    /非空 name 和 persona/,
+  );
+  assert.equal(calls.length, 0);
+  assert.throws(
+    () => api.materializeCustomAppSupportingCharacters({ targetCharacterId: "missing", results: [valid] }),
+    /目标角色不存在/,
+  );
+  const result = api.materializeCustomAppSupportingCharacters({ targetCharacterId: "char_000", results: [valid, { ...valid, name: "NPC 2" }], allowAutoPost: true });
+  assert.deepEqual(result, { created: [{ id: "npc_1", name: "NPC" }, { id: "npc_2", name: "NPC 2" }] });
+  assert.deepEqual(calls.map(call => call.options), [
+    { allowAutoPost: true, placementIndex: 0 },
+    { allowAutoPost: true, placementIndex: 1 },
+  ]);
+});
+
+await test("Target Archives previews AI output before save or native NPC materialization", async () => {
+  const js = await readFile(new URL("../custom-apps/target-archives/assets/app.js", import.meta.url), "utf8");
+  assert.match(js, /generateBriefPersona/);
+  assert.match(js, /form\.elements\.briefPersona\.value/);
+  assert.match(js, /npcResults/);
+  assert.match(js, /npc-materialize-form/);
+  const npcFlow = js.slice(js.indexOf("function generateNpcDrafts"), js.indexOf("function relationForm"));
+  assert.match(npcFlow, /generateSupportingCharacters/);
+  assert.match(npcFlow, /materializeSupportingCharacters/);
+  assert.doesNotMatch(npcFlow, /characters\.create|characterWorlds\.moveCharacter|createRelation/);
+  assert.doesNotMatch(js, /\[配角\]|simpleLLMCall|max_tokens/);
 });
 
 await test("100-character list is paginated and summaries do not leak long fields", async () => {

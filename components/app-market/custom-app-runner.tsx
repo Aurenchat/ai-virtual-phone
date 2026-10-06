@@ -48,7 +48,9 @@ import {
   deleteCustomAppTimelineEvent,
   fetchCustomAppNetwork,
   generateCustomAppGroupText,
+  generateCustomAppBriefPersona,
   generateCustomAppImage,
+  generateCustomAppSupportingCharacters,
   generateCustomAppText,
   isCustomAppGroupGenerateRecord,
   getCustomAppBadge,
@@ -59,6 +61,7 @@ import {
   listCustomAppCharacterSummaries,
   listCustomAppCharacterWorlds,
   markCustomAppNotificationsRead,
+  materializeCustomAppSupportingCharacters,
   moveCustomAppCharacter,
   payCustomAppWallet,
   readCustomAppBridgeState,
@@ -488,6 +491,9 @@ html, body { min-height: 100%; }
       create: function(payload){ return request('characters.create', payload || {}); },
       update: function(payload){ return request('characters.update', payload || {}); },
       delete: function(payload){ return request('characters.delete', payload || {}); },
+      generateBriefPersona: function(payload){ return request('characters.generateBriefPersona', payload || {}); },
+      generateSupportingCharacters: function(payload){ return request('characters.generateSupportingCharacters', payload || {}); },
+      materializeSupportingCharacters: function(payload){ return request('characters.materializeSupportingCharacters', payload || {}); },
       readState: function(payload){ return request('characters.state.read', payload || {}); },
       writeState: function(payload){ return request('characters.state.write', payload || {}); },
       readRelations: function(payload){ return request('characters.relations.read', payload || {}); }
@@ -1131,7 +1137,7 @@ export function CustomAppRunner({
           calendar: ["read", "list", "write", "create", "update", "delete", "replaceWeek"],
           world: ["read", "list", "get", "write", "create", "update", "delete", "activate"],
           media: ["pick", "save", "put", "get", "revoke", "delete"],
-          characters: ["list", "get", "listSummaries", "create", "update", "delete", "readState", "writeState", "readRelations"],
+          characters: ["list", "get", "listSummaries", "create", "update", "delete", "generateBriefPersona", "generateSupportingCharacters", "materializeSupportingCharacters", "readState", "writeState", "readRelations"],
           characterWorlds: ["list", "create", "update", "delete", "moveCharacter", "createRelation", "updateRelation", "deleteRelation"],
           chat: ["getCurrentSession", "readHistory", "sendMessage", "sendCard", "updateCard", "writeHistory", "requestReply", "openConversation", "setContactState"],
           memory: ["readCore", "readLongTerm", "readShortTerm", "search", "add", "addTimeline", "deleteTimeline", "removeTimeline", "suggest", "searchSource", "writeSource", "invalidateSource"],
@@ -1688,6 +1694,22 @@ export function CustomAppRunner({
     if (action === "characters.delete") {
       requirePermission("characters.write");
       return deleteCustomAppCharacter(record as unknown as Parameters<typeof deleteCustomAppCharacter>[0]);
+    }
+    if (action === "characters.generateBriefPersona") {
+      requirePermission("characters.read");
+      requirePermission("ai.generate");
+      return generateCustomAppBriefPersona(record as unknown as Parameters<typeof generateCustomAppBriefPersona>[0]);
+    }
+    if (action === "characters.generateSupportingCharacters") {
+      requirePermission("characters.read");
+      requirePermission("ai.generate");
+      return generateCustomAppSupportingCharacters(record as unknown as Parameters<typeof generateCustomAppSupportingCharacters>[0]);
+    }
+    if (action === "characters.materializeSupportingCharacters") {
+      requirePermission("characters.write");
+      requirePermission("characters.worlds.write");
+      requirePermission("characters.relations.write");
+      return materializeCustomAppSupportingCharacters(record as unknown as Parameters<typeof materializeCustomAppSupportingCharacters>[0]);
     }
     if (action === "characterWorlds.list") {
       requirePermission("characters.worlds.read");
