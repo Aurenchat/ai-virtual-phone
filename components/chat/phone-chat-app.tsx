@@ -36,8 +36,6 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
     const [chatAppCSS, setChatAppCSS] = useState(() =>
         typeof window !== "undefined" ? kvGet("chat-app-custom-css") || "" : ""
     );
-    // Cache all visited sessions so their ChatRoom stays mounted (hidden)
-    const [visitedSessions, setVisitedSessions] = useState<Map<string, ChatSession>>(new Map());
     const [dbReady, setDbReady] = useState(false);
     const [hideTabBar, setHideTabBar] = useState(false);
 
@@ -91,18 +89,12 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
         return () => window.removeEventListener(CHAT_OPEN_SESSION_EVENT, handler);
     }, []);
 
-    // 重复会话被合并：被删会话的聊天室缓存一并卸载
+    // 重复会话被合并：关闭当前被移除的会话
     useEffect(() => {
         const handler = (e: Event) => {
             const removed = (e as CustomEvent<ChatSessionsMergedDetail>).detail?.removedSessionIds;
             if (!removed?.length) return;
             const removedSet = new Set(removed);
-            setVisitedSessions(prev => {
-                if (![...prev.keys()].some(id => removedSet.has(id))) return prev;
-                const next = new Map(prev);
-                removedSet.forEach(id => next.delete(id));
-                return next;
-            });
             setActiveSession(prev => (prev && removedSet.has(prev.id) ? null : prev));
         };
         window.addEventListener(CHAT_SESSIONS_MERGED_EVENT, handler);
@@ -129,17 +121,11 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
         return () => window.removeEventListener(CHAT_OPEN_ADD_CONTACT_EVENT, handler);
     }, []);
 
-    // Notify parent of session changes + cache visited session + push mascot context
+    // Notify parent of session changes + push mascot context
     useEffect(() => {
         onSessionChange?.(activeSession);
         if (activeSession) {
             setActiveMascot(false);
-            setVisitedSessions(prev => {
-                if (prev.has(activeSession.id)) return prev;
-                const next = new Map(prev);
-                next.set(activeSession.id, activeSession);
-                return next;
-            });
             // Push session info to mascot context so 小卷 can access sessionId
             const chars = loadCharacters();
             const char = chars.find(c => c.id === activeSession.contactId);
@@ -300,24 +286,17 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
                 </button>
             </nav>
 
-            {/* Chat Rooms — all visited sessions stay mounted, only active one is visible */}
-            {[...visitedSessions.values()].map(sess => (
-                <div key={sess.id} style={{ display: activeSession?.id === sess.id ? undefined : 'none' }} className="chat-room-layer absolute inset-0">
+            {/* Mount only the active room; leaving it releases its local UI and media. */}
+            {activeSession && (
+                <div key={activeSession.id} className="chat-room-layer absolute inset-0">
                     <ChatRoom
-                        session={sess}
+                        key={activeSession.id}
+                        session={activeSession}
                         onBack={() => setActiveSession(null)}
-                        onDeleted={() => {
-                            // 会话已删除：把缓存的聊天室一并卸载，避免僵尸挂载
-                            setVisitedSessions(prev => {
-                                const next = new Map(prev);
-                                next.delete(sess.id);
-                                return next;
-                            });
-                            setActiveSession(null);
-                        }}
+                        onDeleted={() => setActiveSession(null)}
                     />
                 </div>
-            ))}
+            )}
             {activeMascot && (
                 <div className="chat-room-layer absolute inset-0">
                     <MascotChatRoom

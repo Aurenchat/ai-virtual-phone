@@ -2434,7 +2434,11 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
     if (sid) setChatInitSessionId(sid);
   }, []);
   useEffect(() => {
+    if (activeApp === "chat") setShowMiniChat(false);
+  }, [activeApp]);
+  useEffect(() => {
     const handler = (e: Event) => {
+      if (activeAppRef.current === "chat") return;
       const detail = (e as CustomEvent).detail;
       if (detail?.share) setMiniSharePayload(detail.share);
       else setMiniSharePayload(null);
@@ -4443,19 +4447,20 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
               />
 
               {/* Mini chat window — persists across music pages */}
-              <MiniAppWindow
-                title="聊天"
-                visible={showMiniChat}
-                onClose={handleMiniChatClose}
-                onExpand={handleMiniChatExpand}
-              >
-                <PhoneChatApp
+              {showMiniChat && activeApp !== "chat" && (
+                <MiniAppWindow
+                  title="聊天"
                   onClose={handleMiniChatClose}
-                  onSessionChange={handleMiniChatSessionChange}
-                  sharePayload={miniSharePayload}
-                  onShareDone={handleMiniShareDone}
-                />
-              </MiniAppWindow>
+                  onExpand={handleMiniChatExpand}
+                >
+                  <PhoneChatApp
+                    onClose={handleMiniChatClose}
+                    onSessionChange={handleMiniChatSessionChange}
+                    sharePayload={miniSharePayload}
+                    onShareDone={handleMiniShareDone}
+                  />
+                </MiniAppWindow>
+              )}
 
               <div
                 ref={workspaceRef}
