@@ -69,10 +69,12 @@ function fakeDexie(tables) { return { default: class {
     for (const stage of stages.filter(s => !s.startsWith('PLUGIN'))) b.mark(stage);
     check(b.diag.getCurrent().ready, true);
   }
-  // Structural guard: inserts only, no edits to schemas/cache/legacy normalization/boot branches.
+  // Protect the current audited main boundary. The old ebd54d4 baseline predates
+  // approved payment/storage changes and the active-only desktop chat hotfix.
+  // Stage 3A/3B marker behavior above is still checked against its own baseline.
   const cp = require('node:child_process');
   for (const file of ['lib/chat-db.ts', 'lib/chat-storage.ts', 'lib/kv-db.ts', 'lib/vn-storage.ts', 'lib/map-storage.ts', 'lib/chat-plugin-runtime.ts', 'components/main-app.tsx', 'components/desktop-shell.tsx']) {
-    const before = cp.execFileSync('git', ['show', 'ebd54d4:' + file], { cwd: root, encoding: 'utf8', maxBuffer: 10e6 });
+    const before = cp.execFileSync('git', ['show', 'a1511ed:' + file], { cwd: root, encoding: 'utf8', maxBuffer: 10e6 });
     const after = fs.readFileSync(path.join(root, file), 'utf8');
     // Stage 3B intentionally changes these boundaries. Dedicated chunk/scheduling
     // tests check their behavior; keep all Stage 3A marker calls unchanged here.

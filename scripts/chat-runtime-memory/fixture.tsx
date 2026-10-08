@@ -13,10 +13,12 @@ import { CHAT_SESSIONS_MERGED_EVENT } from "../../lib/chat-session-merge";
 import { PhoneChatApp } from "../../components/chat/phone-chat-app";
 import * as bubbles from "../../components/chat/message-bubble";
 import { findStickerByName } from "../../lib/sticker-data";
+import { installMediaSpikeFixture } from "./media-spike-fixture";
 
 export function init(Shell: React.ComponentType) {
     const root = createRoot(document.getElementById("app")!);
     const sessions: Record<string, chat.ChatSession> = {};
+    installMediaSpikeFixture(root, sessions);
     let media: { image: string; audio: string; sticker: string };
     let completions = 0;
     const pacing: Record<string, number> = {};

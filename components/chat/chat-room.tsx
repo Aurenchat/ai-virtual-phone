@@ -37,6 +37,9 @@ import { CustomAppForegroundBoundary } from "@/components/app-market/custom-app-
 
 import { ChatSettingsPanel } from "./chat-settings-panel";
 import { VoiceCallScreen } from "./voice-call-screen";
+import { storeMediaBlob } from "@/lib/media-cache-storage";
+import { startGenerationDiagnostic, markGenerationDiagnostic } from "@/lib/chat-generation-diagnostics";
+import { startChatRuntimeDiagnostic, markChatRuntimeDiagnostic } from "@/lib/chat-runtime-diagnostics";
 import { VideoCallScreen } from "./video-call-screen";
 import { GroupCallScreen } from "./group-call-screen";
 import { TransferTargetModal } from "./transfer-target-modal";
@@ -304,9 +307,11 @@ type ActiveGenerationRun = {
     runId: string;
     controller: AbortController;
     pendingNativeToolCalls: PendingNativeToolCall[];
+    firstDeltaSeen?: boolean;
 };
 
 type GenerationRunGuard = {
+    diagnosticRunId?: string;
     signal?: AbortSignal;
     isActive?: () => boolean;
 };
@@ -352,16 +357,24 @@ function hasActiveGenerationLock(sessionId: string): boolean {
     return true;
 }
 
-function createGenerationRun(sessionId: string): ActiveGenerationRun {
+function createGenerationRun(sessionId: string, isGroup: boolean): ActiveGenerationRun {
     const existing = activeGenerationRuns.get(sessionId);
     existing?.controller.abort();
     const run: ActiveGenerationRun = {
         runId: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         controller: new AbortController(),
         pendingNativeToolCalls: [],
+        firstDeltaSeen: false,
     };
     activeGenerationRuns.set(sessionId, run);
+    startGenerationDiagnostic(run.runId, sessionId, isGroup);
     return run;
+}
+
+function markFirstGenerationDelta(run: ActiveGenerationRun) {
+    if (run.firstDeltaSeen) return;
+    run.firstDeltaSeen = true;
+    markGenerationDiagnostic(run.runId, "API_FIRST_DELTA");
 }
 
 function isGenerationRunActive(sessionId: string, runId: string): boolean {
@@ -916,6 +929,7 @@ const ChatTextInputBar = memo(forwardRef<ChatTextInputHandle, {
             {showStickerPanel && (
                 <StickerPanel
                     onSend={onSendSticker}
+                    sessionId={sessionId}
                     characterId={characterId}
                     characterIds={stickerCharacterIds}
                 />
@@ -1144,6 +1158,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     // Emoji panel
     const [showEmojiPanel, setShowEmojiPanel] = useState(false);
     const [showStickerPanel, setShowStickerPanel] = useState(false);
+    const voiceOperationIdRef = useRef<string | undefined>(undefined);
+    const startVoiceCallDiagnostic = (initiator: "character" | "user") => {
+        voiceOperationIdRef.current = startChatRuntimeDiagnostic(session.id, "VOICE_CALL", "CALL_TRIGGERED", { initiator });
+    };
     const chatTextInputRef = useRef<ChatTextInputHandle | null>(null);
     const offlineTextInputRef = useRef<OfflineTextInputHandle | null>(null);
 
@@ -2096,7 +2114,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 // Only handle call if this ChatRoom is currently visible
                 if (!isChatRoomElementVisible(wrapperRef.current)) return;
                 setCallInitiator("character");
-                if (detail.type === "voice") setShowVoiceCall(true);
+                if (detail.type === "voice") { startVoiceCallDiagnostic("character"); setShowVoiceCall(true); }
                 else if (detail.type === "video") setShowVideoCall(true);
                 // Dismiss the global incoming-call bar (if showing)
                 window.dispatchEvent(new CustomEvent("incoming-call-dismiss"));
@@ -2381,6 +2399,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         revealOptions?: { instantReveal?: boolean },
     ) => {
         throwIfGenerationStopped(guard);
+        if (results.length) markGenerationDiagnostic(guard?.diagnosticRunId, "RESPONSE_RECEIVED", { rawLength: results.reduce((sum, r) => sum + r.responseText.length, 0) });
         const responseRoundId = createResponseRoundId();
         const editableResponseText = buildEditableGroupRoundText(results);
         // 群聊一轮回复只有一份思维链，挂到本轮第一条落库消息上
@@ -2408,6 +2427,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             const responseBatchId = createResponseBatchId();
             const { parts: rawParts, stateValues, freshStateValues, statusPanel, innerMonologue } = parseAIResponse(r.responseText, getCurrentStateForCharacter(r.characterId));
             const parts = stripInvalidStickerParts(rawParts, r.characterId);
+            const diagnosticParts = parts.filter(part => !["voice_call", "video_call", "accept_red_packet", "decline_red_packet", "accept_transfer", "decline_transfer", "accept_payment_request", "decline_payment_request"].includes(part.mediaType || ""));
+            const diagnosticFallback = !diagnosticParts.some(canCarryFoldedPanel) && Boolean(statusPanel || innerMonologue || stateValues.length);
+            markGenerationDiagnostic(guard?.diagnosticRunId, "PARSE_DONE", {}, diagnosticParts.length + Number(diagnosticFallback));
             let attachedState = false;
             let savedAnyPart = false;
             for (const part of parts) {
@@ -2424,7 +2446,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     } else {
                         setCallInitiator("character");
                         setCallInitiatorName(r.characterName);
-                        if (callType === "voice") setShowVoiceCall(true);
+                        if (callType === "voice") { startVoiceCallDiagnostic("character"); setShowVoiceCall(true); }
                         else setShowVideoCall(true);
                     }
                     continue;
@@ -2492,6 +2514,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         senderCharacterId: r.characterId,
                         senderName: applied.senderName,
                     });
+                    markGenerationDiagnostic(guard?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
                     savedAnyPart = true;
                     msgsSetter(prev => [...prev, msg]);
                     continue;
@@ -2516,6 +2539,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         senderCharacterId: r.characterId,
                         senderName: pokeSender,
                     });
+                    markGenerationDiagnostic(guard?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
                     savedAnyPart = true;
                     msgsSetter(prev => [...prev, msg]);
                     dispatchChatMessageNotice({
@@ -2552,6 +2576,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 }, guard);
                 throwIfGenerationStopped(guard);
                 const msg = pushChatMessage(draft);
+                markGenerationDiagnostic(guard?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
                 imageReplacementTasks.push(scheduleGeneratedImageReplacement(msg, r.characterId, guard));
                 if (attachHere) attachedState = true;
                 savedAnyPart = true;
@@ -2588,12 +2613,14 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     senderCharacterId: r.characterId,
                     senderName: r.characterName,
                 });
+                markGenerationDiagnostic(guard?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
                 msgsSetter(prev => [...prev, msg]);
             }
             if (stateValues.length > 0) {
                 currentStateByCharacter.set(r.characterId, stateValues);
             }
         }
+        markGenerationDiagnostic(guard?.diagnosticRunId, "PUBLISH_DONE");
         if (imageReplacementTasks.length > 0) {
             await Promise.allSettled(imageReplacementTasks);
             throwIfGenerationStopped(guard);
@@ -2864,6 +2891,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         }
 
         if (filteredParts.length === 0) {
+            markGenerationDiagnostic(options?.diagnosticRunId, "PARSE_DONE", {}, Number(Boolean(statusPanel || innerMonologue || options?.reasoningText)));
             // Silence: only status panel / inner monologue / reasoning, no visible chat text
             if (statusPanel || innerMonologue || options?.reasoningText) {
                 throwIfGenerationStopped(options);
@@ -2881,8 +2909,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     stateValues: stateValues.length > 0 ? stateValues : undefined,
                     freshStateValues,
                 });
+                markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
                 setMessages(prev => [...prev, aiMsg]);
             }
+            markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISH_DONE");
             return { hasVisible: false, stateValues, triggerCall, hasDecline };
         }
 
@@ -2968,9 +2998,11 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             });
         };
 
+        markGenerationDiagnostic(options?.diagnosticRunId, "PARSE_DONE", {}, messageDrafts.length);
         const publishVisibleMessage = (entry: { draft: AssistantMessageDraft; afterPublish?: (message: ChatMessage) => void }): ChatMessage => {
             throwIfGenerationStopped(options);
             const msg = pushChatMessage(entry.draft);
+            markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
             setMessages(prev => [...prev, msg]);
             dispatchVisibleNotice(msg);
             const body = getNoticeBody(msg);
@@ -2994,6 +3026,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 publishVisibleMessage(messageDrafts[i]);
             }
         }
+        markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISH_DONE");
         if (imageReplacementTasks.length > 0) {
             await Promise.allSettled(imageReplacementTasks);
             throwIfGenerationStopped(options);
@@ -3005,7 +3038,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     const handleCallTrigger = (triggerCall?: "voice" | "video") => {
         if (!triggerCall) return;
         setCallInitiator("character");
-        if (triggerCall === "voice") setShowVoiceCall(true);
+        if (triggerCall === "voice") { startVoiceCallDiagnostic("character"); setShowVoiceCall(true); }
         else setShowVideoCall(true);
     };
 
@@ -3209,17 +3242,19 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             clearGenerationLock(session.id);
         }
 
-        const generationRun = createGenerationRun(session.id);
+        const generationRun = createGenerationRun(session.id, Boolean(session.isGroup));
         const generationRunId = generationRun.runId;
         const isCurrentGeneration = () => isGenerationRunActive(session.id, generationRunId);
-        const generationGuard: GenerationRunGuard = { signal: generationRun.controller.signal, isActive: isCurrentGeneration };
+        const generationGuard: GenerationRunGuard = { signal: generationRun.controller.signal, isActive: isCurrentGeneration, diagnosticRunId: generationRunId };
         let shouldRunDeclineReply = false;
 
         isGeneratingRef.current = true;
         setIsGenerating(true);
         setGenerationLock(session.id);
 
+        markGenerationDiagnostic(generationRunId, "HISTORY_LOADED", { historyCount: history.length });
         try {
+            markGenerationDiagnostic(generationRunId, "API_BEGIN");
             if (session.isGroup) {
                 let roundReasoning: string | undefined;
                 const results = await generateGroupChatCompletion(
@@ -3229,6 +3264,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         onReasoning: (t) => { roundReasoning = t; },
                         onStreamDelta: (delta) => {
                             if (!isCurrentGeneration()) return;
+                            markFirstGenerationDelta(generationRun);
                             streamAccumRef.current += delta;
                             // 群聊全文解析较重：合并到 rAF 下一帧执行，避免一帧多段增量重复解析
                             if (streamParseFrameRef.current) return;
@@ -3247,7 +3283,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                 setStreamPreview({ parts });
                             });
                         },
-                        onTextPart: () => {
+                        onTextPart: (text) => {
+                            markGenerationDiagnostic(generationRunId, "RESPONSE_RECEIVED", { rawLength: text.length });
                             if (streamParseFrameRef.current) {
                                 cancelAnimationFrame(streamParseFrameRef.current);
                                 streamParseFrameRef.current = 0;
@@ -3276,6 +3313,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         onReasoning: (t) => { capturedReasoning = t; },
                         onStreamDelta: (delta) => {
                             if (!isCurrentGeneration()) return;
+                            markFirstGenerationDelta(generationRun);
                             streamAccumRef.current += delta;
                             // 预览更新合并到 rAF 下一帧：每帧最多一次全文净化+setState，避免高频增量卡顿
                             if (streamParseFrameRef.current) return;
@@ -3285,7 +3323,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                 setStreamPreview({ texts: splitStreamPreviewSegments(cleanStreamText(streamAccumRef.current, { stripXmlTags: streamPreviewTagConfig.online, stripLiterals: streamPreviewTagConfig.stripTexts })) });
                             });
                         },
-                        onTextPart: () => {
+                        onTextPart: (text) => {
+                            markGenerationDiagnostic(generationRunId, "RESPONSE_RECEIVED", { rawLength: text.length });
                             if (streamParseFrameRef.current) {
                                 cancelAnimationFrame(streamParseFrameRef.current);
                                 streamParseFrameRef.current = 0;
@@ -3304,6 +3343,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             }
         } catch (error: any) {
             if (!isCurrentGeneration() || isAbortLikeError(error)) return;
+            markGenerationDiagnostic(generationRunId, "GEN_ERROR", { errorName: typeof error?.name === "string" ? error.name : "Error" });
             const errorMsg = pushChatMessage({
                 sessionId: session.id,
                 role: "system",
@@ -3311,6 +3351,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             });
             setMessages(prev => [...prev, errorMsg]);
         } finally {
+            markGenerationDiagnostic(generationRunId, "GEN_FINALLY", { completed: true });
             if (finishGenerationRun(session.id, generationRunId)) {
                 isGeneratingRef.current = false;
                 setIsGenerating(false);
@@ -3396,6 +3437,29 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         setMessages(prev => [...prev, newMsg]);
         setPendingGenerate(true);
         return true;
+    };
+
+    const sendUploadedPhoto = async (description: string, file: Blob, operationId?: string): Promise<boolean> => {
+        if (!ensureGroupSpeakPermission()) return false;
+        if (isGeneratingRef.current) { showChatToast("请先等待对方回复"); return false; }
+        cancelFollowUp(session.id);
+        markChatRuntimeDiagnostic(operationId, "PHOTO_STORE_BEGIN");
+        try {
+            const mediaUrl = await storeMediaBlob(file, file.type || "application/octet-stream", "image");
+            markChatRuntimeDiagnostic(operationId, "PHOTO_STORED");
+            const newMsg = pushChatMessage({
+                sessionId: session.id, role: "user", content: "", mediaType: "image",
+                mediaData: { label: description }, mediaUrl,
+            });
+            markChatRuntimeDiagnostic(operationId, "PHOTO_MESSAGE_PERSISTED");
+            setMessages(prev => [...prev, newMsg]);
+            setPendingGenerate(true);
+            markChatRuntimeDiagnostic(operationId, "PHOTO_DONE", true);
+            return true;
+        } catch {
+            showChatToast("图片存储失败，请重试");
+            return false;
+        }
     };
 
     const sendSystemInstruction = (content: string): boolean => {
@@ -3507,10 +3571,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             setIsGenerating(false);
             clearGenerationLock(session.id);
         }
-        const generationRun = createGenerationRun(session.id);
+        const generationRun = createGenerationRun(session.id, Boolean(session.isGroup));
         const generationRunId = generationRun.runId;
         const isCurrentGeneration = () => isGenerationRunActive(session.id, generationRunId);
-        const generationGuard: GenerationRunGuard = { signal: generationRun.controller.signal, isActive: isCurrentGeneration };
+        const generationGuard: GenerationRunGuard = { signal: generationRun.controller.signal, isActive: isCurrentGeneration, diagnosticRunId: generationRunId };
         let shouldRunDeclineReply = false;
         isGeneratingRef.current = true;
         setIsGenerating(true);
@@ -3520,6 +3584,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         setStreamPreview(null);
         try {
             const latestMessages = loadChatMessages(session.id);
+            markGenerationDiagnostic(generationRunId, "HISTORY_LOADED", { historyCount: latestMessages.length });
+            markGenerationDiagnostic(generationRunId, "API_BEGIN");
             if (session.isGroup) {
                 const streamedImageReplacementTasks: Promise<unknown>[] = [];
                 // 每轮 LLM 调用的思维链：中间轮挂到该轮首条气泡，最终轮传给 processGroupParts
@@ -3528,6 +3594,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     onReasoning: (t) => { pendingGroupReasoning = t; },
                     onStreamDelta: (delta) => {
                         if (!isCurrentGeneration()) return;
+                        markFirstGenerationDelta(generationRun);
                         streamAccumRef.current += delta;
                         // 群聊全文解析较重：合并到 rAF 下一帧执行，避免一帧多段增量重复解析
                         if (streamParseFrameRef.current) return;
@@ -3548,6 +3615,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     },
                     onTextPart: async (text, senderInfo, options) => {
                         if (!isCurrentGeneration()) return;
+                        markGenerationDiagnostic(generationRunId, "RESPONSE_RECEIVED", { rawLength: text.length });
                         // 本轮群聊内容经 onTextPart 落库后重置，供下一轮（工具轮）重新预览
                         if (streamParseFrameRef.current) {
                             cancelAnimationFrame(streamParseFrameRef.current);
@@ -3567,6 +3635,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         const previousState = getLatestCharacterStateValues(senderInfo.characterId);
                         const { parts: rawParts, stateValues, freshStateValues, statusPanel, innerMonologue } = parseAIResponse(text, previousState);
                         const parts = stripInvalidStickerParts(rawParts, senderInfo.characterId);
+                        const diagnosticCount = parts.filter(part => part.content.trim() || part.mediaType).length;
+                        markGenerationDiagnostic(generationRunId, "PARSE_DONE", {}, diagnosticCount || Number(Boolean(statusPanel || innerMonologue || roundReasoning)));
                         let attachedState = false;
                         let savedAnyPart = false;
                         for (const part of parts) {
@@ -3594,6 +3664,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                             }, generationGuard);
                             throwIfGenerationStopped(generationGuard);
                             const msg = pushChatMessage(draft);
+                            markGenerationDiagnostic(generationRunId, "PUBLISHING", {}, 0, 1);
                             streamedImageReplacementTasks.push(scheduleGeneratedImageReplacement(msg, senderInfo.characterId, generationGuard));
                             attachedState = true;
                             savedAnyPart = true;
@@ -3620,8 +3691,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                 senderCharacterId: senderInfo.characterId,
                                 senderName: senderInfo.characterName,
                             });
+                            markGenerationDiagnostic(generationRunId, "PUBLISHING", {}, 0, 1);
                             setMessages(prev => [...prev, msg]);
                         }
+                        markGenerationDiagnostic(generationRunId, "PUBLISH_DONE");
                     },
                     onToolNotice: (notice) => {
                         if (!isCurrentGeneration()) return;
@@ -3706,6 +3779,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     onReasoning: (t) => { pendingReasoning = t; },
                     onStreamDelta: (delta) => {
                         if (!isCurrentGeneration()) return;
+                        markFirstGenerationDelta(generationRun);
                         streamAccumRef.current += delta;
                         // 预览更新合并到 rAF 下一帧：每帧最多一次全文净化+setState，避免高频增量卡顿
                         if (streamParseFrameRef.current) return;
@@ -3717,6 +3791,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     },
                     onTextPart: async (text, _senderInfo, options) => {
                         if (!isCurrentGeneration()) return;
+                        markGenerationDiagnostic(generationRunId, "RESPONSE_RECEIVED", { rawLength: text.length });
                         // 本轮流式已结束且内容经 splitAndSaveAIMessages 落库：清掉预览、重置累积，
                         // 供下一轮（工具轮）重新累积预览
                         if (streamParseFrameRef.current) {
@@ -3802,6 +3877,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             }
         } catch (error: any) {
             if (!isCurrentGeneration() || isAbortLikeError(error)) return;
+            markGenerationDiagnostic(generationRunId, "GEN_ERROR", { errorName: typeof error?.name === "string" ? error.name : "Error" });
             const errorMsg = pushChatMessage({
                 sessionId: session.id,
                 role: "system",
@@ -3809,6 +3885,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             });
             setMessages(prev => [...prev, errorMsg]);
         } finally {
+            markGenerationDiagnostic(generationRunId, "GEN_FINALLY", { completed: true });
             if (finishGenerationRun(session.id, generationRunId)) {
                 isGeneratingRef.current = false;
                 setIsGenerating(false);
@@ -6267,7 +6344,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 	                onOpenRichModal={(modal) => { setShowPlusMenu(false); setRichModal(modal); }}
                 onOpenCustomPlusAction={handleOpenCustomPlusAction}
                 onStartVideoCall={() => { cancelFollowUp(session.id); setShowPlusMenu(false); setCallInitiator("user"); setShowVideoCall(true); }}
-                onStartVoiceCall={() => { cancelFollowUp(session.id); setShowPlusMenu(false); setCallInitiator("user"); setShowVoiceCall(true); }}
+                onStartVoiceCall={() => { startVoiceCallDiagnostic("user"); cancelFollowUp(session.id); setShowPlusMenu(false); setCallInitiator("user"); setShowVoiceCall(true); }}
                 onSendText={handleSendText}
                 onStopGeneration={clearStuckGeneration}
                 onTriggerAIResponse={triggerAIResponse}
@@ -6415,7 +6492,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             )}
             {richModal === "photo" && (
                 <PhotoInputModal
-                    onSend={(desc, imageDataUrl) => { setRichModal(null); sendRichMessage("image", { label: desc }, "", imageDataUrl); }}
+                    sessionId={session.id}
+                    onSend={sendUploadedPhoto}
                     onClose={() => setRichModal(null)}
                 />
             )}
@@ -6749,6 +6827,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 全屏界面还是左侧悬浮窗 */}
             {showVoiceCall && character && (
                 <VoiceCallScreen
+                    diagnosticOperationId={voiceOperationIdRef.current}
                     session={session}
                     character={character}
                     initiator={callInitiator}

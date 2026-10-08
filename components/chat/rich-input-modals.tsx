@@ -7,30 +7,62 @@ import { PaymentFxLine, usePaymentFx } from "./payment-fx-preview";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { CallSttWarningDialog, hideCallSttWarningPermanently, isCallSttWarningHidden } from "./call-stt-warning-dialog";
 import { isAndroidBrowser } from "./voice-input-platform";
+import { startChatRuntimeDiagnostic } from "@/lib/chat-runtime-diagnostics";
 
 // ── Photo Input Modal ─────────────────────────────
 
 interface PhotoInputModalProps {
-    onSend: (description: string, imageDataUrl?: string) => void;
+    sessionId?: string;
+    onSend: (description: string, file: Blob, operationId?: string) => Promise<boolean>;
     onClose: () => void;
 }
 
-export function PhotoInputModal({ onSend, onClose }: PhotoInputModalProps) {
+export function PhotoInputModal({ onSend, onClose, sessionId = "" }: PhotoInputModalProps) {
     const [desc, setDesc] = useState("");
-    const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+    const [file, setFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [sending, setSending] = useState(false);
+    const [sendError, setSendError] = useState("");
+    const sendingRef = useRef(false);
+    const mountedRef = useRef(true);
+    const operationId = useRef<string | undefined>(undefined);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-            setImageDataUrl(reader.result as string);
-        };
-        reader.readAsDataURL(file);
+        if (!file || sendingRef.current) return;
+        setFile(file);
+        setSendError("");
+        operationId.current = startChatRuntimeDiagnostic(sessionId, "PHOTO_UPLOAD", "PHOTO_SELECTED", {
+            fileBytes: file.size, mime: file.type || "application/octet-stream",
+        });
     };
 
-    const canSend = !!imageDataUrl;
+    useEffect(() => {
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+        return () => URL.revokeObjectURL(url);
+    }, [file]);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
+    const handleSend = async () => {
+        if (!file || sendingRef.current) return;
+        sendingRef.current = true;
+        setSending(true);
+        try {
+            const sent = await onSend(desc.trim(), file, operationId.current);
+            if (sent && mountedRef.current) onClose();
+        } catch {
+            if (mountedRef.current) setSendError("图片存储失败，请重试");
+        } finally {
+            sendingRef.current = false;
+            if (mountedRef.current) setSending(false);
+        }
+    };
+    const canSend = !!file && !sending;
 
     return (
         <div className="modal-overlay" onClick={onClose}>
@@ -41,12 +73,12 @@ export function PhotoInputModal({ onSend, onClose }: PhotoInputModalProps) {
                 <div className="ts-16 font-semibold text-center text-[var(--c-text)]">发送照片</div>
                 <div
                     className="w-full rounded-xl flex items-center justify-center ui-placeholder-gradient overflow-hidden cursor-pointer relative"
-                    style={{ minHeight: imageDataUrl ? "auto" : "120px" }}
+                    style={{ minHeight: previewUrl ? "auto" : "120px" }}
                     onClick={() => fileInputRef.current?.click()}
                 >
-                    {imageDataUrl ? (
+                    {previewUrl ? (
                         <img
-                            src={imageDataUrl}
+                            src={previewUrl}
                             alt="preview"
                             className="w-full h-auto rounded-xl"
                             style={{ maxHeight: "240px", objectFit: "contain" }}
@@ -68,13 +100,14 @@ export function PhotoInputModal({ onSend, onClose }: PhotoInputModalProps) {
                         onChange={handleFileChange}
                     />
                 </div>
+                {sendError && <div role="alert" className="ts-12 text-[var(--c-danger)]">{sendError}</div>}
                 <div className="flex gap-3 w-full">
                     <button
                         onClick={onClose}
                         className="ui-btn ui-btn-ghost ui-btn-bordered-ghost flex-1"
                     >取消</button>
                     <button
-                        onClick={() => { if (canSend) onSend(desc.trim(), imageDataUrl!); }}
+                        onClick={handleSend}
                         disabled={!canSend}
                         className="ui-btn ui-btn-success flex-1"
                     >发送</button>

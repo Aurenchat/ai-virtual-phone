@@ -54,9 +54,9 @@ const ts = require(${JSON.stringify(require.resolve('typescript'))});
 const transpile = require(${JSON.stringify(path.join(repo, 'scripts/anonymous-xhs-phase0/ts-loader.cjs'))});
 module.exports = function(source) {
  const ast = ts.createSourceFile(this.resourcePath, source, ts.ScriptTarget.Latest, true);
- const edits = ast.statements.filter(n => ts.isFunctionDeclaration(n) && ['resolveVoiceConfig','synthesizeSpeech'].includes(n.name?.text)).map(n => ({pos:n.body.getStart(ast)+1,name:n.name.text})).sort((a,b)=>b.pos-a.pos);
- if (edits.length !== 2) throw Error('Both TTS entry probes must be installed');
- for (const e of edits) source = source.slice(0,e.pos) + 'window.__ttsCalls.' + e.name + '++;' + source.slice(e.pos);
+ const edits = ast.statements.filter(n => ts.isFunctionDeclaration(n) && ['resolveVoiceConfig','synthesizeSpeech','setCallAudioSessionActive'].includes(n.name?.text)).map(n => ({pos:n.body.getStart(ast)+1,name:n.name.text,arg:n.parameters[0].name.getText(ast)})).sort((a,b)=>b.pos-a.pos);
+ if (edits.length !== 3) throw Error('TTS and call audio entry probes must be installed');
+ for (const e of edits) source = source.slice(0,e.pos) + (e.name === 'setCallAudioSessionActive' ? '(window as any).__callAudio?.push(' + e.arg + ');' : 'window.__ttsCalls.' + e.name + '++;') + source.slice(e.pos);
  return transpile.call(this,source);
 };`);
     await fs.writeFile(path.join(temp, 'sticker-probe-loader.cjs'), `
@@ -92,12 +92,14 @@ module.exports = function(source) {
  }
  return transpile.call(this,source);
 };`);
+    const mediaSpikeRules = await require('./chat-runtime-memory/media-spike-loaders.cjs')({ temp, repo });
     const wp = require('next/dist/compiled/webpack/webpack'); wp.init();
     await new Promise((resolve, reject) => wp.webpack({
         mode: 'development', target: 'web', devtool: false, context: repo,
         entry: path.join(temp, 'entry.tsx'), output: { path: temp, filename: 'fixture.js' },
         resolve: { extensions: ['.tsx', '.ts', '.js'], alias: { '@': repo }, modules: [path.join(repo, 'node_modules')], fallback: { fs: false, path: false, crypto: false } },
         module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, oneOf: [
+            ...mediaSpikeRules,
             { test: /[\\/]tts-service\.ts$/, use: path.join(temp, 'tts-probe-loader.cjs') },
             { test: /[\\/]message-bubble\.tsx$/, use: path.join(temp, 'sticker-probe-loader.cjs') },
             { test: /[\\/]theme-storage\.ts$/, use: path.join(temp, 'asset-probe-loader.cjs') },
@@ -118,6 +120,9 @@ module.exports = function(source) {
                 res.setHeader('Content-Type', 'text/html');
                 res.end(`<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/style.css"><style>html,body,#app{margin:0;width:100%;height:100%;overflow:hidden}</style><div id="app"></div><script>
 window.process={env:{NODE_ENV:'development'}}; window.__ttsCalls={resolveVoiceConfig:0,synthesizeSpeech:0};
+window.__diagWrites=[];
+const setItem=Storage.prototype.setItem;
+Storage.prototype.setItem=function(k,v){if(k.startsWith('ai_phone_chat_')&&k.includes('_diag_current_'))window.__diagWrites.push({key:k,record:JSON.parse(v)});return setItem.call(this,k,v)};
 window.__urls={created:[],revoked:[]};
 const create=URL.createObjectURL.bind(URL),revoke=URL.revokeObjectURL.bind(URL);
 URL.createObjectURL=b=>{const u=create(b);window.__urls.created.push(u);return u};
@@ -220,6 +225,7 @@ HTMLMediaElement.prototype.play=function(){window.__played.push(this.src);return
         await page.evaluate(() => window.hostMemoryTest.reply());
         await page.waitForFunction(() => !!window.hostMemoryTest.lock());
         await waitForRequest();
+        check(await page.evaluate(() => { const r = window.mediaSpikeTest.generation().current; return r.lastStage === 'API_BEGIN' && !r.completed && r.historyCount > 0; }), 'pending real generation records API_BEGIN without content');
         await back(); check(await count() === 0, 'pending generation room truly unmounted');
         resolveReply('Deferred reply persisted.');
         await page.waitForFunction(() => window.hostMemoryTest.messages().some(m => m.role === 'assistant' && m.content.includes('Deferred reply persisted.')) && !window.hostMemoryTest.lock());
@@ -234,14 +240,23 @@ HTMLMediaElement.prototype.play=function(){window.__played.push(this.src);return
         resolveReply('Second generation works.');
         await page.locator('.chat-room-wrapper').getByText('Second generation works.', { exact: true }).waitFor();
         await page.waitForFunction(() => !window.hostMemoryTest.lock());
+        check(await page.evaluate(() => { const r = window.mediaSpikeTest.generation().current; return r.lastStage === 'GEN_FINALLY' && r.completed && r.publishedCount > 0; }), 'real generation finalizes diagnostics after successful persistence');
         check(true, 'module generation run cleared: next generation completes');
         await page.evaluate(() => { window.hostMemoryTest.observePacing(); window.hostMemoryTest.reply(); });
         await waitForRequest();
         resolveReply('Paced reply one\n\nPaced reply two\n\nPaced reply three');
         await page.locator('.chat-room-wrapper').getByText('Paced reply one', { exact: true }).waitFor();
         check(await page.locator('.chat-room-wrapper').getByText('Paced reply two', { exact: true }).count() === 0, 'non-instant reply publishes its first bubble before the remaining bubbles');
+        check(await page.evaluate(() => { const r = window.mediaSpikeTest.generation().current; return r.lastStage === 'PUBLISHING' && r.publishedCount === 1 && r.draftCount === 3 && !r.completed; }), 'first real staged publish leaves an incomplete breadcrumb with full draft count');
         await page.locator('.chat-room-wrapper').getByText('Paced reply three', { exact: true }).waitFor();
         const pacing = await page.evaluate(() => window.hostMemoryTest.pacing());
+        check(await page.evaluate(() => {
+            const current = window.mediaSpikeTest.generation().current;
+            const writes = window.__diagWrites.filter(w => w.record.runId === current.runId).map(w => w.record);
+            return writes.some(r => r.lastStage === 'PARSE_DONE' && r.draftCount === 3 && r.publishedCount === 0)
+                && writes.some(r => r.lastStage === 'PUBLISHING' && r.publishedCount === 1 && r.draftCount === 3)
+                && writes.some(r => r.lastStage === 'PUBLISH_DONE' && r.publishedCount === 3 && !r.completed);
+        }), 'real staged publish records parse, first publish and publish done before finally');
         check(pacing['Paced reply two'] - pacing['Paced reply one'] >= 700 && pacing['Paced reply three'] - pacing['Paced reply two'] >= 700, 'non-instant reply retains the 800ms delays between successive bubbles');
         await page.waitForFunction(() => !window.hostMemoryTest.lock());
         await page.locator('button[title="关闭"]').click();
@@ -263,6 +278,8 @@ HTMLMediaElement.prototype.play=function(){window.__played.push(this.src);return
         assert.deepEqual(errors, []); check(true, 'no browser page errors');
         await require('./chat-runtime-memory/sticker-scenarios.cjs')({ page, check });
         assert.deepEqual(errors, []); check(true, 'lazy sticker scenarios have no browser page errors or unhandled rejections');
+        await require('./chat-runtime-memory/media-spike-scenarios.cjs')({ page, check, waitForRequest, resolveReply });
+        assert.deepEqual(errors, []); check(true, 'media spike and diagnostics scenarios have no browser page errors or unhandled rejections');
         console.log(JSON.stringify({ checks: results.length, results, errors }, null, 2));
     } finally {
         for (const res of pending) res.destroy();

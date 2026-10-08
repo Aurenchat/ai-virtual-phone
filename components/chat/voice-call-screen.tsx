@@ -21,6 +21,7 @@ import { useCallKeyboardOffsetStyle } from "./use-call-keyboard-offset";
 import { CallSttWarningDialog, hideCallSttWarningPermanently, isCallSttWarningHidden } from "./call-stt-warning-dialog";
 import { isAndroidBrowser, isIOSDevice } from "./voice-input-platform";
 import { CallVolumeControl } from "./call-volume-control";
+import { startChatRuntimeDiagnostic, markChatRuntimeDiagnostic } from "@/lib/chat-runtime-diagnostics";
 import { startIncomingCallVibration } from "@/lib/call-vibration";
 
 // ── Types ───────────────────────────────────────────
@@ -44,6 +45,7 @@ type VoiceCallScreenProps = {
     character: Character;
     onEnd: () => void;
     onConnect?: () => void;
+    diagnosticOperationId?: string;
     initiator?: "user" | "character";
     /** 通话是否处于缩小的悬浮窗状态：暂停麦克风监听/计时/语音播放，仅显示背景+名字 */
     minimized?: boolean;
@@ -62,7 +64,7 @@ function stripBilingualForSpeech(text: string): string {
 
 // ── Component ───────────────────────────────────────
 
-export function VoiceCallScreen({ session, character, onEnd, onConnect, initiator = "user", minimized = false, onMinimize, onRestore }: VoiceCallScreenProps) {
+export function VoiceCallScreen({ session, character, onEnd, onConnect, initiator = "user", minimized = false, onMinimize, onRestore, diagnosticOperationId }: VoiceCallScreenProps) {
     // iOS 保留 Web Speech 免提 + Web Audio 播放（麦克风会话共存的老方案）；
     // 其余设备改「按住说话 + 云端转写」，播放走媒体元素（音量键可控、无静音拨键坑）。
     // 没配 OpenAI 兼容识别时回落旧行为（安卓=文字输入）。
@@ -98,6 +100,14 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
     const sttWarningShownRef = useRef(false);
     const subtitleScrollRef = useRef<HTMLDivElement>(null);
     const messagesRef = useRef<ChatMessage[]>([]);
+    const messagesLoadedRef = useRef(false);
+    const operationIdRef = useRef(diagnosticOperationId);
+    const ensureMessagesLoaded = useCallback(() => {
+        if (messagesLoadedRef.current) return;
+        messagesRef.current = loadChatMessages(session.id);
+        messagesLoadedRef.current = true;
+    }, [session.id]);
+    const callSessionActive = callState !== "CONNECTING" && callState !== "ENDED";
     const _initUi = resolveUserIdentity(session.contactId, "chat");
     const userNameRef = useRef<string>(_initUi?.name || "你");
 
@@ -132,7 +142,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
     // 恒成立（stateRef 停在 IDLE），会在后台无限自我重启，麦克风永不归还，
     // 整页音频被钉在通话模式（语音条/试听音量巨大且音量键失灵）。
     useEffect(() => {
-        setCallAudioSessionActive(true);
+        stateRef.current = "CONNECTING";
         return () => {
             stateRef.current = "ENDED";
             if (sttRef.current) { sttRef.current.abort(); sttRef.current = null; }
@@ -140,6 +150,15 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
             setCallAudioSessionActive(false);
         };
     }, []);
+    useEffect(() => {
+        if (!callSessionActive) return;
+        setCallAudioSessionActive(true);
+        return () => {
+            if (sttRef.current) { sttRef.current.abort(); sttRef.current = null; }
+            if (audioAbortRef.current) { audioAbortRef.current(); audioAbortRef.current = null; }
+            setCallAudioSessionActive(false);
+        };
+    }, [callSessionActive]);
     useEffect(() => { interimTextRef.current = interimText; }, [interimText]);
 
     const showSttCompatibilityWarning = useCallback(() => {
@@ -167,20 +186,25 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
     // ── Resolve voiceBackground from IndexedDB ──────
 
     useEffect(() => {
-        if (!session.voiceBackground) {
-            setBgImageResolved(null);
-            return;
-        }
-        if (session.voiceBackground.startsWith("data:") || session.voiceBackground.startsWith("http")) {
-            setBgImageResolved(session.voiceBackground);
-            return;
-        }
-        // IndexedDB ID
-        import("@/lib/chat-asset-storage").then(({ getChatImageFromIndexedDB }) => {
-            getChatImageFromIndexedDB(session.voiceBackground!).then(dataUrl => {
-                if (dataUrl) setBgImageResolved(dataUrl);
+        setBgImageResolved(null);
+        if (!session.voiceBackground) return;
+        let cancelled = false;
+        let secondFrame = 0;
+        const firstFrame = requestAnimationFrame(() => {
+            secondFrame = requestAnimationFrame(() => {
+                markChatRuntimeDiagnostic(operationIdRef.current, "CALL_BG_BEGIN");
+                const background = session.voiceBackground!;
+                const resolve = background.startsWith("data:") || background.startsWith("http")
+                    ? Promise.resolve(background)
+                    : import("@/lib/chat-asset-storage").then(({ getChatImageFromIndexedDB }) => getChatImageFromIndexedDB(background));
+                void resolve.then(url => {
+                    if (cancelled) return;
+                    if (url) setBgImageResolved(url);
+                    markChatRuntimeDiagnostic(operationIdRef.current, "CALL_BG_READY");
+                }).catch(() => { /* Keep the default call background. */ });
             });
         });
+        return () => { cancelled = true; cancelAnimationFrame(firstFrame); cancelAnimationFrame(secondFrame); };
     }, [session.voiceBackground]);
 
     // ── Call timer ───────────────────────────────────
@@ -222,29 +246,33 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
         const ui = resolveUserIdentity(session.contactId, "chat");
         userNameRef.current = ui?.name || "你";
 
-        // Load existing messages for context
-        messagesRef.current = loadChatMessages(session.id);
+        if (!operationIdRef.current) {
+            operationIdRef.current = startChatRuntimeDiagnostic(session.id, "VOICE_CALL", "CALL_TRIGGERED", { initiator });
+        }
+        markChatRuntimeDiagnostic(operationIdRef.current, "CALL_SCREEN_MOUNTED");
+        // Incoming calls only need the last record until the user accepts.
+        const lastMsg = loadChatMessages(session.id, 1)[0];
 
         // Insert system message (skip if already exists from strict mode remount)
-        const lastMsg = messagesRef.current[messagesRef.current.length - 1];
         const initRole = initiator === "character" ? "assistant" : "user";
         if (!lastMsg || !(lastMsg.content.includes("发起了语音通话"))) {
             const callMsg = initiator === "character"
                 ? `[我向${userNameRef.current}发起了语音通话]`
                 : `[我向${character.name}发起了语音通话]`;
-            const sysMsg = pushChatMessage({
+            pushChatMessage({
                 sessionId: session.id,
                 role: initRole,
                 content: callMsg,
             });
-            messagesRef.current = [...messagesRef.current, sysMsg];
         }
+        markChatRuntimeDiagnostic(operationIdRef.current, "CALL_RECORD_PERSISTED");
 
         // User-initiated: auto-connect after 3s fake dial
         // Character-initiated: wait for user to accept
         let connectTimer: NodeJS.Timeout | undefined;
         if (initiator !== "character") {
             connectTimer = setTimeout(() => {
+                ensureMessagesLoaded();
                 setCallState("IDLE");
             }, 3000);
         }
@@ -258,10 +286,12 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
 
     // Track first connect
     useEffect(() => {
-        if (callState !== "CONNECTING" && !hasConnectedRef.current) {
+        if (callSessionActive && !hasConnectedRef.current) {
+            ensureMessagesLoaded();
             hasConnectedRef.current = true;
+            markChatRuntimeDiagnostic(operationIdRef.current, "CALL_CONNECTED");
         }
-    }, [callState]);
+    }, [callSessionActive, ensureMessagesLoaded]);
 
     // ── Format time MM:SS ───────────────────────────
 
@@ -344,6 +374,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
     // ── Full conversation turn ──────────────────────
 
     const runConversationTurn = useCallback(async (userText?: string) => {
+        ensureMessagesLoaded();
         // 1. Save user message (skip for initial greeting)
         if (userText) {
             const userMsg = pushChatMessage({
@@ -424,7 +455,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
                 setCallState("IDLE");
             }
         }
-    }, [session, processAIResponse, playCallAudio]);
+    }, [session, processAIResponse, playCallAudio, ensureMessagesLoaded]);
 
     // ── Auto-listen: 进入 IDLE 自动开始监听 ────────
 
@@ -598,6 +629,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
     // ── Hangup ──────────────────────────────────────
 
     const handleHangup = useCallback(() => {
+        markChatRuntimeDiagnostic(operationIdRef.current, "CALL_ENDED", true);
         setCallState("ENDED");
 
         // Stop any ongoing STT
@@ -955,6 +987,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
                                         role: "user",
                                         content: `[我拒绝了语音通话]`,
                                     });
+                                    markChatRuntimeDiagnostic(operationIdRef.current, "CALL_ENDED", true);
                                     onEnd();
                                 }}
                                 className="ui-call-btn ui-call-btn-danger"
@@ -965,7 +998,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
                                 </svg>
                             </button>
                             <button
-                                onClick={() => setCallState("IDLE")}
+                                onClick={() => { ensureMessagesLoaded(); setCallState("IDLE"); }}
                                 className="ui-call-btn ui-call-btn-success"
                             >
                                 {/* Phone pick-up icon */}
@@ -983,6 +1016,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
                                     role: "user",
                                     content: `[我取消了语音通话]`,
                                 });
+                                markChatRuntimeDiagnostic(operationIdRef.current, "CALL_ENDED", true);
                                 onEnd();
                             }}
                             className="ui-call-btn ui-call-btn-danger"
