@@ -4,6 +4,11 @@ import { saveFile, releaseDownloads } from "./float-rescue/save.js";
 const element = id => document.getElementById(id);
 let schema; let exporter = null; let index = null; let busy = false;
 const status = message => { element("status").textContent = message; };
+function preflightProgress({ phase, dbName, storeName, completedStores, totalStores }) {
+  if (phase === "OPEN_DB") status(`正在预检：${dbName}（打开数据库）`);
+  else if (phase === "COUNT_STORE") status(`正在预检：${dbName} / ${storeName}（${completedStores + 1} / ${totalStores}）`);
+  else status(`预检记录数核对完成（${completedStores} / ${totalStores}）`);
+}
 const selected = () => Array.from(document.querySelectorAll("#modules input:checked"), input => input.value);
 const mode = () => selected().length === 1 && selected()[0] === "chat" ? "chat" : "full";
 const bytes = value => `${(value / 1024 / 1024).toFixed(2)} MiB`;
@@ -40,7 +45,7 @@ element("preset-full").addEventListener("click", () => resetSelection(schema.mod
 element("preflight").addEventListener("click", () => action(async () => {
   exporter = null; element("inventory").textContent = ""; lockSelection(true); status("正在只读预检数据库与记录数…");
   try {
-    exporter = await RescueExporter.prepare(schema, selected(), mode());
+    exporter = await RescueExporter.prepare(schema, selected(), mode(), { onProgress: preflightProgress });
     element("inventory").textContent = exporter.inventory.map(task => `${task.id}: ${task.exists ? task.count + " 条" : "数据库不存在（未创建）"}`).join("\n");
     status("预检通过。准备好保存文件后，点击生成分卷。");
   } finally { lockSelection(false); }
@@ -73,7 +78,7 @@ element("verify").addEventListener("click", () => action(async () => {
   } catch (error) { element("verification").textContent = `验证失败：${error.message}`; }
 }));
 element("resume-button").addEventListener("click", () => action(async () => {
-  status("正在重新预检，确认源数据未变化…"); exporter = await RescueExporter.resume(schema); lockSelection(true); element("resume").hidden = true; await generateNext();
+  status("正在重新预检，确认源数据未变化…"); exporter = await RescueExporter.resume(schema, { onProgress: preflightProgress }); lockSelection(true); element("resume").hidden = true; await generateNext();
 }));
 element("restart").addEventListener("click", () => action(async () => {
   RescueExporter.restart(); exporter = null; index = null; element("resume").hidden = true; element("part").hidden = true; element("index").hidden = true; lockSelection(false); resetSelection(["chat"]); status("已移除救援断点。Float 原数据未修改，可以重新预检。");

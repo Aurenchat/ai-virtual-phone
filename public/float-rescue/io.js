@@ -1,6 +1,7 @@
 import { IncrementalSha256 } from "./sha256.js";
 export const READ_CHUNK_BYTES = 1024 * 1024;
 export const CHECKPOINT_KEY = "float_rescue_export_checkpoint_v1";
+export const RESCUE_DB_OPEN_TIMEOUT_MS = 15_000;
 const yieldFrame = () => new Promise(resolve => setTimeout(resolve, 0));
 
 // Slice even before stream(): never trust a browser stream's chosen chunk size.
@@ -39,18 +40,29 @@ export async function crc32Blob(blob, probe) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-export async function openExistingDb(name) {
-  if (typeof indexedDB.databases === "function" && !(await indexedDB.databases()).some(db => db.name === name)) return null;
+export function openExistingDb(name) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(name); let stopped = false;
-    const timer = setTimeout(() => { stopped = true; reject(Error(`数据库读取超时：${name}`)); }, 15000);
-    request.onupgradeneeded = () => { stopped = true; request.transaction.abort(); clearTimeout(timer); resolve(null); };
-    request.onerror = () => { clearTimeout(timer); if (!stopped) reject(Error(`数据库无法打开：${name}`)); };
-    request.onblocked = () => { stopped = true; clearTimeout(timer); reject(Error(`数据库被其它页面占用：${name}`)); };
+    let request; let settled = false;
+    const settle = (error, db = null) => {
+      if (settled) return;
+      settled = true; clearTimeout(timer);
+      if (error) reject(error); else resolve(db);
+    };
+    const abortUpgrade = () => { try { request?.transaction?.abort(); } catch { /* It may already have ended. */ } };
+    // Start before open(), covering the entire request, including upgrade waits.
+    const timer = setTimeout(() => { settle(Error(`数据库读取超时：${name}`)); abortUpgrade(); }, RESCUE_DB_OPEN_TIMEOUT_MS);
+    try { request = indexedDB.open(name); } catch { settle(Error(`数据库无法打开：${name}`)); return; }
+    request.onupgradeneeded = event => {
+      // Settle first so abort's error event cannot replace the missing-DB result.
+      settle(event.oldVersion === 0 ? null : Error(`数据库需要升级，救援读取已停止：${name}`));
+      abortUpgrade();
+    };
+    request.onerror = () => { if (!settled) { settle(Error(`数据库无法打开：${name}`)); abortUpgrade(); } };
+    request.onblocked = () => { if (!settled) { settle(Error(`数据库被其它页面占用：${name}`)); abortUpgrade(); } };
     request.onsuccess = () => {
-      clearTimeout(timer); const db = request.result;
-      if (stopped) { db.close(); return; }
-      db.onversionchange = () => db.close(); resolve(db);
+      const db = request.result;
+      if (settled) { db.close(); return; }
+      db.onversionchange = () => db.close(); settle(null, db);
     };
   });
 }

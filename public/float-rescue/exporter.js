@@ -1,4 +1,4 @@
-import { CHECKPOINT_KEY, openExistingDb, transactionDone, requestResult, ownsKey, storeSchema, encodeKey, decodeKey, rawSize, sha256Blob } from "./io.js";
+import { CHECKPOINT_KEY, openExistingDb, transactionDone, ownsKey, storeSchema, encodeKey, decodeKey, rawSize, sha256Blob } from "./io.js";
 import { createCollector, serializeValue, serializeStorageString } from "./serializer.js";
 import { StoreZipWriter, CENTRAL_DIRECTORY_MAX_BYTES } from "./zip-store.js";
 export const CHAT_RESCUE_BATCH_ROWS = 1;
@@ -6,6 +6,7 @@ export const DEFAULT_RESCUE_BATCH_ROWS = 16;
 export const RESCUE_RAW_BATCH_CHAR_BUDGET = 16 * 1024 * 1024;
 export const RESCUE_PART_TARGET_BYTES = 96 * 1024 * 1024;
 export const RESCUE_PART_HARD_MAX_BYTES = 128 * 1024 * 1024;
+export const RESCUE_PREFLIGHT_STORE_TIMEOUT_MS = 30_000;
 const cloneMetadata = value => JSON.parse(JSON.stringify(value));
 const sourceChanged = "源数据在导出过程中发生变化，请保持 Float 主应用关闭并重新导出。";
 const resumeChanged = "源数据自备份开始后已发生变化，为避免生成不一致的备份，请重新开始。";
@@ -25,44 +26,73 @@ function localKeys(schema, moduleId, sourceIndex) {
   }
   return keys.sort();
 }
-async function countTask(db, task, schema) {
-  const tx = db.transaction(task.store, "readonly"); const done = transactionDone(tx); const store = tx.objectStore(task.store);
-  let count = 0;
-  if (task.type === "indexeddb") {
-    const [result] = await Promise.all([requestResult(store.count()), done]);
-    return result;
-  }
-  else {
-    const request = store.openKeyCursor();
-    request.onsuccess = () => { const cursor = request.result; if (!cursor) return; if (ownsKey(schema, task.moduleId, task.sourceIndex, cursor.primaryKey, "kv")) count++; cursor.continue(); };
-  }
-  await done; return count;
+function countTask(db, task, schema) {
+  return new Promise((resolve, reject) => {
+    let tx; let spec; let count = 0; let settled = false; let requestComplete = false; let txComplete = false;
+    const fail = error => {
+      if (settled) return;
+      settled = true; clearTimeout(timer); reject(error);
+      try { tx?.abort(); } catch { /* It may already have ended. */ }
+    };
+    const complete = () => {
+      if (settled || !requestComplete || !txComplete) return;
+      settled = true; clearTimeout(timer); resolve({ count, schema: spec });
+    };
+    const timer = setTimeout(() => fail(Error(`预检超时：${task.dbName} / ${task.store}`)), RESCUE_PREFLIGHT_STORE_TIMEOUT_MS);
+    try {
+      tx = db.transaction(task.store, "readonly"); const store = tx.objectStore(task.store);
+      spec = storeSchema(store);
+      tx.oncomplete = () => { txComplete = true; complete(); };
+      tx.onerror = tx.onabort = () => fail(Error(`预检读取失败：${task.dbName} / ${task.store}`));
+      const request = task.type === "indexeddb" ? store.count() : store.openKeyCursor();
+      request.onerror = () => fail(Error(`预检读取失败：${task.dbName} / ${task.store}`));
+      request.onsuccess = () => {
+        if (settled) return;
+        try {
+          if (task.type === "indexeddb") { count = request.result; requestComplete = true; }
+          else {
+            const cursor = request.result;
+            if (cursor) { if (ownsKey(schema, task.moduleId, task.sourceIndex, cursor.primaryKey, "kv")) count++; cursor.continue(); return; }
+            requestComplete = true;
+          }
+          complete();
+        } catch (error) { fail(error); }
+      };
+    } catch (error) { fail(error); }
+  });
 }
-export async function preflightInventory(schema, ids) {
-  const tasks = [];
-  for (const module of selectedModules(schema, ids)) for (const source of module.sources) {
+export async function preflightInventory(schema, ids, onProgress = () => {}) {
+  const modules = selectedModules(schema, ids); const tasks = []; let completedStores = 0;
+  // Unknown store lists expand this denominator when their database opens.
+  let totalStores = modules.reduce((total, module) => total + module.sources.reduce((sum, source) => sum + (source.type === "indexeddb" ? source.stores?.length ?? 1 : 1), 0), 0);
+  for (const module of modules) for (const source of module.sources) {
     const base = { moduleId: module.id, label: module.label, sourceIndex: source.sourceIndex, type: source.type, source };
     if (source.type === "localStorage") {
-      tasks.push({ ...base, id: `${module.id}/${source.sourceIndex}/localStorage`, exists: true, count: localKeys(schema, module.id, source.sourceIndex).length }); continue;
+      onProgress({ phase: "COUNT_STORE", dbName: "localStorage", storeName: "localStorage", completedStores, totalStores });
+      tasks.push({ ...base, id: `${module.id}/${source.sourceIndex}/localStorage`, exists: true, count: localKeys(schema, module.id, source.sourceIndex).length }); completedStores++; continue;
     }
     const dbName = source.type === "kv" ? "AiPhoneKvDB" : source.dbName;
+    onProgress({ phase: "OPEN_DB", dbName, completedStores, totalStores });
     const db = await openExistingDb(dbName);
     if (!db) {
       if (module.critical) throw Error(`关键数据库不存在，不能开始救援备份：${dbName}`);
+      totalStores -= source.type === "indexeddb" ? source.stores?.length ?? 1 : 1;
       tasks.push({ ...base, id: `${module.id}/${source.sourceIndex}/absent`, dbName, exists: false, count: 0 }); continue;
     }
     try {
       const names = source.type === "kv" ? ["entries"] : source.stores || Array.from(db.objectStoreNames).sort();
+      totalStores += names.length - (source.type === "indexeddb" ? source.stores?.length ?? 1 : 1);
       if (!names.length && module.critical) throw Error(`关键数据库没有 object store：${dbName}`);
       if (!names.length) tasks.push({ ...base, id: `${module.id}/${source.sourceIndex}/empty`, dbName, exists: true, count: 0 });
       for (const name of names) {
         if (!db.objectStoreNames.contains(name)) throw Error(`数据库缺少 object store：${dbName}/${name}`);
-        const tx = db.transaction(name, "readonly"); const done = transactionDone(tx); const spec = storeSchema(tx.objectStore(name)); await done;
-        const task = { ...base, id: `${module.id}/${source.sourceIndex}/${name}`, dbName, store: name, schema: spec, exists: true, count: 0 };
-        task.count = await countTask(db, task, schema); tasks.push(task);
+        onProgress({ phase: "COUNT_STORE", dbName, storeName: name, completedStores, totalStores });
+        const task = { ...base, id: `${module.id}/${source.sourceIndex}/${name}`, dbName, store: name, exists: true, count: 0 };
+        Object.assign(task, await countTask(db, task, schema)); tasks.push(task); completedStores++;
       }
     } finally { db.close(); }
   }
+  onProgress({ phase: "COMPLETE", completedStores, totalStores });
   return tasks;
 }
 function sameInventory(a, b) {
@@ -117,7 +147,7 @@ export class RescueExporter {
   }
   static async prepare(schema, ids, mode, options) {
     if (!["chat", "full"].includes(mode)) throw Error("备份模式无效");
-    return new RescueExporter(schema, await preflightInventory(schema, ids), selectedModules(schema, ids).map(module => module.id), mode, options);
+    return new RescueExporter(schema, await preflightInventory(schema, ids, options?.onProgress), selectedModules(schema, ids).map(module => module.id), mode, options);
   }
   checkpoint(state = this.state, parts = this.parts) {
     return { version: 1, setId: this.setId, createdAt: this.createdAt, origin: this.origin, mode: this.mode, selected: this.selected, inventory: this.inventory, state, parts, partTargetBytes: this.target };
