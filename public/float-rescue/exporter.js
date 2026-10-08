@@ -8,6 +8,9 @@ export const RESCUE_RAW_BATCH_CHAR_BUDGET = 16 * 1024 * 1024;
 export const RESCUE_PART_TARGET_BYTES = 96 * 1024 * 1024;
 export const RESCUE_PART_HARD_MAX_BYTES = 128 * 1024 * 1024;
 export const RESCUE_PREFLIGHT_STORE_TIMEOUT_MS = 30_000;
+export const RESCUE_MESSAGE_COUNT_INACTIVITY_TIMEOUT_MS = 20_000;
+export const RESCUE_MESSAGE_COUNT_ABSOLUTE_TIMEOUT_MS = 120_000;
+export const RESCUE_MESSAGE_COUNT_PROGRESS_KEYS = 512;
 const cloneMetadata = value => JSON.parse(JSON.stringify(value));
 const sourceChanged = "源数据在导出过程中发生变化，请保持 Float 主应用关闭并重新导出。";
 const resumeChanged = "源数据自备份开始后已发生变化，为避免生成不一致的备份，请重新开始。";
@@ -39,7 +42,61 @@ function localKeys(schema, moduleId, sourceIndex) {
   }
   return keys.sort();
 }
+function countMessageKeys(db, task, onProgress) {
+  return new Promise((resolve, reject) => {
+    const started = performance.now();
+    let tx; let spec; let count = 0; let settled = false; let exhausted = false; let txComplete = false;
+    let lastEvent = "TX_OPENED"; let inactivityTimer;
+    const clearTimers = () => { clearTimeout(inactivityTimer); clearTimeout(absoluteTimer); };
+    const detail = reason => `${reason}：${task.dbName} / ${task.store}；已扫描 ${count} 条；最后事件 ${lastEvent}`;
+    const fail = error => {
+      if (settled) return;
+      settled = true; clearTimers(); reject(error);
+      try { tx?.abort(); } catch { /* Best effort after a stalled/ended transaction. */ }
+    };
+    const report = event => {
+      lastEvent = event;
+      onProgress({ phase: "COUNT_KEYS", dbName: task.dbName, storeName: task.store, scannedCount: count, elapsedMs: Math.round(performance.now() - started), lastEvent });
+    };
+    const armInactivity = () => {
+      clearTimeout(inactivityTimer);
+      inactivityTimer = setTimeout(() => fail(Error(detail("预检超时（inactivity timeout，20 秒无进展）"))), RESCUE_MESSAGE_COUNT_INACTIVITY_TIMEOUT_MS);
+    };
+    const absoluteTimer = setTimeout(() => fail(Error(detail("预检超时（absolute timeout，120 秒总上限）"))), RESCUE_MESSAGE_COUNT_ABSOLUTE_TIMEOUT_MS);
+    const complete = () => {
+      if (settled || !exhausted || !txComplete) return;
+      settled = true; clearTimers(); resolve({ count, schema: spec });
+    };
+    armInactivity();
+    try {
+      tx = db.transaction(task.store, "readonly"); const store = tx.objectStore(task.store);
+      spec = storeSchema(store); report("TX_OPENED");
+      tx.oncomplete = () => {
+        if (settled) return;
+        try { txComplete = true; report("TX_COMPLETE"); complete(); } catch (error) { fail(error); }
+      };
+      tx.onerror = tx.onabort = event => {
+        if (settled) return;
+        try { report(event.type === "abort" ? "TX_ABORT" : "TX_ERROR"); } catch { /* Preserve the database failure. */ }
+        fail(Error(detail("预检读取失败")));
+      };
+      const request = store.openKeyCursor(); report("REQUEST_ISSUED");
+      request.onerror = () => { if (!settled) fail(Error(detail("聊天消息 key 请求失败"))); };
+      request.onsuccess = () => {
+        if (settled) return;
+        try {
+          const cursor = request.result;
+          if (!cursor) { exhausted = true; report("CURSOR_EXHAUSTED"); armInactivity(); complete(); return; }
+          count++; lastEvent = count === 1 ? "FIRST_KEY_RECEIVED" : "KEY_PROGRESS";
+          if (count === 1 || count % RESCUE_MESSAGE_COUNT_PROGRESS_KEYS === 0) report(lastEvent);
+          cursor.continue(); armInactivity();
+        } catch (error) { fail(error); }
+      };
+    } catch (error) { fail(error); }
+  });
+}
 function countTask(db, task, schema, onProgress) {
+  if (task.dbName === "AiPhoneChatDB" && task.store === "messages") return countMessageKeys(db, task, onProgress);
   return new Promise((resolve, reject) => {
     let tx; let spec; let count = 0; let settled = false; let requestComplete = false; let txComplete = false;
     const fail = error => {
