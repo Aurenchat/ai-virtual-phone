@@ -37,7 +37,7 @@ for(const file of ['html','js']){
     check(failure==='offline'?failed:response.status===(failure==='404'?404:200)&&await response.text()==='preview only',`Maintenance ${file} ${failure||'online'} never falls back to hydrated shell`);
   }
 }
-for(const pathname of ['/float-rescue-backup','/float-rescue-backup/','/float-rescue-backup.js','/float-rescue-backup/schema','/float-rescue-backup/schema/','/float-rescue/exporter.js','/float-rescue/zip-store.js','/float-rescue/sha256.js','/float-rescue/serializer.js','/float-rescue/io.js','/float-rescue/save.js','/float-rescue/verifier.js']){
+for(const pathname of ['/float-rescue-backup','/float-rescue-backup/','/float-rescue-backup.js','/float-rescue-backup/schema','/float-rescue-backup/schema/','/float-rescue/exporter.js','/float-rescue/zip-store.js','/float-rescue/sha256.js','/float-rescue/serializer.js','/float-rescue/io.js','/float-rescue/kv-selectors.js','/float-rescue/save.js','/float-rescue/verifier.js']){
   for(const failure of ['', '404', 'offline']){
     const rescue=harness({clients:[bClient],maintenanceFailure:failure});await rescue.ready();
     let response,failed=false;try{response=await rescue.run('fetch',{request:new Request(`https://float.test${pathname}`)});}catch{failed=true;}

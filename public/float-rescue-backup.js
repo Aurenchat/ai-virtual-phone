@@ -4,9 +4,10 @@ import { saveFile, releaseDownloads } from "./float-rescue/save.js";
 const element = id => document.getElementById(id);
 let schema; let exporter = null; let index = null; let busy = false;
 const status = message => { element("status").textContent = message; };
-function preflightProgress({ phase, dbName, storeName, completedStores, totalStores }) {
+function preflightProgress({ phase, dbName, storeName, completedStores, totalStores, sourceLabel, selectorIndex, selectorCount }) {
   if (phase === "OPEN_DB") status(`正在预检：${dbName}（打开数据库）`);
   else if (phase === "COUNT_STORE") status(`正在预检：${dbName} / ${storeName}（${completedStores + 1} / ${totalStores}）`);
+  else if (phase === "COUNT_SELECTOR") status(`正在预检：${dbName} / ${storeName}\n${sourceLabel || "KV 数据"}\nselector ${selectorIndex + 1} / ${selectorCount}`);
   else status(`预检记录数核对完成（${completedStores} / ${totalStores}）`);
 }
 const selected = () => Array.from(document.querySelectorAll("#modules input:checked"), input => input.value);

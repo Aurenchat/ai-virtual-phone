@@ -72,11 +72,12 @@ async function routeModule(file, imports = {}) {
       return { inventory, progress, writes, enumerations, transactions: transactions.map(({ tx, ...entry }) => entry), requestKinds, constants: [io.RESCUE_DB_OPEN_TIMEOUT_MS, api.RESCUE_PREFLIGHT_STORE_TIMEOUT_MS] };
     }, schema);
     check('pending indexedDB.databases is never called; normal chat preflight returns correct count without message values', normal.enumerations === 0 && normal.inventory.find(task => task.store === 'messages').count === 3);
-    check('schema and count/key cursor share exactly one readonly transaction per store, never schema-only', normal.transactions.length === 6 && normal.transactions.every(tx => tx.requests === 1) && normal.requestKinds.filter(kind => kind === 'openKeyCursor').length === 1);
+    check('schema and count/selectors share one readonly transaction per store, never schema-only', normal.transactions.length === 6 && normal.transactions.every(tx => tx.requests === (tx.db === 'AiPhoneKvDB' ? 18 : 1)) && normal.requestKinds.filter(kind => kind === 'openKeyCursor').length === 18);
     const starts = normal.progress.filter(item => item.phase === 'COUNT_STORE');
-    check('progress advances through DB/store metadata only and reports completion', starts.length === 7 && starts.every((item, n) => item.completedStores === n && item.totalStores >= n + 1) && normal.progress.at(-1).phase === 'COMPLETE' && normal.progress.at(-1).completedStores === 7 && !JSON.stringify(normal.progress).includes('PRIVATE') && normal.progress.every(item => Object.keys(item).every(key => ['phase','dbName','storeName','completedStores','totalStores'].includes(key))));
+    check('progress advances through DB/store/selectors metadata only and reports completion', starts.length === 7 && starts.every((item, n) => item.completedStores === n && item.totalStores >= n + 1) && normal.progress.at(-1).phase === 'COMPLETE' && normal.progress.at(-1).completedStores === 7 && !JSON.stringify(normal.progress).includes('PRIVATE') && normal.progress.every(item => Object.keys(item).every(key => ['phase','dbName','storeName','completedStores','totalStores','sourceLabel','selectorIndex','selectorCount'].includes(key))));
     assert.deepEqual(normal.constants, [15000,30000]);
     check('production open/store timeout constants are 15s/30s; preflight performs zero business writes', normal.writes === 0);
+    await require('./rescue-backup/kv-scenarios.cjs')({ browser, baseURL: `http://127.0.0.1:${server.address().port}`, schema, check });
 
     const missing = await page.evaluate(async () => {
       const result = await io.openExistingDb('MissingRescueFixture');
@@ -135,7 +136,8 @@ async function routeModule(file, imports = {}) {
       indexedDB.databases = () => { throw Error('UI enumeration forbidden'); };
       for (const name of ['put','add','delete','clear']) IDBObjectStore.prototype[name] = () => { throw Error('UI business write forbidden'); };
       const tx = IDBDatabase.prototype.transaction; IDBDatabase.prototype.transaction = function(names, mode = 'readonly', ...rest) { if (mode !== 'readonly') throw Error('UI write tx forbidden'); return tx.call(this, names, mode, ...rest); };
-      const count = IDBObjectStore.prototype.count; IDBObjectStore.prototype.count = function(...args) { return this.name === 'messages' ? {} : count.apply(this, args); };
+      const count = IDBObjectStore.prototype.count; IDBObjectStore.prototype.count = function(...args) { return this.name === 'messages' && window.stallMessages !== false ? {} : count.apply(this, args); };
+      const keyCursor = IDBObjectStore.prototype.openKeyCursor; IDBObjectStore.prototype.openKeyCursor = function(...args) { return window.stallKv && this.transaction.db.name === 'AiPhoneKvDB' ? {} : keyCursor.apply(this, args); };
       const timer = setTimeout; window.setTimeout = (fn, ms, ...rest) => timer(fn, ms === 30000 ? 500 : ms, ...rest);
     });
     await page.goto('/float-rescue-backup'); await page.waitForFunction(() => !document.getElementById('preflight').disabled);
@@ -143,6 +145,11 @@ async function routeModule(file, imports = {}) {
     check('actual standalone UI displays specific DB/store progress while request is pending', true);
     await page.waitForFunction(() => document.getElementById('status').textContent === '预检超时：AiPhoneChatDB / messages');
     check('actual UI shows timeout, unlocks preflight retry and does not enable generation', !(await page.locator('#preflight').isDisabled()) && await page.locator('#generate').isDisabled());
+    await page.evaluate(() => { window.stallMessages = false; window.stallKv = true; });
+    await page.locator('#preflight').click();
+    await page.waitForFunction(() => document.getElementById('status').textContent.includes('聊天设置与待处理状态') && document.getElementById('status').textContent.includes('selector 1 / 18'));
+    check('actual UI displays KV source label and selector progress without values', (await page.locator('#status').textContent()).includes('AiPhoneKvDB / entries'));
+    await page.waitForFunction(() => document.getElementById('status').textContent === '预检超时：AiPhoneKvDB / entries');
     check('all preflight fault simulations have no unhandled page errors', errors.length === 0);
     await context.close(); console.log(`PASS ${checks} rescue preflight browser checks`);
   } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }

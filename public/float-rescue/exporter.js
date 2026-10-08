@@ -1,6 +1,7 @@
 import { CHECKPOINT_KEY, openExistingDb, transactionDone, ownsKey, storeSchema, encodeKey, decodeKey, rawSize, sha256Blob } from "./io.js";
 import { createCollector, serializeValue, serializeStorageString } from "./serializer.js";
 import { StoreZipWriter, CENTRAL_DIRECTORY_MAX_BYTES } from "./zip-store.js";
+import { compileKvSelectors, kvSelectorRange, validateKvCursor } from "./kv-selectors.js";
 export const CHAT_RESCUE_BATCH_ROWS = 1;
 export const DEFAULT_RESCUE_BATCH_ROWS = 16;
 export const RESCUE_RAW_BATCH_CHAR_BUDGET = 16 * 1024 * 1024;
@@ -26,7 +27,7 @@ function localKeys(schema, moduleId, sourceIndex) {
   }
   return keys.sort();
 }
-function countTask(db, task, schema) {
+function countTask(db, task, schema, onProgress) {
   return new Promise((resolve, reject) => {
     let tx; let spec; let count = 0; let settled = false; let requestComplete = false; let txComplete = false;
     const fail = error => {
@@ -44,20 +45,29 @@ function countTask(db, task, schema) {
       spec = storeSchema(store);
       tx.oncomplete = () => { txComplete = true; complete(); };
       tx.onerror = tx.onabort = () => fail(Error(`预检读取失败：${task.dbName} / ${task.store}`));
-      const request = task.type === "indexeddb" ? store.count() : store.openKeyCursor();
-      request.onerror = () => fail(Error(`预检读取失败：${task.dbName} / ${task.store}`));
-      request.onsuccess = () => {
+      const selectors = task.type === "kv" ? compileKvSelectors(schema, task.moduleId, task.sourceIndex) : [];
+      const scan = index => {
         if (settled) return;
-        try {
-          if (task.type === "indexeddb") { count = request.result; requestComplete = true; }
-          else {
-            const cursor = request.result;
-            if (cursor) { if (ownsKey(schema, task.moduleId, task.sourceIndex, cursor.primaryKey, "kv")) count++; cursor.continue(); return; }
-            requestComplete = true;
-          }
-          complete();
-        } catch (error) { fail(error); }
+        if (task.type === "kv" && selectors.length && index === selectors.length) { requestComplete = true; complete(); return; }
+        if (task.type === "kv") onProgress({ phase: "COUNT_SELECTOR", dbName: task.dbName, storeName: task.store, sourceLabel: task.source.label, selectorIndex: index, selectorCount: selectors.length });
+        // Even an empty selection issues a bounded metadata request, so schema
+        // inspection never relies on a request-free transaction completing.
+        const request = task.type === "indexeddb" ? store.count() : selectors.length ? store.openKeyCursor(kvSelectorRange(selectors[index])) : store.count(IDBKeyRange.only(CHECKPOINT_KEY));
+        request.onerror = () => fail(Error(`预检读取失败：${task.dbName} / ${task.store}`));
+        request.onsuccess = () => {
+          if (settled) return;
+          try {
+            if (task.type === "indexeddb") count = request.result;
+            else if (selectors.length) {
+              const cursor = request.result;
+              if (cursor) { if (ownsKey(schema, task.moduleId, task.sourceIndex, cursor.primaryKey, "kv")) count++; cursor.continue(); return; }
+              scan(index + 1); return;
+            }
+            requestComplete = true; complete();
+          } catch (error) { fail(error); }
+        };
       };
+      scan(0);
     } catch (error) { fail(error); }
   });
 }
@@ -88,7 +98,7 @@ export async function preflightInventory(schema, ids, onProgress = () => {}) {
         if (!db.objectStoreNames.contains(name)) throw Error(`数据库缺少 object store：${dbName}/${name}`);
         onProgress({ phase: "COUNT_STORE", dbName, storeName: name, completedStores, totalStores });
         const task = { ...base, id: `${module.id}/${source.sourceIndex}/${name}`, dbName, store: name, exists: true, count: 0 };
-        Object.assign(task, await countTask(db, task, schema)); tasks.push(task); completedStores++;
+        Object.assign(task, await countTask(db, task, schema, onProgress)); tasks.push(task); completedStores++;
       }
     } finally { db.close(); }
   }
@@ -117,12 +127,45 @@ async function readBatch(task, lastKey, schema, rowCap, probe) {
   if (!db) throw Error(sourceChanged);
   try {
     const tx = db.transaction(task.store, "readonly"); const completed = transactionDone(tx); const store = tx.objectStore(task.store);
-    const request = store.openCursor(lastKey === null ? undefined : IDBKeyRange.lowerBound(decodeKey(lastKey), true));
     const rows = []; let chars = 0; let last = lastKey; let done = false;
+    if (task.type === "kv") {
+      const selectors = compileKvSelectors(schema, task.moduleId, task.sourceIndex);
+      last = { ...validateKvCursor(lastKey ?? { selectorIndex: 0, key: null }, selectors) };
+      const scan = () => {
+        if (last.selectorIndex === selectors.length) { done = true; return; }
+        const selector = selectors[last.selectorIndex];
+        const request = store.openKeyCursor(kvSelectorRange(selector, last.key === null ? null : decodeKey(last.key)));
+        request.onsuccess = () => {
+          try {
+            const cursor = request.result;
+            if (!cursor) { last = { selectorIndex: last.selectorIndex + 1, key: null }; scan(); return; }
+            const key = cursor.primaryKey;
+            probe("kvKey", { task: task.id, selectorIndex: last.selectorIndex, selectorType: selector.type });
+            const advance = () => {
+              last = selector.type === "exact" ? { selectorIndex: last.selectorIndex + 1, key: null } : { selectorIndex: last.selectorIndex, key: encodeKey(key) };
+            };
+            const proceed = () => { if (selector.type === "exact") scan(); else cursor.continue(); };
+            if (!ownsKey(schema, task.moduleId, task.sourceIndex, key, "kv")) { advance(); proceed(); return; }
+            // Enumerate keys first: earlier owners' values are never loaded.
+            const read = store.get(key);
+            read.onsuccess = () => {
+              try {
+                const value = read.result; const bytes = rawSize(value);
+                if (rows.length && chars + bytes > RESCUE_RAW_BATCH_CHAR_BUDGET) return;
+                rows.push({ key, value }); chars += bytes; advance();
+                if (rows.length < rowCap && chars < RESCUE_RAW_BATCH_CHAR_BUDGET) proceed();
+              } catch { tx.abort(); }
+            };
+          } catch { tx.abort(); }
+        };
+      };
+      scan();
+      await completed; probe("batch", { task: task.id, rows: rows.length, chars }); return { rows, lastKey: last, done };
+    }
+    const request = store.openCursor(lastKey === null ? undefined : IDBKeyRange.lowerBound(decodeKey(lastKey), true));
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor) { done = true; return; }
-      if (task.type === "kv" && !ownsKey(schema, task.moduleId, task.sourceIndex, cursor.primaryKey, "kv")) { last = encodeKey(cursor.primaryKey); cursor.continue(); return; }
       try {
         const value = cursor.value; const bytes = rawSize(value);
         if (rows.length && chars + bytes > RESCUE_RAW_BATCH_CHAR_BUDGET) return;
@@ -150,6 +193,9 @@ export class RescueExporter {
     return new RescueExporter(schema, await preflightInventory(schema, ids, options?.onProgress), selectedModules(schema, ids).map(module => module.id), mode, options);
   }
   checkpoint(state = this.state, parts = this.parts) {
+    // A new checkpoint entering a KV task is distinguishable from legacy null
+    // or tagged-key cursors. This stores only selector position and one key.
+    if (this.inventory[state.taskIndex]?.type === "kv" && state.lastKey === null) state = { ...state, lastKey: { selectorIndex: 0, key: null } };
     return { version: 1, setId: this.setId, createdAt: this.createdAt, origin: this.origin, mode: this.mode, selected: this.selected, inventory: this.inventory, state, parts, partTargetBytes: this.target };
   }
   persist(state = this.state, parts = this.parts) {
@@ -164,10 +210,13 @@ export class RescueExporter {
   static async resume(schema, options = {}) {
     const saved = RescueExporter.readCheckpoint();
     if (!saved || saved.version !== 1 || !/^[a-zA-Z0-9-]{1,100}$/.test(saved.setId) || !numeric(saved.state?.taskIndex) || !numeric(saved.state?.sequence) || !Array.isArray(saved.parts) || !saved.state.exportedCounts || !Array.isArray(saved.inventory) || !Number.isFinite(Date.parse(saved.createdAt)) || saved.origin !== location.origin) throw Error("救援断点格式无效");
+    if (saved.inventory[saved.state.taskIndex]?.type === "kv" && (!saved.state.lastKey || !Object.hasOwn(saved.state.lastKey, "selectorIndex"))) throw Error("救援断点来自旧版 KV 扫描逻辑，请重新开始救援备份。Float 原数据未修改。");
     const result = await RescueExporter.prepare(schema, saved.selected, saved.mode, { ...options, partTargetBytes: saved.partTargetBytes });
     if (!sameInventory(saved.inventory, result.inventory)) throw Error(resumeChanged);
     if (saved.state.taskIndex > result.inventory.length || Object.keys(saved.state.exportedCounts).length !== result.inventory.length || saved.parts.some((part, i) => part.partNumber !== i + 1 || part.filename !== partFilename(saved.setId, i + 1) || !numeric(part.bytes) || part.bytes > RESCUE_PART_HARD_MAX_BYTES || !numeric(part.recordCount) || !Array.isArray(part.moduleIds) || !/^[a-f0-9]{64}$/.test(part.sha256)) || result.inventory.some((task, i) => !numeric(saved.state.exportedCounts[task.id]) || saved.state.exportedCounts[task.id] > task.count || i < saved.state.taskIndex && saved.state.exportedCounts[task.id] !== task.count) || saved.parts.reduce((sum, part) => sum + part.recordCount, 0) !== Object.values(saved.state.exportedCounts).reduce((sum, records) => sum + records, 0)) throw Error("救援断点计数无效");
-    if (saved.state.lastKey !== null) encodeKey(decodeKey(saved.state.lastKey));
+    const task = result.inventory[saved.state.taskIndex];
+    if (task?.type === "kv") validateKvCursor(saved.state.lastKey, compileKvSelectors(schema, task.moduleId, task.sourceIndex));
+    else if (saved.state.lastKey !== null) encodeKey(decodeKey(saved.state.lastKey));
     result.setId = saved.setId; result.createdAt = saved.createdAt; result.state = saved.state; result.parts = saved.parts; return result;
   }
   manifest(stats, sourceCounts, number) {
