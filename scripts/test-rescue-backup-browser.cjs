@@ -194,6 +194,7 @@ async function installReadGuards(page) {
     // Additional runtime scenarios follow in a separate test-only module below.
     await require('./rescue-backup/scenarios.cjs')({ page, browser, baseURL, schema, check, assert, errors, sourceContext, seed, installReadGuards, savedParts, savedIndex: result.index });
     await require('./rescue-backup/chat-media-scenarios.cjs')({ browser, baseURL, schema, check, seed, snapshot, installReadGuards, savedParts });
+    await require('./rescue-backup/remaining-scenarios.cjs')({ browser, baseURL, schema, check, snapshot, installReadGuards, savedParts });
     check('all rescue scenarios have no page errors', () => assert.deepEqual(errors, []));
     await sourceContext.close(); console.log(`PASS ${checks} rescue backup browser checks`);
   } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }

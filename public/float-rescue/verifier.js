@@ -6,7 +6,7 @@ const equal = (a, b) => JSON.stringify(a.slice().sort()) === JSON.stringify(b.sl
 export async function verifyRescueFiles(indexFile, files, progress = () => {}, probe) {
   if (!indexFile || indexFile.size > 2 * 1024 * 1024) throw Error("index 缺失或过大");
   const index = JSON.parse(await indexFile.text());
-  if (index.format !== "float-rescue-set" || index.version !== 1 || index.complete !== true || !/^[a-zA-Z0-9-]{1,100}$/.test(index.setId) || !Array.isArray(index.parts) || !index.parts.length || index.totalParts !== index.parts.length || !Array.isArray(index.inventory) || !index.exportedCounts || !["chat", "full", "chat-media-safety"].includes(index.mode)) throw Error("index 无效或标记为 INCOMPLETE");
+  if (index.format !== "float-rescue-set" || index.version !== 1 || index.complete !== true || !/^[a-zA-Z0-9-]{1,100}$/.test(index.setId) || !Array.isArray(index.parts) || !index.parts.length || index.totalParts !== index.parts.length || !Array.isArray(index.inventory) || !index.exportedCounts || !["chat", "full", "chat-media-safety", "remaining-non-kv"].includes(index.mode)) throw Error("index 无效或标记为 INCOMPLETE");
   if (files.length !== index.parts.length || new Set(files.map(file => file.name)).size !== files.length || index.totalBytes !== index.parts.reduce((sum, part) => sum + part.bytes, 0)) throw Error("分卷数量、文件名或总大小不完整");
   const sums = {}; let totalRecords = 0;
   for (let i = 0; i < index.parts.length; i++) {

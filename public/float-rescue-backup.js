@@ -2,7 +2,7 @@ import { RescueExporter } from "./float-rescue/exporter.js";
 import { verifyRescueFiles } from "./float-rescue/verifier.js";
 import { saveFile, releaseDownloads } from "./float-rescue/save.js";
 const element = id => document.getElementById(id);
-let schema; let exporter = null; let index = null; let busy = false; let safetyScope = false;
+let schema; let exporter = null; let index = null; let busy = false; let safetyScope = false; let remainingScope = false;
 const status = message => { element("status").textContent = message; };
 function preflightProgress({ phase, dbName, storeName, completedStores, totalStores, sourceLabel, selectorIndex, selectorCount, scannedCount, elapsedMs, lastEvent }) {
   if (phase === "OPEN_DB") status(`正在预检：${dbName}（打开数据库）`);
@@ -12,12 +12,13 @@ function preflightProgress({ phase, dbName, storeName, completedStores, totalSto
   else status(`预检记录数核对完成（${completedStores} / ${totalStores}）`);
 }
 const selected = () => Array.from(document.querySelectorAll("#modules input:checked"), input => input.value);
-const mode = () => safetyScope ? "chat-media-safety" : selected().length === 1 && selected()[0] === "chat" ? "chat" : "full";
-function showScope(isSafety) {
+const mode = () => remainingScope ? "remaining-non-kv" : safetyScope ? "chat-media-safety" : selected().length === 1 && selected()[0] === "chat" ? "chat" : "full";
+function showScope(isSafety, isRemaining = false) {
   safetyScope = isSafety;
-  element("scope-detail").textContent = isSafety ? "当前范围：仅 AiPhoneChatDB 与 AiPhoneMediaCacheDB。这是部分备份，不包含 KV、聊天设置、插件状态或其它 Float 数据。" : "当前范围：按所选模块导出。";
+  remainingScope = isRemaining;
+  element("scope-detail").textContent = isSafety ? "当前范围：仅 AiPhoneChatDB 与 AiPhoneMediaCacheDB。这是部分备份，不包含 KV、聊天设置、插件状态或其它 Float 数据。" : isRemaining ? "当前范围：其余 IndexedDB 与 localStorage 数据（部分备份），排除 AiPhoneChatDB、AiPhoneMediaCacheDB 及所有 KV source。不是完整 Float 备份。" : "当前范围：按所选模块导出。";
 }
-const scopeSummary = () => exporter.mode === "chat-media-safety" ? "\n范围：聊天媒体紧急保护备份（仅两库，部分备份）" : "";
+const scopeSummary = () => exporter.mode === "chat-media-safety" ? "\n范围：聊天媒体紧急保护备份（仅两库，部分备份）" : exporter.mode === "remaining-non-kv" ? "\n范围：其余非 KV 数据救援备份（部分备份，排除已备份两库）" : "";
 const bytes = value => `${(value / 1024 / 1024).toFixed(2)} MiB`;
 function lockSelection(locked) { for (const item of element("selection").querySelectorAll("button,input")) item.disabled = locked; element("generate").disabled = locked || !exporter; }
 async function action(fn) {
@@ -25,12 +26,12 @@ async function action(fn) {
   try { await fn(); } catch (error) { status(error.message || "救援操作失败，源数据未修改。"); }
   finally { busy = false; }
 }
-function resetSelection(ids, isSafety = false) {
-  showScope(isSafety);
+function resetSelection(ids, isSafety = false, isRemaining = false) {
+  showScope(isSafety, isRemaining);
   for (const input of element("modules").querySelectorAll("input")) input.checked = ids.includes(input.value);
   exporter = null; element("generate").disabled = true; element("inventory").textContent = "";
 }
-function invalidate() { showScope(false); exporter = null; element("generate").disabled = true; element("inventory").textContent = "选择已改变，请重新预检。"; }
+function invalidate() { showScope(false, remainingScope); exporter = null; element("generate").disabled = true; element("inventory").textContent = "选择已改变，请重新预检。"; }
 async function generateNext() {
   status("正在逐条读取并生成分卷，请保持页面打开…");
   const part = await exporter.nextPart();
@@ -49,6 +50,7 @@ async function generateNext() {
   status("当前只保留这一卷。请保存并明确确认后继续。");
 }
 element("preset-chat-media").addEventListener("click", () => resetSelection(["chat"], true));
+element("preset-remaining").addEventListener("click", () => resetSelection(schema.modules.map(module => module.id), false, true));
 element("preset-chat").addEventListener("click", () => resetSelection(["chat"]));
 element("preset-full").addEventListener("click", () => resetSelection(schema.modules.map(module => module.id)));
 element("preflight").addEventListener("click", () => action(async () => {
@@ -87,7 +89,7 @@ element("verify").addEventListener("click", () => action(async () => {
   } catch (error) { element("verification").textContent = `验证失败：${error.message}`; }
 }));
 element("resume-button").addEventListener("click", () => action(async () => {
-  status("正在重新预检，确认源数据未变化…"); exporter = await RescueExporter.resume(schema, { onProgress: preflightProgress }); showScope(exporter.mode === "chat-media-safety"); lockSelection(true); element("resume").hidden = true; await generateNext();
+  status("正在重新预检，确认源数据未变化…"); exporter = await RescueExporter.resume(schema, { onProgress: preflightProgress }); showScope(exporter.mode === "chat-media-safety", exporter.mode === "remaining-non-kv"); lockSelection(true); element("resume").hidden = true; await generateNext();
 }));
 element("restart").addEventListener("click", () => action(async () => {
   RescueExporter.restart(); exporter = null; index = null; element("resume").hidden = true; element("part").hidden = true; element("index").hidden = true; lockSelection(false); resetSelection(["chat"]); status("已移除救援断点。Float 原数据未修改，可以重新预检。");
@@ -101,5 +103,24 @@ try {
   }
   lockSelection(false); status("请选择范围并预检。源数据库全程只读。");
   const checkpoint = RescueExporter.readCheckpoint();
-  if (checkpoint) { showScope(checkpoint.mode === "chat-media-safety"); element("resume").hidden = false; element("resume-label").textContent = `检测到未完成的救援备份 set ${checkpoint.setId}${checkpoint.mode === "chat-media-safety" ? "（仅两库，部分备份）" : ""}，是否继续？`; lockSelection(true); }
+  if (checkpoint) { showScope(checkpoint.mode === "chat-media-safety", checkpoint.mode === "remaining-non-kv"); element("resume").hidden = false; element("resume-label").textContent = `检测到未完成的救援备份 set ${checkpoint.setId}${checkpoint.mode === "chat-media-safety" ? "（仅两库，部分备份）" : checkpoint.mode === "remaining-non-kv" ? "（其余非 KV，部分备份）" : ""}，是否继续？`; lockSelection(true); }
 } catch (error) { status(error.message); }
+
+// Diagnostics have their own controls/status; a pending KV request cannot lock
+// non-KV preflight/export. They run only on an explicit diagnostic button click.
+let kvBusy = false; let kvResults = [];
+for (const button of document.querySelectorAll("[data-kv-method]")) button.addEventListener("click", async () => {
+  if (kvBusy) return; kvBusy = true;
+  for (const control of document.querySelectorAll("[data-kv-method]")) control.disabled = true;
+  try {
+    const { diagnoseKvRead, formatKvDiagnosticReport } = await import("./float-rescue/kv-diagnostics.js");
+    const result = await diagnoseKvRead(button.dataset.kvMethod, progress => { element("kv-status").textContent = `${progress.method} · ${progress.lastStage} · ${(progress.elapsedMs / 1000).toFixed(1)} 秒 · 已观察 ${progress.observedKeyCount} 个 key`; });
+    kvResults = [...kvResults.slice(-15), result]; element("kv-report").textContent = formatKvDiagnosticReport(kvResults);
+    element("kv-status").textContent = `${result.method}：${result.status} · 阶段 ${result.lastStage} · ${(result.elapsedMs / 1000).toFixed(1)} 秒${result.status === "SUCCESS" ? ` · 主键计数 ${result.keyCount}${result.atLimit ? "（达到采样上限）" : ""}` : " · 结果未确认，不代表数据库为空或 key 不存在"}`;
+  } catch { element("kv-status").textContent = "诊断工具无法运行，结果未确认。其余非 KV 备份仍可单独进行。"; }
+  finally { kvBusy = false; for (const control of document.querySelectorAll("[data-kv-method]")) control.disabled = false; }
+});
+element("copy-kv-report").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText(element("kv-report").textContent); element("kv-status").textContent = "诊断报告已复制。"; }
+  catch { element("kv-status").textContent = "无法自动复制，请长按选择下方报告复制。"; }
+});

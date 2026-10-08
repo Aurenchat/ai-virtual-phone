@@ -69,6 +69,12 @@ function visit(directory, fn) {
     });
     await page.locator('#preflight').click(); await page.waitForFunction(() => document.getElementById('status').textContent.includes('关键数据库不存在'));
     check('production rescue missing critical DB stops before export and creates no database', () => {}); assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []);
+    await page.locator('[data-kv-method="getKey"]').click(); await page.waitForFunction(() => document.getElementById('kv-status').textContent.includes('DB_MISSING'));
+    check('built rescue loads key diagnostic under real CSP only on request, bypasses shell, and keeps missing KV uncreated', () => {
+      assert.ok(rescueRequests.some(req => req.pathname === '/float-rescue/kv-diagnostics.js'));
+      assert.ok(!rescueRequests.some(req => req.pathname.startsWith('/_next/'))); assert.deepEqual(errors, []);
+    });
+    assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []); assert.equal(await page.evaluate(() => writeAttempts), 0);
     console.log(`PASS ${checks} production boundary checks`);
   } finally { await browser?.close(); child.kill(); await new Promise(resolve => { if (child.exitCode != null) resolve(); else child.once('exit', resolve); }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

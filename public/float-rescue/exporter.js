@@ -23,7 +23,12 @@ function selectedModules(schema, ids) {
   return schema.modules.filter(module => ids.includes(module.id));
 }
 function schemaForMode(schema, ids, mode) {
-  if (!["chat", "full", "chat-media-safety"].includes(mode)) throw Error("备份模式无效");
+  if (!["chat", "full", "chat-media-safety", "remaining-non-kv"].includes(mode)) throw Error("备份模式无效");
+  if (mode === "remaining-non-kv") {
+    const scoped = { ...schema, modules: schema.modules.map(module => ({ ...module, label: `${module.label}（部分备份，非 KV）`, sources: module.sources.filter(source => source.type === "localStorage" || source.type === "indexeddb" && !["AiPhoneChatDB", "AiPhoneMediaCacheDB", "AiPhoneKvDB"].includes(source.dbName)) })) };
+    if (selectedModules(scoped, ids).every(module => !module.sources.length)) throw Error("所选模块没有可导出的非 KV 数据源");
+    return scoped;
+  }
   if (mode !== "chat-media-safety") return schema;
   const chat = selectedModules(schema, ids).find(module => module.id === "chat");
   if (!chat || ids.length !== 1) throw Error("两库紧急保护备份只能选择聊天媒体范围");

@@ -79,6 +79,7 @@ async function routeModule(file, imports = {}) {
     check('open/other-store timeouts remain 15s/30s; messages use 20s inactivity / 120s absolute / 512 keys; zero writes', normal.writes === 0);
     await require('./rescue-backup/kv-scenarios.cjs')({ browser, baseURL: `http://127.0.0.1:${server.address().port}`, schema, check });
     await require('./rescue-backup/message-count-scenarios.cjs')({ browser, baseURL: `http://127.0.0.1:${server.address().port}`, schema, check });
+    await require('./rescue-backup/kv-diagnostic-scenarios.cjs')({ browser, baseURL: `http://127.0.0.1:${server.address().port}`, schema, check });
 
     const missing = await page.evaluate(async () => {
       const result = await io.openExistingDb('MissingRescueFixture');
