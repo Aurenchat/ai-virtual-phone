@@ -648,6 +648,24 @@ export function DataManagement({ onNotice }: DataManagementProps) {
       </div>
 
       <div className="data-section">
+        <DataSectionTitle>Legacy Chat Media</DataSectionTitle>
+        <div className="menu-group">
+          <div className="menu-item data-readonly-item">
+            <DataSettingsIcon icon={Database} color={BINDING_ACCENTS.api} />
+            <div className="menu-label-group">
+              <span className="menu-label">旧版聊天媒体体检</span>
+              <span className="menu-desc">检查旧聊天中直接存储的图片/语音 data URL。当前版本仅扫描，不修改任何聊天或媒体数据。</span>
+            </div>
+          </div>
+          <div className="data-menu-actions">
+            <button type="button" className="ui-btn ui-btn-outline" onClick={() => window.location.assign("/float-inline-media-maintenance.html")}>
+              打开只读体检
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="data-section">
         <DataSectionTitle>Media Cleanup</DataSectionTitle>
         <div className="menu-group">
           <div className="menu-item data-readonly-item">

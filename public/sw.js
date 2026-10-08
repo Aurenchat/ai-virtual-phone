@@ -367,12 +367,17 @@ self.addEventListener("notificationclick", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+  const url = new URL(request.url);
+  // Maintenance must fail closed, never fall back to the hydrated Float shell.
+  if (url.origin === self.location.origin && ["/float-inline-media-maintenance.html", "/float-inline-media-maintenance.js"].includes(url.pathname)) {
+    event.respondWith(fetch(new Request(request, { cache: "no-store" })));
+    return;
+  }
   if (request.mode === "navigate") {
     event.respondWith(networkFirstNavigation(event));
     return;
   }
   if (!isCacheableRequest(request)) return;
-  const url = new URL(request.url);
   if (url.pathname.startsWith("/_next/static/") || ["script", "style", "worker"].includes(request.destination)) {
     event.respondWith(buildAssetFirst(event));
     return;
