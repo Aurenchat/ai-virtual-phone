@@ -19,6 +19,18 @@ function selectedModules(schema, ids) {
   if (schema.version !== 1 || !Array.isArray(schema.modules) || !ids.length || new Set(ids).size !== ids.length || ids.some(id => !schema.modules.some(module => module.id === id))) throw Error("数据源清单或模块选择无效");
   return schema.modules.filter(module => ids.includes(module.id));
 }
+function schemaForMode(schema, ids, mode) {
+  if (!["chat", "full", "chat-media-safety"].includes(mode)) throw Error("备份模式无效");
+  if (mode !== "chat-media-safety") return schema;
+  const chat = selectedModules(schema, ids).find(module => module.id === "chat");
+  if (!chat || ids.length !== 1) throw Error("两库紧急保护备份只能选择聊天媒体范围");
+  const names = ["AiPhoneChatDB", "AiPhoneMediaCacheDB"];
+  const sources = chat.sources.filter(source => source.type === "indexeddb" && names.includes(source.dbName));
+  if (names.some(name => sources.filter(source => source.dbName === name).length !== 1)) throw Error("两库紧急保护备份的数据源清单不完整");
+  // Derive from the canonical descriptors, preserving original sourceIndex.
+  // Always enumerate every real store in these two databases.
+  return { ...schema, modules: [{ ...chat, critical: true, label: "聊天媒体紧急保护备份（仅两库，部分备份）", sources: sources.map(({ stores, ...source }) => source) }] };
+}
 function localKeys(schema, moduleId, sourceIndex) {
   const keys = [];
   for (let index = 0; index < localStorage.length; index++) {
@@ -189,7 +201,7 @@ export class RescueExporter {
     this.state = { taskIndex: 0, lastKey: null, sequence: 0, exportedCounts: Object.fromEntries(inventory.map(task => [task.id, 0])) };
   }
   static async prepare(schema, ids, mode, options) {
-    if (!["chat", "full"].includes(mode)) throw Error("备份模式无效");
+    schema = schemaForMode(schema, ids, mode);
     return new RescueExporter(schema, await preflightInventory(schema, ids, options?.onProgress), selectedModules(schema, ids).map(module => module.id), mode, options);
   }
   checkpoint(state = this.state, parts = this.parts) {

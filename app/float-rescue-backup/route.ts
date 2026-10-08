@@ -11,7 +11,7 @@ export function GET() {
 <p>请关闭其它 Float 标签页，并在导出完成前保持主应用关闭。历史媒体迁移仍未开放。</p>
 <p>1. 选择备份范围 → 2. 预检 → 3. 生成分卷 → 4. 每卷保存 → 5. 保存 index → 6. 验证备份</p>
 <section id="resume" hidden><p id="resume-label"></p><button id="resume-button">继续未完成备份</button><button id="restart">重新开始</button><p>重新开始只移除救援工具自己的进度记录，不删除 Float 数据。</p></section>
-<section id="selection"><h2>选择备份范围</h2><button id="preset-chat" disabled>迁移保护备份（聊天数据）</button><button id="preset-full" disabled>完整 Float 救援备份</button><div id="modules"></div><button id="preflight" disabled>只读预检</button><pre id="inventory"></pre><button id="generate" disabled>生成分卷</button></section>
+<section id="selection"><h2>选择备份范围</h2><button id="preset-chat-media" disabled>聊天媒体紧急保护备份（仅两库）</button><p>仅保护聊天记录和聊天媒体缓存，不包括聊天设置、插件状态、KV 配置或其它 Float 数据。适用于 KV 预检异常时的定向救援。</p><button id="preset-chat" disabled>迁移保护备份（聊天数据）</button><button id="preset-full" disabled>完整 Float 救援备份</button><p id="scope-detail">当前范围：按所选模块导出。</p><div id="modules"></div><button id="preflight" disabled>只读预检</button><pre id="inventory"></pre><button id="generate" disabled>生成分卷</button></section>
 <p id="status" role="status" aria-live="polite">正在读取数据源清单…</p>
 <section id="part" hidden><h2 id="part-title"></h2><pre id="part-detail"></pre><p id="oversized" hidden>此卷包含单个超大媒体文件，因此超过默认分卷大小。</p><button id="save-part">保存当前卷</button><button id="continue" disabled>我已保存，继续</button><p>系统分享成功后，仍请确认文件已保存到自己的位置，再点击继续。取消分享可以重新保存当前卷。</p></section>
 <section id="index" hidden><h2>保存救援 set index</h2><pre id="index-detail"></pre><button id="save-index">保存 index 文件</button><p>生成完毕尚不代表已经获得备份。请保存 index 和所有 ZIP，再使用下面的验证器。</p></section>

@@ -44,8 +44,8 @@ async function seed(page, schema) {
     for (const db of dbs.values()) db.close();
   }, schema);
 }
-async function snapshot(page) {
-  return page.evaluate(async () => {
+async function snapshot(page, names = ['AiPhoneChatDB', 'AiPhoneMediaCacheDB', 'AiPhoneKvDB', 'AiPhoneStoryDB']) {
+  return page.evaluate(async names => {
     const open = name => new Promise((resolve, reject) => { const request = indexedDB.open(name); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
     const rows = store => new Promise((resolve, reject) => { const request = store.getAll(); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); });
     async function normalized(value) {
@@ -55,14 +55,14 @@ async function snapshot(page) {
       return value;
     }
     const result = {};
-    for (const name of ['AiPhoneChatDB', 'AiPhoneMediaCacheDB', 'AiPhoneKvDB', 'AiPhoneStoryDB']) {
+    for (const name of names) {
       const db = await open(name); result[name] = {};
       for (const name of Array.from(db.objectStoreNames).sort()) result[db.name][name] = await normalized(await rows(db.transaction(name).objectStore(name)));
       db.close();
     }
     result.localStorage = Object.fromEntries(Object.keys(localStorage).filter(key => key !== 'float_rescue_export_checkpoint_v1').sort().map(key => [key, localStorage.getItem(key)]));
     return result;
-  });
+  }, names);
 }
 async function installReadGuards(page) {
   await page.evaluate(() => {
@@ -193,6 +193,7 @@ async function installReadGuards(page) {
     await restoreContext.close();
     // Additional runtime scenarios follow in a separate test-only module below.
     await require('./rescue-backup/scenarios.cjs')({ page, browser, baseURL, schema, check, assert, errors, sourceContext, seed, installReadGuards, savedParts, savedIndex: result.index });
+    await require('./rescue-backup/chat-media-scenarios.cjs')({ browser, baseURL, schema, check, seed, snapshot, installReadGuards, savedParts });
     check('all rescue scenarios have no page errors', () => assert.deepEqual(errors, []));
     await sourceContext.close(); console.log(`PASS ${checks} rescue backup browser checks`);
   } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }

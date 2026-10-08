@@ -2,7 +2,7 @@ import { RescueExporter } from "./float-rescue/exporter.js";
 import { verifyRescueFiles } from "./float-rescue/verifier.js";
 import { saveFile, releaseDownloads } from "./float-rescue/save.js";
 const element = id => document.getElementById(id);
-let schema; let exporter = null; let index = null; let busy = false;
+let schema; let exporter = null; let index = null; let busy = false; let safetyScope = false;
 const status = message => { element("status").textContent = message; };
 function preflightProgress({ phase, dbName, storeName, completedStores, totalStores, sourceLabel, selectorIndex, selectorCount }) {
   if (phase === "OPEN_DB") status(`正在预检：${dbName}（打开数据库）`);
@@ -11,7 +11,12 @@ function preflightProgress({ phase, dbName, storeName, completedStores, totalSto
   else status(`预检记录数核对完成（${completedStores} / ${totalStores}）`);
 }
 const selected = () => Array.from(document.querySelectorAll("#modules input:checked"), input => input.value);
-const mode = () => selected().length === 1 && selected()[0] === "chat" ? "chat" : "full";
+const mode = () => safetyScope ? "chat-media-safety" : selected().length === 1 && selected()[0] === "chat" ? "chat" : "full";
+function showScope(isSafety) {
+  safetyScope = isSafety;
+  element("scope-detail").textContent = isSafety ? "当前范围：仅 AiPhoneChatDB 与 AiPhoneMediaCacheDB。这是部分备份，不包含 KV、聊天设置、插件状态或其它 Float 数据。" : "当前范围：按所选模块导出。";
+}
+const scopeSummary = () => exporter.mode === "chat-media-safety" ? "\n范围：聊天媒体紧急保护备份（仅两库，部分备份）" : "";
 const bytes = value => `${(value / 1024 / 1024).toFixed(2)} MiB`;
 function lockSelection(locked) { for (const item of element("selection").querySelectorAll("button,input")) item.disabled = locked; element("generate").disabled = locked || !exporter; }
 async function action(fn) {
@@ -19,11 +24,12 @@ async function action(fn) {
   try { await fn(); } catch (error) { status(error.message || "救援操作失败，源数据未修改。"); }
   finally { busy = false; }
 }
-function resetSelection(ids) {
+function resetSelection(ids, isSafety = false) {
+  showScope(isSafety);
   for (const input of element("modules").querySelectorAll("input")) input.checked = ids.includes(input.value);
   exporter = null; element("generate").disabled = true; element("inventory").textContent = "";
 }
-function invalidate() { exporter = null; element("generate").disabled = true; element("inventory").textContent = "选择已改变，请重新预检。"; }
+function invalidate() { showScope(false); exporter = null; element("generate").disabled = true; element("inventory").textContent = "选择已改变，请重新预检。"; }
 async function generateNext() {
   status("正在逐条读取并生成分卷，请保持页面打开…");
   const part = await exporter.nextPart();
@@ -31,16 +37,17 @@ async function generateNext() {
     index = await exporter.finish(); element("part").hidden = true;
     if (!index.complete) { status(`INCOMPLETE：${index.error}`); return; }
     element("index").hidden = false;
-    element("index-detail").textContent = `${index.totalParts} 卷 / ${bytes(index.totalBytes)}\nsetId: ${index.setId}\n请保存 index，然后验证所有已保存文件。`;
+    element("index-detail").textContent = `${index.totalParts} 卷 / ${bytes(index.totalBytes)}\nsetId: ${index.setId}${scopeSummary()}\n请保存 index，然后验证所有已保存文件。`;
     status("分卷已生成并确认保存。请保存 index 并验证；尚未验证成功。"); return;
   }
   element("part").hidden = false; element("part-title").textContent = `第 ${part.metadata.partNumber} 卷已生成`;
-  element("part-detail").textContent = `${part.metadata.filename}\n大小：${bytes(part.metadata.bytes)}\n包含记录数：${part.metadata.recordCount}\nSHA-256：${part.metadata.sha256.slice(0, 20)}…`;
+  element("part-detail").textContent = `${part.metadata.filename}${scopeSummary()}\n大小：${bytes(part.metadata.bytes)}\n包含记录数：${part.metadata.recordCount}\nSHA-256：${part.metadata.sha256.slice(0, 20)}…`;
   element("save-part").textContent = `保存第 ${part.metadata.partNumber} 卷`; element("save-part").disabled = false; element("continue").disabled = true;
   element("oversized").hidden = !part.oversized;
   element("oversized").textContent = part.singleOversizedMedia ? "此卷包含单个超大媒体文件，因此超过默认分卷大小。" : "此卷包含一条较大的完整记录及其媒体，因此超过默认分卷大小。";
   status("当前只保留这一卷。请保存并明确确认后继续。");
 }
+element("preset-chat-media").addEventListener("click", () => resetSelection(["chat"], true));
 element("preset-chat").addEventListener("click", () => resetSelection(["chat"]));
 element("preset-full").addEventListener("click", () => resetSelection(schema.modules.map(module => module.id)));
 element("preflight").addEventListener("click", () => action(async () => {
@@ -79,7 +86,7 @@ element("verify").addEventListener("click", () => action(async () => {
   } catch (error) { element("verification").textContent = `验证失败：${error.message}`; }
 }));
 element("resume-button").addEventListener("click", () => action(async () => {
-  status("正在重新预检，确认源数据未变化…"); exporter = await RescueExporter.resume(schema, { onProgress: preflightProgress }); lockSelection(true); element("resume").hidden = true; await generateNext();
+  status("正在重新预检，确认源数据未变化…"); exporter = await RescueExporter.resume(schema, { onProgress: preflightProgress }); showScope(exporter.mode === "chat-media-safety"); lockSelection(true); element("resume").hidden = true; await generateNext();
 }));
 element("restart").addEventListener("click", () => action(async () => {
   RescueExporter.restart(); exporter = null; index = null; element("resume").hidden = true; element("part").hidden = true; element("index").hidden = true; lockSelection(false); resetSelection(["chat"]); status("已移除救援断点。Float 原数据未修改，可以重新预检。");
@@ -93,5 +100,5 @@ try {
   }
   lockSelection(false); status("请选择范围并预检。源数据库全程只读。");
   const checkpoint = RescueExporter.readCheckpoint();
-  if (checkpoint) { element("resume").hidden = false; element("resume-label").textContent = `检测到未完成的救援备份 set ${checkpoint.setId}，是否继续？`; lockSelection(true); }
+  if (checkpoint) { showScope(checkpoint.mode === "chat-media-safety"); element("resume").hidden = false; element("resume-label").textContent = `检测到未完成的救援备份 set ${checkpoint.setId}${checkpoint.mode === "chat-media-safety" ? "（仅两库，部分备份）" : ""}，是否继续？`; lockSelection(true); }
 } catch (error) { status(error.message); }
