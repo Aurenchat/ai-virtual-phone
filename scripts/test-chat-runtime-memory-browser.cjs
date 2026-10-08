@@ -59,6 +59,39 @@ module.exports = function(source) {
  for (const e of edits) source = source.slice(0,e.pos) + 'window.__ttsCalls.' + e.name + '++;' + source.slice(e.pos);
  return transpile.call(this,source);
 };`);
+    await fs.writeFile(path.join(temp, 'sticker-probe-loader.cjs'), `
+const transpile = require(${JSON.stringify(path.join(repo, 'scripts/anonymous-xhs-phase0/ts-loader.cjs'))});
+module.exports = function(source) {
+ const original = 'findCustomStickerByName, resolveCustomStickerUrl';
+ if (!source.includes(original)) throw Error('Sticker resolver import changed');
+ source = source.replace(original, 'findCustomStickerByName, resolveCustomStickerUrl as storageResolveCustomStickerUrl');
+ source += \`\nfunction resolveCustomStickerUrl(assetId: string): Promise<string | null> {
+   const probe = (window as any).__stickerReadProbe;
+   return probe ? probe(assetId, () => storageResolveCustomStickerUrl(assetId)) : storageResolveCustomStickerUrl(assetId);
+ }
+ export const __stickerCacheTest = {
+   get: getCachedStickerUrl, set: cacheStickerUrl, resolve: resolveStickerAsset,
+   maxEntries: STICKER_CACHE_MAX_ENTRIES, maxChars: STICKER_CACHE_MAX_CHARS,
+   snapshot: () => ({keys: [..._stickerUrlCache.keys()], chars: stickerCacheChars, active: activeStickerResolves, queued: stickerResolveQueue.length, inFlight: stickerResolvesInFlight.size}),
+   reset() { if(stickerResolvesInFlight.size) throw Error('Cannot reset pending reads'); _stickerUrlCache.clear(); stickerCacheChars = 0; }
+ };\`;
+ return transpile.call(this,source);
+};`);
+    // Also observe the real single/bulk asset APIs, so a hidden pack-wide read
+    // cannot evade tests by bypassing StickerBubble's resolver.
+    await fs.writeFile(path.join(temp, 'asset-probe-loader.cjs'), `
+const ts = require(${JSON.stringify(require.resolve('typescript'))});
+const transpile = require(${JSON.stringify(path.join(repo, 'scripts/anonymous-xhs-phase0/ts-loader.cjs'))});
+module.exports = function(source) {
+ const ast = ts.createSourceFile(this.resourcePath, source, ts.ScriptTarget.Latest, true);
+ const edits = ast.statements.filter(n => ts.isFunctionDeclaration(n) && ['getThemeAssetDataUrl','getThemeAssetMap'].includes(n.name?.text)).map(n => ({pos:n.body.getStart(ast)+1,arg:n.parameters[0].name.getText(ast),single:n.name.text==='getThemeAssetDataUrl'})).sort((a,b)=>b.pos-a.pos);
+ if(edits.length !== 2) throw Error('Single and bulk asset API probes required');
+ for(const e of edits) {
+   const ids = e.single ? '[' + e.arg + ']' : e.arg;
+   source = source.slice(0,e.pos) + '(window as any).__stickerImageReadProbe?.(' + ids + ');' + source.slice(e.pos);
+ }
+ return transpile.call(this,source);
+};`);
     const wp = require('next/dist/compiled/webpack/webpack'); wp.init();
     await new Promise((resolve, reject) => wp.webpack({
         mode: 'development', target: 'web', devtool: false, context: repo,
@@ -66,6 +99,8 @@ module.exports = function(source) {
         resolve: { extensions: ['.tsx', '.ts', '.js'], alias: { '@': repo }, modules: [path.join(repo, 'node_modules')], fallback: { fs: false, path: false, crypto: false } },
         module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, oneOf: [
             { test: /[\\/]tts-service\.ts$/, use: path.join(temp, 'tts-probe-loader.cjs') },
+            { test: /[\\/]message-bubble\.tsx$/, use: path.join(temp, 'sticker-probe-loader.cjs') },
+            { test: /[\\/]theme-storage\.ts$/, use: path.join(temp, 'asset-probe-loader.cjs') },
             { use: path.join(repo, 'scripts/anonymous-xhs-phase0/ts-loader.cjs') },
         ] }] },
         plugins: [new wp.webpack.DefinePlugin({ 'process.env.NODE_ENV': JSON.stringify('development') })],
@@ -200,6 +235,15 @@ HTMLMediaElement.prototype.play=function(){window.__played.push(this.src);return
         await page.locator('.chat-room-wrapper').getByText('Second generation works.', { exact: true }).waitFor();
         await page.waitForFunction(() => !window.hostMemoryTest.lock());
         check(true, 'module generation run cleared: next generation completes');
+        await page.evaluate(() => { window.hostMemoryTest.observePacing(); window.hostMemoryTest.reply(); });
+        await waitForRequest();
+        resolveReply('Paced reply one\n\nPaced reply two\n\nPaced reply three');
+        await page.locator('.chat-room-wrapper').getByText('Paced reply one', { exact: true }).waitFor();
+        check(await page.locator('.chat-room-wrapper').getByText('Paced reply two', { exact: true }).count() === 0, 'non-instant reply publishes its first bubble before the remaining bubbles');
+        await page.locator('.chat-room-wrapper').getByText('Paced reply three', { exact: true }).waitFor();
+        const pacing = await page.evaluate(() => window.hostMemoryTest.pacing());
+        check(pacing['Paced reply two'] - pacing['Paced reply one'] >= 700 && pacing['Paced reply three'] - pacing['Paced reply two'] >= 700, 'non-instant reply retains the 800ms delays between successive bubbles');
+        await page.waitForFunction(() => !window.hostMemoryTest.lock());
         await page.locator('button[title="关闭"]').click();
         await page.waitForFunction(() => !document.querySelector('.chat-app'));
         check(await count() === 0, 'mini close unmounts PhoneChatApp and its room');
@@ -217,6 +261,8 @@ HTMLMediaElement.prototype.play=function(){window.__played.push(this.src);return
         await page.waitForFunction(() => document.querySelectorAll('.chat-app').length === 1 && !document.querySelector('button[title="关闭"]') && !!document.querySelector('.chat-room-wrapper'));
         check(true, 'mini expand preserves selected session in one fresh full host');
         assert.deepEqual(errors, []); check(true, 'no browser page errors');
+        await require('./chat-runtime-memory/sticker-scenarios.cjs')({ page, check });
+        assert.deepEqual(errors, []); check(true, 'lazy sticker scenarios have no browser page errors or unhandled rejections');
         console.log(JSON.stringify({ checks: results.length, results, errors }, null, 2));
     } finally {
         for (const res of pending) res.destroy();

@@ -1583,61 +1583,110 @@ function PokeBubble({ msg, charName, userName }: { msg: ChatMessage; charName?: 
 
 // ── Sticker ─────────────────────────────
 
-// In-memory cache: assetId/name → resolved URL (survives re-renders, cleared on page reload)
+// Local assets only. String length is an approximate budget, not heap bytes.
+const STICKER_CACHE_MAX_ENTRIES = 32;
+const STICKER_CACHE_MAX_CHARS = 6 * 1024 * 1024;
+const STICKER_RESOLVE_CONCURRENCY = 2;
 const _stickerUrlCache = new Map<string, string>();
+let stickerCacheChars = 0;
+const stickerResolvesInFlight = new Map<string, Promise<string | null>>();
+const stickerResolveQueue: { assetId: string; complete: (url: string | null) => void }[] = [];
+let activeStickerResolves = 0;
 
-/** Pre-populate sticker cache for a character. Call before rendering messages. */
-export async function prewarmStickerCache(characterId: string): Promise<void> {
-    const { resolveCustomStickerMap } = await import("@/lib/custom-sticker-storage");
-    const map = await resolveCustomStickerMap(characterId);
-    for (const [name, url] of Object.entries(map)) {
-        _stickerUrlCache.set(`${characterId}:${name}`, url);
+function getCachedStickerUrl(assetId: string): string | undefined {
+    const url = _stickerUrlCache.get(assetId);
+    if (url !== undefined) {
+        _stickerUrlCache.delete(assetId);
+        _stickerUrlCache.set(assetId, url);
     }
+    return url;
+}
+
+function cacheStickerUrl(assetId: string, url: string): void {
+    const previous = _stickerUrlCache.get(assetId);
+    if (previous !== undefined) {
+        stickerCacheChars -= previous.length;
+        _stickerUrlCache.delete(assetId);
+    }
+    if (url.length > STICKER_CACHE_MAX_CHARS) return;
+    _stickerUrlCache.set(assetId, url);
+    stickerCacheChars += url.length;
+    while (_stickerUrlCache.size > STICKER_CACHE_MAX_ENTRIES || stickerCacheChars > STICKER_CACHE_MAX_CHARS) {
+        const oldest = _stickerUrlCache.keys().next().value!;
+        stickerCacheChars -= _stickerUrlCache.get(oldest)!.length;
+        _stickerUrlCache.delete(oldest);
+    }
+}
+
+function drainStickerResolveQueue(): void {
+    while (activeStickerResolves < STICKER_RESOLVE_CONCURRENCY && stickerResolveQueue.length) {
+        const task = stickerResolveQueue.shift()!;
+        activeStickerResolves++;
+        void (async () => {
+            let url: string | null = null;
+            try {
+                url = await resolveCustomStickerUrl(task.assetId);
+                if (url) cacheStickerUrl(task.assetId, url);
+            } catch {
+                // Missing/unreadable assets use the bubble's existing fallback.
+            } finally {
+                stickerResolvesInFlight.delete(task.assetId);
+                activeStickerResolves--;
+                task.complete(url);
+                drainStickerResolveQueue();
+            }
+        })();
+    }
+}
+
+function resolveStickerAsset(assetId: string): Promise<string | null> {
+    const cached = getCachedStickerUrl(assetId);
+    if (cached !== undefined) return Promise.resolve(cached);
+    const inFlight = stickerResolvesInFlight.get(assetId);
+    if (inFlight) return inFlight;
+    let complete!: (url: string | null) => void;
+    const promise = new Promise<string | null>(resolve => { complete = resolve; });
+    stickerResolvesInFlight.set(assetId, promise);
+    stickerResolveQueue.push({ assetId, complete });
+    drainStickerResolveQueue();
+    return promise;
 }
 
 function StickerBubble({ msg, characterId }: { msg: ChatMessage; characterId?: string }) {
     const d = msg.mediaData;
     const label = d?.label || "";
 
-    // Check pre-resolved URL or memory cache first
-    const cacheKey = `${characterId || ""}:${label}`;
-    const cachedUrl = d?.stickerUrl || _stickerUrlCache.get(cacheKey);
-    const [resolvedUrl, setResolvedUrl] = useState<string | null>(cachedUrl || null);
+    const custom = !d?.stickerUrl && label && characterId ? findCustomStickerByName(characterId, label) : undefined;
+    const directUrl = d?.stickerUrl || custom?.externalUrl;
+    const assetId = !directUrl ? custom?.assetId : undefined;
+    const cachedUrl = assetId ? getCachedStickerUrl(assetId) : undefined;
+    const [resolution, setResolution] = useState<{ assetId: string; url: string | null } | null>(null);
+    const currentResolution = resolution?.assetId === assetId ? resolution : null;
+    const imgUrl = directUrl || cachedUrl || currentResolution?.url;
+    const pending = Boolean(assetId && !imgUrl && !currentResolution);
 
     useEffect(() => {
-        if (resolvedUrl || d?.stickerUrl || !label || !characterId) return;
-        const custom = findCustomStickerByName(characterId, label);
-        if (!custom) return;
-        if (custom.externalUrl) {
-            _stickerUrlCache.set(cacheKey, custom.externalUrl);
-            setResolvedUrl(custom.externalUrl);
-            return;
-        }
-        if (!custom.assetId) return;
-        // Check cache
-        const cached = _stickerUrlCache.get(cacheKey);
-        if (cached) { setResolvedUrl(cached); return; }
-        // Only hit IndexedDB once, then cache
+        if (!assetId) { setResolution(null); return; }
         let cancelled = false;
-        resolveCustomStickerUrl(custom.assetId).then(url => {
-            if (!cancelled && url) {
-                _stickerUrlCache.set(cacheKey, url);
-                setResolvedUrl(url);
-            }
-        });
+        setResolution(null);
+        resolveStickerAsset(assetId).then(
+            url => { if (!cancelled) setResolution({ assetId, url }); },
+            () => { if (!cancelled) setResolution({ assetId, url: null }); },
+        );
         return () => { cancelled = true; };
-    }, [label, characterId, d?.stickerUrl]);
+    }, [assetId]);
 
-    const imgUrl = d?.stickerUrl || resolvedUrl;
-    if (imgUrl) {
+    if (imgUrl || pending) {
         return (
-            <div className="chat-sticker chat-sticker-image sticker-bounce p-1">
-                <img
-                    src={imgUrl}
-                    alt={label || "表情包"}
-                    className="w-[120px] h-[120px] object-contain"
-                    style={{ WebkitTouchCallout: 'none', userSelect: 'none', pointerEvents: 'none' }}
-                />
+            <div className={`chat-sticker chat-sticker-image p-1${imgUrl ? " sticker-bounce" : ""}`} aria-busy={pending || undefined}>
+                {imgUrl ? (
+                    <img
+                        src={imgUrl}
+                        alt={label || "表情包"}
+                        className="w-[120px] h-[120px] object-contain"
+                        style={{ WebkitTouchCallout: 'none', userSelect: 'none', pointerEvents: 'none' }}
+                    />
+                ) : <div className="w-[120px] h-[120px]" aria-hidden="true" />}
             </div>
         );
     }

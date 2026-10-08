@@ -8,7 +8,7 @@ import { parseStateValues, mergeStateValues } from "@/lib/state-value-parser";
 import { parseAIResponse, type ParsedMessagePart } from "@/lib/rich-message-parser";
 import { isKnownStickerLabel } from "@/lib/sticker-data";
 import { translateReasoningText } from "@/lib/reasoning-translate";
-import { MessageBubble, MediaDetailModal, prewarmStickerCache, BilingualTextBlock, isStandaloneHtmlPreviewContent, normalizeTextBubbleContent } from "./message-bubble";
+import { MessageBubble, MediaDetailModal, BilingualTextBlock, isStandaloneHtmlPreviewContent, normalizeTextBubbleContent } from "./message-bubble";
 import { GeneratedImageErrorDialog } from "./generated-image-error-dialog";
 import { PhotoInputModal, TextPhotoModal, VoiceRecordModal, RedPacketModal, LocationInputModal, SystemInstructionModal } from "./rich-input-modals";
 import { EmojiPanel, StickerPanel } from "./emoji-panel";
@@ -1087,7 +1087,6 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     const [liveCSS, setLiveCSS] = useState(session.customCSS || "");
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [transientMessages, setTransientMessages] = useState<ChatMessage[]>([]);
-    const [stickerReady, setStickerReady] = useState(false);
     const [character, setCharacter] = useState<Character | null>(() => {
         const chars = loadCharacters();
         return chars.find(c => c.id === session.contactId) || null;
@@ -1751,22 +1750,16 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         setEditingOfflineContent("");
         setOfflineTurns(loadChatOfflineTurns(session.id));
 
-        // Prewarm sticker cache for all relevant characters, then load messages
+        // Publish the recent window immediately; rendered stickers resolve individually.
         const allMsgs = loadChatMessages(session.id);
         const msgs = allMsgs.length > INITIAL_LOAD ? allMsgs.slice(-INITIAL_LOAD) : allMsgs;
         const nextHasMore = allMsgs.length > INITIAL_LOAD;
         hasMoreRef.current = nextHasMore;
         setHasMore(nextHasMore);
-        const charIds = session.isGroup && session.participantIds
-            ? session.participantIds
-            : [session.contactId];
-        Promise.all(charIds.map(id => prewarmStickerCache(id))).then(() => {
-            setStickerReady(true);
-            needsInitialScrollRef.current = true;
-            prevMsgCountRef.current = 0;
-            visibleMessagesRef.current = msgs;
-            setMessages(msgs);
-        });
+        needsInitialScrollRef.current = true;
+        prevMsgCountRef.current = 0;
+        visibleMessagesRef.current = msgs;
+        setMessages(msgs);
 
         // If a background generation is still in progress, show loading indicator.
         // Old or expired locks are cleared so the room cannot stay frozen forever.
