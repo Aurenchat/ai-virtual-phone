@@ -44,6 +44,7 @@ function isStaticRoute(pathname: string): boolean {
   // Standalone local-only preview must never be rewritten to the Float shell.
   if (pathname === "/float-inline-media-maintenance.html") return true;
   if (/^\/float-rescue-backup(?:\/schema)?\/?$/.test(pathname)) return true;
+  if (/^\/float-kv-rescue\/?$/.test(pathname)) return true;
   return STATIC_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix)) || STATIC_FILE_RE.test(pathname);
 }
 

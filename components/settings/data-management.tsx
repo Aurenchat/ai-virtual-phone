@@ -37,6 +37,7 @@ import {
   type CloudBackupConfig,
 } from "@/lib/cloud-backup/config";
 import { getRuntimePwaDisplayMode } from "@/lib/pwa-display-mode";
+import { openHydratedKvCacheSnapshot } from "@/lib/kv-rescue-cache-handoff";
 import { listCloudBackups, loadCloudBackupState, restoreFromCloudManifest, runCloudBackup, type CloudBackupListItem, type CloudBackupState } from "@/lib/cloud-backup/engine";
 import { CloudDownload } from "lucide-react";
 import {
@@ -679,7 +680,12 @@ export function DataManagement({ onNotice }: DataManagementProps) {
             <button type="button" className="ui-btn ui-btn-outline" onClick={() => window.location.assign("/float-rescue-backup")}>
               打开救援备份
             </button>
+            <button type="button" className="ui-btn ui-btn-outline" onClick={() => window.location.assign("/float-kv-rescue")}>
+              打开独立 KV 救援
+            </button>
           </div>
+          <div className="menu-item data-readonly-item"><div className="menu-label-group"><span className="menu-label">KV 应急缓存快照</span><span className="menu-desc">仅交接当前已成功水合的缓存。尚未独立证明与持久化数据库完整一致，不可视为完整备份；交接后主应用会卸载。</span></div></div>
+          <div className="data-menu-actions"><button type="button" className="ui-btn ui-btn-outline" onClick={() => openHydratedKvCacheSnapshot(message => onNotice?.(message))}>打开 KV 应急缓存快照</button></div>
         </div>
       </div>
 

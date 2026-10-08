@@ -75,6 +75,20 @@ function visit(directory, fn) {
       assert.ok(!rescueRequests.some(req => req.pathname.startsWith('/_next/'))); assert.deepEqual(errors, []);
     });
     assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []); assert.equal(await page.evaluate(() => writeAttempts), 0);
+    const kvRequests = []; page.on('request', request => kvRequests.push({ method: request.method(), pathname: new URL(request.url()).pathname }));
+    const kvResponse = await page.goto(`http://127.0.0.1:${port}/float-kv-rescue`); await page.waitForFunction(() => !!window.Dexie && document.getElementById('report').textContent.includes('阶段'));
+    check('production KV rescue bypasses root layout/auth, loads installed Dexie only, and performs no automatic hydration/reads', () => {
+      assert.equal(kvResponse.status(), 200); assert.ok(kvRequests.every(request => request.method === 'GET' && (request.pathname === '/float-kv-rescue' || request.pathname === '/float-rescue-backup/schema' || request.pathname.startsWith('/float-rescue/'))));
+      assert.ok(!kvRequests.some(request => request.pathname.startsWith('/_next/'))); assert.deepEqual(errors, []);
+    });
+    await page.locator('#diagnose').click(); await page.waitForFunction(() => document.getElementById('status').textContent.includes('DB_MISSING'));
+    check('built Dexie missing-DB diagnostic creates/writes/deletes nothing and cannot enable COMPLETE export', () => {});
+    assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []); assert.equal(await page.evaluate(() => writeAttempts), 0); assert.equal(await page.locator('#prepare').isDisabled(), true);
+    await page.goto(`http://127.0.0.1:${port}/float-kv-rescue#cache-snapshot`);
+    await page.reload(); // Hash-only navigation does not start a new standalone document.
+    await page.waitForFunction(() => document.getElementById('provenance').textContent.includes('尚未独立证明'));
+    check('production cache entry stays unverified, awaits explicit handoff, never starts hydration/Float shell', () => {});
+    assert.equal(await page.locator('#prepare').isDisabled(), true); assert.equal(await page.locator('#diagnose').isDisabled(), true); assert.deepEqual(errors, []);
     console.log(`PASS ${checks} production boundary checks`);
   } finally { await browser?.close(); child.kill(); await new Promise(resolve => { if (child.exitCode != null) resolve(); else child.once('exit', resolve); }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

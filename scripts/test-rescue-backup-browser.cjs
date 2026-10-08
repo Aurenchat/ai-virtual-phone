@@ -91,6 +91,7 @@ async function installReadGuards(page) {
   const modules = await routeModule('lib/data-management/modules.ts');
   const schemaRoute = await routeModule('app/float-rescue-backup/schema/route.ts', { '@/lib/data-management/modules': modules });
   const schema = await schemaRoute.GET().json(); const html = await (await routeModule('app/float-rescue-backup/route.ts')).GET().text();
+  const kvHtml = await (await routeModule('app/float-kv-rescue/route.ts')).GET().text();
   const temp = await fs.mkdtemp(path.join(os.tmpdir(), 'float-rescue-tests-')); const wp = require('next/dist/compiled/webpack/webpack'); wp.init();
   await new Promise((resolve, reject) => wp.webpack({ mode: 'development', target: 'web', devtool: false, context: repo, entry: path.join(repo, 'scripts/rescue-backup/restore-fixture.ts'), output: { path: temp, filename: 'restore.js' }, resolve: { extensions: ['.tsx','.ts','.js'], alias: { '@': repo } }, module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, use: path.join(repo, 'scripts/anonymous-xhs-phase0/ts-loader.cjs') }] }, plugins: [new wp.webpack.DefinePlugin({ 'process.env.NODE_ENV': JSON.stringify('development') })] }, (error, stats) => error || stats.hasErrors() ? reject(error || Error(stats.toString({ all: false, errors: true }))) : resolve()));
   const savedParts = new Map();
@@ -102,6 +103,7 @@ async function installReadGuards(page) {
       if (pathname === '/restore') { res.setHeader('Content-Type', 'text/html'); return res.end('<!doctype html><script src="/restore.js"></script>'); }
       if (pathname === '/restore.js') { res.setHeader('Content-Type', 'text/javascript'); return res.end(await fs.readFile(path.join(temp, 'restore.js'))); }
       if (pathname === '/float-rescue-backup') { res.setHeader('Content-Type', 'text/html'); return res.end(html); }
+      if (pathname === '/float-kv-rescue') { res.setHeader('Content-Type', 'text/html'); return res.end(kvHtml); }
       if (pathname === '/float-rescue-backup/schema') { res.setHeader('Content-Type', 'application/json'); return res.end(JSON.stringify(schema)); }
       if (savedParts.has(pathname)) { res.setHeader('Content-Type', 'application/zip'); return res.end(savedParts.get(pathname)); }
       if (pathname === '/float-rescue-backup.js' || /^\/float-rescue\/[a-z0-9-]+\.js$/.test(pathname)) { res.setHeader('Content-Type', 'text/javascript'); return res.end(await fs.readFile(path.join(repo, 'public', pathname))); }
@@ -110,7 +112,9 @@ async function installReadGuards(page) {
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); const baseURL = `http://127.0.0.1:${server.address().port}`; let browser;
   try {
-    browser = await chromium.launch({ channel: 'msedge', headless: true }); const sourceContext = await browser.newContext({ baseURL }); const page = await sourceContext.newPage(); const errors = []; page.on('pageerror', error => errors.push(error.message));
+    browser = await chromium.launch({ channel: 'msedge', headless: true });
+    if (process.argv.includes('--kv-only')) { await require('./rescue-backup/kv-rescue-scenarios.cjs')({ browser, baseURL, schema, check, snapshot, savedParts }); console.log(`PASS ${checks} KV rescue checks`); return; }
+    const sourceContext = await browser.newContext({ baseURL }); const page = await sourceContext.newPage(); const errors = []; page.on('pageerror', error => errors.push(error.message));
     await seed(page, schema); const before = await snapshot(page); await installReadGuards(page);
     const unexpectedRequests = [];
     await sourceContext.route('**/*', route => {
@@ -195,6 +199,7 @@ async function installReadGuards(page) {
     await require('./rescue-backup/scenarios.cjs')({ page, browser, baseURL, schema, check, assert, errors, sourceContext, seed, installReadGuards, savedParts, savedIndex: result.index });
     await require('./rescue-backup/chat-media-scenarios.cjs')({ browser, baseURL, schema, check, seed, snapshot, installReadGuards, savedParts });
     await require('./rescue-backup/remaining-scenarios.cjs')({ browser, baseURL, schema, check, snapshot, installReadGuards, savedParts });
+    await require('./rescue-backup/kv-rescue-scenarios.cjs')({ browser, baseURL, schema, check, snapshot, savedParts });
     check('all rescue scenarios have no page errors', () => assert.deepEqual(errors, []));
     await sourceContext.close(); console.log(`PASS ${checks} rescue backup browser checks`);
   } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }

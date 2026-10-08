@@ -260,6 +260,10 @@ export class RescueExporter {
     this.target = Math.min(options.partTargetBytes ?? RESCUE_PART_TARGET_BYTES, RESCUE_PART_TARGET_BYTES);
     if (!Number.isSafeInteger(this.target) || this.target <= 0) throw Error("分卷大小无效");
     this.probe = options.probe || (() => {}); this.parts = []; this.pending = null; this.generating = false;
+    // Isolated KV rescue supplies bounded reads and a lossless string payload.
+    // Existing rescue modes use the original path unchanged.
+    this.batchReader = options.batchReader; this.payloadBuilder = options.payloadBuilder;
+    this.storageSerializer = options.storageSerializer || serializeStorageString; this.onBatchCommitted = options.onBatchCommitted;
     this.state = { taskIndex: 0, lastKey: null, sequence: 0, exportedCounts: Object.fromEntries(inventory.map(task => [task.id, 0])) };
   }
   static async prepare(schema, ids, mode, options) {
@@ -309,17 +313,17 @@ export class RescueExporter {
       const task = this.inventory[next.taskIndex];
       if (!task.exists || !task.store && task.type !== "localStorage") { next.taskIndex++; next.lastKey = null; continue; }
       const rowCap = forcedRows || (task.dbName === "AiPhoneChatDB" && task.store === "messages" ? CHAT_RESCUE_BATCH_ROWS : DEFAULT_RESCUE_BATCH_ROWS);
-      const batch = await readBatch(task, next.lastKey, this.schema, rowCap, this.probe);
+      const batch = this.batchReader ? await this.batchReader(task, next.lastKey, rowCap, this.probe) : await readBatch(task, next.lastKey, this.schema, rowCap, this.probe);
       const recordCount = batch.rows.length;
       if (!recordCount && task.count !== 0) { if (!batch.done) throw Error("读取未前进，救援备份已停止"); next.taskIndex++; next.lastKey = null; continue; }
       const collector = createCollector(this.probe); const records = [];
       // Drain raw references one row at a time after the readonly transaction ends.
       while (batch.rows.length) {
         const raw = batch.rows.shift();
-        records.push(task.type === "indexeddb" ? { key: await serializeValue(raw.key, collector, this.probe), value: await serializeValue(raw.value, collector, this.probe) } : { key: raw.key, value: await serializeStorageString(task.type === "kv" ? raw.value.value : raw.value, collector, this.probe) });
+        records.push(task.type === "indexeddb" ? { key: await serializeValue(raw.key, collector, this.probe), value: await serializeValue(raw.value, collector, this.probe) } : { key: raw.key, value: await this.storageSerializer(task.type === "kv" ? raw.value.value : raw.value, collector, this.probe) });
       }
       const source = task.type === "indexeddb" ? { type: "indexeddb", dbName: task.dbName, stores: [{ ...task.schema, records }] } : { type: task.type, records };
-      const payloadBlob = jsonBlob({ moduleId: task.moduleId, sources: [source] }); records.length = 0;
+      const payloadBlob = this.payloadBuilder ? await this.payloadBuilder(task, records) : jsonBlob({ moduleId: task.moduleId, sources: [source] }); records.length = 0;
       const filename = `modules/${task.moduleId}/${String(task.sourceIndex).padStart(3, "0")}-${String(next.sequence + 1).padStart(6, "0")}.json`;
       const media = [...collector.media.entries()].filter(([ref]) => !refs.has(ref)).map(([ref, blob]) => ({ name: `media/${ref}.bin`, blob, ref }));
       const previous = stats.get(task.moduleId) || { records: 0, bytes: 0 };
@@ -344,6 +348,7 @@ export class RescueExporter {
       await writer.add(filename, payloadBlob); collector.media.clear();
       stats.set(task.moduleId, proposedStats.get(task.moduleId)); Object.assign(counts, proposedCounts);
       next.exportedCounts[task.id] += recordCount; next.sequence++; next.lastKey = batch.lastKey; forcedRows = null;
+      this.onBatchCommitted?.(next, task, batch);
       if (batch.done || task.count === 0) { next.taskIndex++; next.lastKey = null; }
       if (oversized) break;
     }
