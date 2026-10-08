@@ -118,9 +118,11 @@ export async function deleteMediaRef(ref: string | undefined): Promise<void> {
     await getDb().entries.delete(id);
 }
 
-export async function loadMediaObjectUrl(ref: string): Promise<string | null> {
+export async function loadMediaObjectUrl(ref: string, signal?: AbortSignal): Promise<string | null> {
+    if (signal?.aborted) return null;
     const result = await loadMediaBlob(ref);
-    if (!result) return null;
+    // Cancel only this consumer's delivery; the IndexedDB read still completes.
+    if (!result || signal?.aborted) return null;
     return URL.createObjectURL(result.blob);
 }
 

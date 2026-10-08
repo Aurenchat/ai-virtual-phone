@@ -1314,6 +1314,60 @@ function GeneratedImagePromptDialog({
     );
 }
 
+function useResolvedMediaUrl(rawUrl: string) {
+    // Identity changes even for A -> B -> A, so render cannot reuse A's revoked URL.
+    const source = useMemo(() => ({ rawUrl }), [rawUrl]);
+    const requestIdRef = useRef(0);
+    const [resolution, setResolution] = useState<{
+        source: typeof source;
+        requestId: number;
+        signal: AbortSignal;
+        url: string;
+        expired: boolean;
+    } | null>(null);
+
+    useEffect(() => {
+        const requestId = ++requestIdRef.current;
+        if (!isMediaStoreRef(source.rawUrl)) {
+            setResolution(null);
+            return;
+        }
+        const controller = new AbortController();
+        let ownedUrl = "";
+        const isCurrent = () => !controller.signal.aborted && requestIdRef.current === requestId;
+        setResolution(null);
+        loadMediaObjectUrl(source.rawUrl, controller.signal).then(
+            url => {
+                if (!isCurrent()) {
+                    // Cleanup can run after URL creation but before Promise delivery.
+                    if (url) URL.revokeObjectURL(url);
+                    return;
+                }
+                ownedUrl = url || "";
+                setResolution({ source, requestId, signal: controller.signal, url: ownedUrl, expired: !url });
+            },
+            () => {
+                if (isCurrent()) {
+                    setResolution({ source, requestId, signal: controller.signal, url: "", expired: true });
+                }
+            },
+        );
+        return () => {
+            controller.abort();
+            if (ownedUrl) {
+                URL.revokeObjectURL(ownedUrl);
+                ownedUrl = "";
+            }
+        };
+    }, [source]);
+
+    if (!isMediaStoreRef(rawUrl)) return { resolvedUrl: rawUrl, expired: false };
+    if (resolution?.source !== source || resolution.signal.aborted || resolution.requestId !== requestIdRef.current) {
+        return { resolvedUrl: "", expired: false };
+    }
+    return { resolvedUrl: resolution.url, expired: resolution.expired };
+}
+
 function ImageBubble({
     msg,
     onUpdate,
@@ -1328,8 +1382,7 @@ function ImageBubble({
     const rawUrl = msg.mediaUrl || "";
     // 媒体维护压缩后 mediaUrl 是 media-store:// 引用，直接当 <img src> 会裂图，
     // 与 MediaFileBubble 相同：先解析为 object URL 再渲染。
-    const [resolvedUrl, setResolvedUrl] = useState<string>(isMediaStoreRef(rawUrl) ? "" : rawUrl);
-    const [refExpired, setRefExpired] = useState(false);
+    const { resolvedUrl, expired: refExpired } = useResolvedMediaUrl(rawUrl);
     const [showPromptEditor, setShowPromptEditor] = useState(false);
     const [promptDraft, setPromptDraft] = useState("");
     const [regenerating, setRegenerating] = useState(false);
@@ -1342,20 +1395,6 @@ function ImageBubble({
 
     const [hasRef, setHasRef] = useState(() => hasCharacterReferenceImage(characterId));
     const [useReferenceDraft, setUseReferenceDraft] = useState(d?.useReferenceImage === true);
-
-    useEffect(() => {
-        if (!isMediaStoreRef(rawUrl)) {
-            setResolvedUrl(rawUrl);
-            setRefExpired(false);
-            return;
-        }
-        let revokeUrl = "";
-        loadMediaObjectUrl(rawUrl).then(objUrl => {
-            if (objUrl) { setResolvedUrl(objUrl); revokeUrl = objUrl; }
-            else setRefExpired(true);
-        });
-        return () => { if (revokeUrl) URL.revokeObjectURL(revokeUrl); };
-    }, [rawUrl]);
 
     const openPromptEditor = useCallback(() => {
         const latestHasRef = hasCharacterReferenceImage(characterId);
@@ -2042,8 +2081,7 @@ function MediaFileBubble({
     const rawUrl = msg.mediaUrl || "";
     const fileType = msg.mediaData?.fileType || "file";
     const title = msg.mediaData?.fileName || msg.content || "";
-    const [resolvedUrl, setResolvedUrl] = useState<string>(isMediaStoreRef(rawUrl) ? "" : rawUrl);
-    const [expired, setExpired] = useState(false);
+    const { resolvedUrl, expired } = useResolvedMediaUrl(rawUrl);
     const audioRef = useRef<HTMLAudioElement>(null);
     const [playing, setPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -2054,24 +2092,6 @@ function MediaFileBubble({
     // 同 ImageBubble：弹窗内校验用 imageRetryError，生成失败走一次性弹窗
     const [imageRetryError, setImageRetryError] = useState("");
     const [imageFailureNotice, setImageFailureNotice] = useState("");
-
-    useEffect(() => {
-        if (!isMediaStoreRef(rawUrl)) {
-            // Plain URLs (e.g. the fresh data URL written by image regeneration)
-            // must re-sync when the message's mediaUrl changes — resolvedUrl is
-            // only initialized at mount, which left the old image on screen
-            // until the chat app was reopened.
-            setResolvedUrl(rawUrl);
-            setExpired(false);
-            return;
-        }
-        let revokeUrl = "";
-        loadMediaObjectUrl(rawUrl).then(objUrl => {
-            if (objUrl) { setResolvedUrl(objUrl); revokeUrl = objUrl; }
-            else setExpired(true);
-        });
-        return () => { if (revokeUrl) URL.revokeObjectURL(revokeUrl); };
-    }, [rawUrl]);
 
     const togglePlay = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
