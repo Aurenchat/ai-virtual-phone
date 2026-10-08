@@ -369,7 +369,7 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
   // Maintenance must fail closed, never fall back to the hydrated Float shell.
-  if (url.origin === self.location.origin && ["/float-inline-media-maintenance.html", "/float-inline-media-maintenance.js"].includes(url.pathname)) {
+  if (url.origin === self.location.origin && (["/float-inline-media-maintenance.html", "/float-inline-media-maintenance.js", "/float-rescue-backup", "/float-rescue-backup/", "/float-rescue-backup/schema", "/float-rescue-backup/schema/", "/float-rescue-backup.js"].includes(url.pathname) || url.pathname.startsWith("/float-rescue/"))) {
     event.respondWith(fetch(new Request(request, { cache: "no-store" })));
     return;
   }

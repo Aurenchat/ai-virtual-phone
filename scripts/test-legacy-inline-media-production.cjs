@@ -54,6 +54,21 @@ function visit(directory, fn) {
     check('built preview remains read-only, noncreating and has no runtime/global migration entry', () => { assert.equal(state.writes, 0); assert.deepEqual(state.databases, []); assert.deepEqual(state.runtime, []); assert.deepEqual(errors, []); assert.equal(state.overflow, false); });
     const offlineEndpoint = await context.request.get(`http://127.0.0.1:${port}/offline-engine.js`);
     check('test-only engine endpoint does not exist in production', () => assert.equal(offlineEndpoint.status(), 404));
+    const rescueRequests = []; page.on('request', req => rescueRequests.push({ method: req.method(), pathname: new URL(req.url()).pathname }));
+    const rescue = await page.goto(`http://127.0.0.1:${port}/float-rescue-backup`);
+    await page.waitForFunction(() => !document.getElementById('preflight').disabled);
+    const rescueState = await page.evaluate(() => ({ writes: writeAttempts, runtime: ['hydrateChatStorage','_messagesCache','runLegacyInlineMediaEpoch','MainApp','ChatPluginBootstrap'].filter(name => name in window), overflow: document.documentElement.scrollWidth > innerWidth }));
+    check('real production rescue route bypasses layout/middleware without cookies and loads only standalone GET assets/schema', () => {
+      assert.equal(rescue.status(), 200); assert.equal(rescueState.writes, 0); assert.equal(rescueState.overflow, false); assert.deepEqual(rescueState.runtime, []); assert.deepEqual(errors, []);
+      assert.ok(rescueRequests.every(req => req.method === 'GET' && ['/float-rescue-backup','/float-rescue-backup.js','/float-rescue-backup/schema'].includes(req.pathname) || req.method === 'GET' && req.pathname.startsWith('/float-rescue/')));
+      assert.ok(!rescueRequests.some(req => req.pathname.startsWith('/_next/')));
+    });
+    const schemaResponse = await context.request.get(`http://127.0.0.1:${port}/float-rescue-backup/schema`); const schema = await schemaResponse.json();
+    check('production rescue schema is pure module metadata including cloud credentials key, never credential values', () => {
+      assert.equal(schemaResponse.status(), 200); assert.equal(schema.version, 1); assert.equal(schema.modules.length, 10); assert.ok(schema.modules.find(m => m.id === 'settings').sources.some(source => source.sourceIndex === 999 && source.keys.includes('ai_phone_cloud_backup_config_v1')));
+    });
+    await page.locator('#preflight').click(); await page.waitForFunction(() => document.getElementById('status').textContent.includes('关键数据库不存在'));
+    check('production rescue missing critical DB stops before export and creates no database', () => {}); assert.deepEqual(await page.evaluate(() => indexedDB.databases()), []);
     console.log(`PASS ${checks} production boundary checks`);
   } finally { await browser?.close(); child.kill(); await new Promise(resolve => { if (child.exitCode != null) resolve(); else child.once('exit', resolve); }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

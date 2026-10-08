@@ -666,6 +666,24 @@ export function DataManagement({ onNotice }: DataManagementProps) {
       </div>
 
       <div className="data-section">
+        <DataSectionTitle>Rescue Backup</DataSectionTitle>
+        <div className="menu-group">
+          <div className="menu-item data-readonly-item">
+            <DataSettingsIcon icon={Database} color={BINDING_ACCENTS.api} />
+            <div className="menu-label-group">
+              <span className="menu-label">本地救援备份</span>
+              <span className="menu-desc">在独立低内存页面中分卷导出完整 Float 数据。源数据库只读，适合普通本地导出因数据过大而闪退时使用。</span>
+            </div>
+          </div>
+          <div className="data-menu-actions">
+            <button type="button" className="ui-btn ui-btn-outline" onClick={() => window.location.assign("/float-rescue-backup")}>
+              打开救援备份
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="data-section">
         <DataSectionTitle>Media Cleanup</DataSectionTitle>
         <div className="menu-group">
           <div className="menu-item data-readonly-item">

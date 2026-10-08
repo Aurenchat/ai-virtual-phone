@@ -13,7 +13,7 @@ function harness({rootId='test-b',missing=false,clients=[],maintenanceFailure=''
     return {match:async k=>map.get(abs(k))?.clone(),put:async(k,v)=>{map.set(abs(k),v.clone());},keys:async()=>[...map.keys()].map(k=>new Request(k))};
   }};
   const self={location:new URL('https://float.test/sw-versioned.js'),addEventListener:(n,f)=>listeners[n]=f,skipWaiting:async()=>{skips++;},registration:{showNotification:async(t,o)=>notices.push({t,o})},clients:{matchAll:async()=>clients,openWindow:async u=>messages.push({open:u})}};
-  const fetch=async req=>{const url=abs(req);if(new URL(url).pathname.startsWith('/float-inline-media-maintenance.')){assert.equal(req.cache,'no-store');if(maintenanceFailure==='offline')throw Error('offline');return new Response('preview only',{status:maintenanceFailure==='404'?404:200});}if(new URL(url).pathname==='/')return new Response(`<meta name="float-build-id" content="${rootId}"><script src="/_next/static/chunks/core-123.js"></script>`,{headers:{'Content-Type':'text/html'}});return new Response('script',{status:missing?404:200,headers:{'Content-Type':'application/javascript'}});};
+  const fetch=async req=>{const url=abs(req);const pathname=new URL(url).pathname;if(pathname.startsWith('/float-inline-media-maintenance.')||pathname.startsWith('/float-rescue-backup')||pathname.startsWith('/float-rescue/')){assert.equal(req.cache,'no-store');if(maintenanceFailure==='offline')throw Error('offline');return new Response('preview only',{status:maintenanceFailure==='404'?404:200});}if(pathname==='/')return new Response(`<meta name="float-build-id" content="${rootId}"><script src="/_next/static/chunks/core-123.js"></script>`,{headers:{'Content-Type':'text/html'}});return new Response('script',{status:missing?404:200,headers:{'Content-Type':'application/javascript'}});};
   vm.runInNewContext(source.replace('"__FLOAT_BUILD_ID__"','"test-b"'),{self,caches,fetch,URL,Request,Response,MessageChannel,setTimeout,clearTimeout,console});
   const run=async(type,props={})=>{let promise,response;listeners[type]({...props,waitUntil:p=>promise=p,respondWith:p=>response=p});if(promise)await promise;return response?await response:null;};
   const ready=async()=>{let reply;await run('message',{data:{type:'PWA_CLIENT_READY',buildId:'test-b'},source:{id:'b'},ports:[{postMessage:m=>reply=m}]});return reply;};
@@ -35,6 +35,13 @@ for(const file of ['html','js']){
     const preview=harness({clients:[bClient],maintenanceFailure:failure});await preview.ready();
     let response,failed=false;try{response=await preview.run('fetch',{request:new Request(`https://float.test/float-inline-media-maintenance.${file}?migrate=1`)});}catch{failed=true;}
     check(failure==='offline'?failed:response.status===(failure==='404'?404:200)&&await response.text()==='preview only',`Maintenance ${file} ${failure||'online'} never falls back to hydrated shell`);
+  }
+}
+for(const pathname of ['/float-rescue-backup','/float-rescue-backup/','/float-rescue-backup.js','/float-rescue-backup/schema','/float-rescue-backup/schema/','/float-rescue/exporter.js','/float-rescue/zip-store.js','/float-rescue/sha256.js','/float-rescue/serializer.js','/float-rescue/io.js','/float-rescue/save.js','/float-rescue/verifier.js']){
+  for(const failure of ['', '404', 'offline']){
+    const rescue=harness({clients:[bClient],maintenanceFailure:failure});await rescue.ready();
+    let response,failed=false;try{response=await rescue.run('fetch',{request:new Request(`https://float.test${pathname}`)});}catch{failed=true;}
+    check(failure==='offline'?failed:response.status===(failure==='404'?404:200)&&await response.text()==='preview only',`Rescue ${pathname} ${failure||'online'} never falls back to shell`);
   }
 }
 h=harness({rootId:'other'});check(!(await h.ready()).ok&&h.skips===0,'Wrong root build refuses preparation/activation');
