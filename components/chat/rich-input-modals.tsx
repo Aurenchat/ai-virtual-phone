@@ -3,6 +3,7 @@ import { reservePaymentDraft } from "@/lib/payment-ledger";
 import { PAYMENT_CURRENCIES, normalizeCurrency, paymentMinor, validateCurrencyPacket, type PaymentCurrency } from "@/lib/payment-currency";
 import type { PaymentFxQuote } from "@/lib/payment-fx";
 import { PaymentFxLine, usePaymentFx } from "./payment-fx-preview";
+import { CashBrand } from "./cash-payment-card";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { CallSttWarningDialog, hideCallSttWarningPermanently, isCallSttWarningHidden } from "./call-stt-warning-dialog";
@@ -123,11 +124,12 @@ interface RedPacketModalProps {
     sessionId: string;
     mode: "red_packet" | "transfer";
     isGroup?: boolean;
+    cashStyle?: boolean;
     onSend: (amount: number, label: string, count?: number, paymentId?: string, currency?: PaymentCurrency, quote?: PaymentFxQuote) => void | Promise<void>;
     onClose: () => void;
 }
 
-export function RedPacketModal({ sessionId, mode, isGroup, onSend, onClose }: RedPacketModalProps) {
+export function RedPacketModal({ sessionId, mode, isGroup, cashStyle = false, onSend, onClose }: RedPacketModalProps) {
     const [amount, setAmount] = useState("");
     const [label, setLabel] = useState("");
     const [count, setCount] = useState("1");
@@ -143,7 +145,7 @@ export function RedPacketModal({ sessionId, mode, isGroup, onSend, onClose }: Re
     const title = isRedPacket ? "发红包" : "转账";
     const defaultLabel = isRedPacket ? "恭喜发财，大吉大利" : "";
     // Brand-specific colors: WeChat red packet / transfer (CSS variables)
-    const color = isRedPacket ? "var(--c-redpacket)" : "var(--c-transfer)";
+    const color = cashStyle ? "#f5f5f7" : isRedPacket ? "var(--c-redpacket)" : "var(--c-transfer)";
 
     const handleSend = async () => {
         if (sending.current) return;
@@ -166,14 +168,13 @@ export function RedPacketModal({ sessionId, mode, isGroup, onSend, onClose }: Re
         <div className="modal-overlay" onClick={onClose}>
             <div
                 onClick={e => e.stopPropagation()}
-                className="w-[300px] bg-[var(--c-card)] rounded-2xl overflow-hidden"
+                className={cashStyle ? "cash-payment-composer" : "w-[300px] bg-[var(--c-card)] rounded-2xl overflow-hidden"}
             >
-                {/* Brand-colored header -- kept as inline style */}
                 <div
-                    className="p-5 flex flex-col items-center gap-2"
-                    style={{ background: color }}
+                    className={cashStyle ? "cash-payment-composer-header" : "p-5 flex flex-col items-center gap-2"}
+                    style={cashStyle ? undefined : { background: color }}
                 >
-                    <div className="ts-28">{isRedPacket ? "🧧" : "💰"}</div>
+                    {cashStyle ? <CashBrand /> : <div className="ts-28">{isRedPacket ? "🧧" : "💰"}</div>}
                     <div className="text-white ts-16 font-semibold">{title}</div>
                 </div>
                 <div className="p-5 flex flex-col gap-3.5">
@@ -237,7 +238,8 @@ export function RedPacketModal({ sessionId, mode, isGroup, onSend, onClose }: Re
                             disabled={!parseFloat(amount) || !fx.ready}
                             className="flex-1 py-2.5 rounded-lg border-none text-white ts-14 font-semibold"
                             style={{
-                                background: parseFloat(amount) ? color : "var(--c-icon)",
+                                background: cashStyle ? "#f2f2f7" : parseFloat(amount) ? color : "var(--c-icon)",
+                                color: cashStyle ? "#171719" : undefined,
                                 cursor: parseFloat(amount) ? "pointer" : "default",
                             }}
                         >{isRedPacket ? "塞入红包" : "确认转账"}</button>

@@ -6,6 +6,14 @@ export const PAYMENT_CURRENCIES = {
   EUR: { name: "欧元", symbol: "€", decimals: 2 },
   JPY: { name: "日元", symbol: "¥", decimals: 0 },
   KRW: { name: "韩元", symbol: "₩", decimals: 0 },
+  GBP: { name: "英镑", symbol: "£", decimals: 2 },
+  HKD: { name: "港币", symbol: "HK$", decimals: 2 },
+  SGD: { name: "新加坡元", symbol: "S$", decimals: 2 },
+  AUD: { name: "澳大利亚元", symbol: "A$", decimals: 2 },
+  CAD: { name: "加拿大元", symbol: "C$", decimals: 2 },
+  CHF: { name: "瑞士法郎", symbol: "CHF ", decimals: 2 },
+  NZD: { name: "新西兰元", symbol: "NZ$", decimals: 2 },
+  THB: { name: "泰铢", symbol: "฿", decimals: 2 },
 } as const;
 export type PaymentCurrency = keyof typeof PAYMENT_CURRENCIES;
 const aliases: Record<string, PaymentCurrency> = {
@@ -18,7 +26,7 @@ export function normalizeCurrency(value?: string): PaymentCurrency {
   const key = value.trim().toUpperCase();
   if (Object.prototype.hasOwnProperty.call(PAYMENT_CURRENCIES, key)) return key as PaymentCurrency;
   if (aliases[key]) return aliases[key];
-  throw new Error("不支持或不明确的交易币种，请使用 CNY、USD、EUR、JPY 或 KRW");
+  throw new Error(`不支持或不明确的交易币种，请使用 ${Object.keys(PAYMENT_CURRENCIES).join("、")}`);
 }
 export function paymentMinor(amount: number, currency?: string): number {
   const code = normalizeCurrency(currency), factor = 10 ** PAYMENT_CURRENCIES[code].decimals;

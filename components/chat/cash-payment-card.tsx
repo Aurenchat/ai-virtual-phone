@@ -2,6 +2,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage } from "@/lib/chat-storage";
 import { formatPaymentAmount } from "@/lib/payment-currency";
+import { paymentDisplayState, paymentStatusGlyph } from "@/lib/payment-display";
+
+export function CashBrand() {
+  return <span className="cash-brand"><span className="cash-brand-apple" aria-hidden="true"></span>Cash</span>;
+}
 
 /** Payment-only drawing using the accepted 24px body and directional tail.
  * Group eligibility stays owned by Message Bridge's data-im-last. */
@@ -18,7 +23,7 @@ export function cashOutline(w: number, h: number, incoming: boolean, tail: boole
 export function CashPaymentCard({ msg, onShowDetail }: { msg: ChatMessage; onShowDetail?: (msg: ChatMessage) => void }) {
   const data = msg.mediaData, packet = msg.mediaType === "red_packet", returned = data?.status === "declined";
   const count = data?.count || 1, claimed = data?.claimedBy?.length || 0;
-  const done = packet ? data?.status === "opened" || claimed >= count : data?.status === "received";
+  const state = paymentDisplayState(packet ? "red_packet" : "transfer", data), done = state === "completed";
   const status = returned ? "已退回" : packet && count > 1 ? `${claimed}/${count} 已领取` : done ? packet ? "已领取" : "已收款" : packet ? "待领取" : "待收款";
   const ref = useRef<HTMLButtonElement>(null);
   const [size, setSize] = useState({ w: 270, h: 176 });
@@ -39,12 +44,12 @@ export function CashPaymentCard({ msg, onShowDetail }: { msg: ChatMessage; onSho
       <path className="cash-outline-tail" d={cashOutline(size.w, size.h, msg.role !== "user", true)} />
     </svg>
     <span className="cash-payment-content">
-      <span className="cash-brand">Cash</span>
+      <CashBrand />
       <span className={packet ? "cash-packet-note cash-primary" : "cash-card-amount cash-primary"}>
         {packet ? data?.label || "恭喜发财，大吉大利" : formatPaymentAmount(data?.amount || 0, data?.currency)}
       </span>
       <span className="cash-card-note">{packet ? "红包" : data?.label || (msg.role === "user" ? "你发起了一笔转账" : "对方发起了一笔转账")}</span>
-      <span className="cash-card-status"><span aria-hidden="true">{returned ? "↩" : done ? "✓" : "◷"}</span> {status}</span>
+      <span className="cash-card-status"><span aria-hidden="true">{paymentStatusGlyph(state)}</span> {status}</span>
     </span>
   </button>;
 }

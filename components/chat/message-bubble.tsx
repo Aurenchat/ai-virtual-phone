@@ -1,8 +1,9 @@
 "use client";
 import { settleChatPayment } from "@/lib/payment-chat";
-import { CashPaymentCard } from "./cash-payment-card";
+import { CashBrand, CashPaymentCard } from "./cash-payment-card";
 import { PaymentFxLine, usePaymentFx } from "./payment-fx-preview";
 import { formatPaymentAmount, normalizeCurrency, PAYMENT_CURRENCIES } from "@/lib/payment-currency";
+import { paymentDisplayState, paymentReceiveSuffix, paymentStatusGlyph } from "@/lib/payment-display";
 
 import { useState, useEffect, useCallback, useRef, useMemo, useContext, useId, memo } from "react";
 import { ImessagePresentation, TranslationBody } from "./imessage-presentation";
@@ -1815,7 +1816,7 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
         try {
             setPaymentError("");
             const updated = await settleChatPayment(msg, action, { id: "self", name: userName, isUser: true }, fx.quote);
-            const suffix = action === "claim" ? `，金额:${formatPaymentAmount(updated.mediaData?.claimedAmounts?.[userName] || 0, d?.currency)} ${normalizeCurrency(d?.currency)}` : "";
+            const suffix = action === "return" ? "" : paymentReceiveSuffix(updated.mediaData, action, userName);
             onAccept(updated, text + suffix, actionType);
         } catch (error) { setPaymentError(error instanceof Error ? error.message : "支付未完成，请重试"); }
         finally { paymentBusy.current = false; setSettling(false); }
@@ -1912,7 +1913,7 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
             : isReceived ? "已收款" : "待收款";
         return <div className="modal-overlay" onClick={onClose}>
             <div className="cash-detail" role="dialog" aria-label={isRedPacket ? "红包详情" : "转账详情"} data-returned={isDeclined || undefined} onClick={e => e.stopPropagation()}>
-                <span className="cash-brand">Cash</span>
+                <CashBrand />
                 <div className="cash-detail-amount">{formatPaymentAmount(d?.amount || 0, code)}</div>
                 <div className="cash-detail-currency">{PAYMENT_CURRENCIES[code].name} · {code}</div>
                 <PaymentFxLine amount={d?.amount || 0} currency={code} quote={fx.quote} settlement={d?.paymentSettlement}
@@ -1924,7 +1925,7 @@ export function MediaDetailModal({ msg, userName, groupSize, onAccept, onClose }
                 {isRedPacket && claimedBy.length > 0 && <div className="cash-detail-list">{claimedBy.map(name => <div className="cash-detail-meta" key={name}>
                     <span>{name}</span><span>{formatPaymentAmount(claimedAmounts[name] || 0, code)}</span>
                 </div>)}</div>}
-                <div className="cash-detail-status">{status}</div>
+                <div className="cash-detail-status"><span aria-hidden="true">{paymentStatusGlyph(paymentDisplayState(isRedPacket ? "red_packet" : "transfer", d, userName))}</span> {status}</div>
                 {paymentError && <div className="cash-detail-error" role="alert">{paymentError}</div>}
                 {(canClaimRedPacket || canActTransfer) && <div className="cash-detail-actions">
                     <button disabled={settling || !fx.ready} onClick={isRedPacket ? handleRedPacketAccept : handleTransferAccept}>{isRedPacket ? "领取" : "收款"}</button>

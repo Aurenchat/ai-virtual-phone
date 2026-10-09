@@ -11,6 +11,7 @@
 .im-bubble:has(> .cash-payment-card) { padding: 0 !important; background: transparent !important; border: 0 !important; box-shadow: none !important; overflow: visible !important; }
 .cash-payment-content { display: flex; box-sizing: border-box; height: 100%; padding: 16px 19px; flex-direction: column; gap: 6px; }
 .cash-brand { font-size: 18px; font-weight: 600; line-height: 23px; letter-spacing: -.6px; }
+.cash-brand-apple { font-size: .90em; margin-right: 2px; }
 .cash-primary { color: #f0eff4; }
 .cash-card-amount { display: block; font-size: clamp(26px, 8vw, 35px); font-weight: 600; line-height: 44px; letter-spacing: -1px; text-align: center; overflow-wrap: anywhere; }
 .cash-packet-note { font-size: 24px; font-weight: 500; line-height: 29px; }
@@ -34,3 +35,15 @@
 .cash-detail-actions button:last-child { background: #ffffff15; color: #f2f2f7; }
 .cash-detail-actions button:disabled { opacity: .4; cursor: default; }
 .cash-detail-error { color: #ffb4ac; font-size: 13px; margin-top: 14px; }
+.cash-payment-composer {
+  width: min(300px, calc(100vw - 36px)); max-height: 85dvh; overflow: auto; border-radius: 16px;
+  background: #222225; color: #f5f5f7;
+  --c-icon: #b6b6bd; --c-text: #f5f5f7; --c-input: #303033;
+  --c-input-border: #ffffff24; --c-danger: #ffb4ac;
+}
+.cash-payment-composer-header { display: flex; flex-direction: column; gap: 8px; padding: 20px 20px 0; }
+.cash-payment-composer .ui-input { color: #f5f5f7; background: #303033; border-color: #ffffff24; }
+.cash-payment-composer .ui-btn-ghost { color: #f5f5f7; border-color: #ffffff24; }
+.cash-payment-composer button:disabled { opacity: .4; cursor: default; }
+.cash-payment-composer input::placeholder { color: #aeadb6; }
+.cash-payment-composer [role="alert"] { color: #ffb4ac; }

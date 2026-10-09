@@ -4,6 +4,9 @@
 
 import type { PresetConfig } from "./settings-types";
 import { getCheckPhonePromptTags } from "./checkphone-config";
+import { PAYMENT_CURRENCIES } from "./payment-currency";
+
+const paymentCurrencyCodes = Object.keys(PAYMENT_CURRENCIES).join("/");
 
 export const BUILTIN_PRESET_ID = "builtin_default_v1";
 export const BUILTIN_PRESET_VERSION = 264; // 升版本会用出厂内容重写用户的内置预设副本（自定义会丢），非必要不升
@@ -397,11 +400,11 @@ export function createBuiltinPreset(): PresetConfig {
                     "",
                     "### 发红包",
                     "【格式】[红包:金额:留言]",
-                    "【币种可选】[红包:USD:金额:留言]；支持 CNY/USD/EUR/JPY/KRW，省略为 CNY。JPY/KRW 必须整数，其余最多两位小数。",
+                    `【币种可选】[红包:USD:金额:留言]；支持 ${paymentCurrencyCodes}，省略为 CNY。JPY/KRW 必须整数，其余最多两位小数。`,
                     "",
                     "### 转账",
                     "【格式】[转账:金额:留言]",
-                    "【币种可选】[转账:USD:金额:留言]；支持 CNY/USD/EUR/JPY/KRW，省略为 CNY。",
+                    `【币种可选】[转账:USD:金额:留言]；支持 ${paymentCurrencyCodes}，省略为 CNY。`,
                     "",
                     "### 请求对方代付",
                     "【格式】[代付请求:总金额:商品名/详情/价格/数量; 商品名/详情/价格/数量]",
@@ -1017,7 +1020,7 @@ export function createBuiltinPreset(): PresetConfig {
                     "",
                     "### 红包",
                     "【格式】[角色名]: [红包:金额:个数:留言]",
-                    "【币种可选】[角色名]: [红包:USD:金额:个数:留言]；整包仅一个币种 CNY/USD/EUR/JPY/KRW。JPY/KRW 必须整数，其他最多两位小数，总额至少每人一个最小单位。",
+                    `【币种可选】[角色名]: [红包:USD:金额:个数:留言]；整包仅一个币种 ${paymentCurrencyCodes}。JPY/KRW 必须整数，其他最多两位小数，总额至少每人一个最小单位。`,
                     "",
                     "### 领取红包",
                     "【格式】[角色名]: [A领取了B的红包] （必须指定双方名字）",
@@ -1027,7 +1030,7 @@ export function createBuiltinPreset(): PresetConfig {
                     "",
                     "### 转账",
                     "【格式】[角色名]: [转账:金额:留言:转账人:收款人] （必须指定双方名字）",
-                    "【币种可选】[角色名]: [转账:USD:金额:留言:转账人:收款人]；支持 CNY/USD/EUR/JPY/KRW，省略为 CNY。",
+                    `【币种可选】[角色名]: [转账:USD:金额:留言:转账人:收款人]；支持 ${paymentCurrencyCodes}，省略为 CNY。`,
                     "",
                     "### 请求对方代付",
                     "【格式】[角色名]: [代付请求:总金额:商品名/详情/价格/数量; 商品名/详情/价格/数量]",
