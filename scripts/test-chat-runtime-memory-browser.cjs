@@ -92,6 +92,29 @@ module.exports = function(source) {
  }
  return transpile.call(this,source);
 };`);
+    await fs.writeFile(path.join(temp, 'window-probe-loader.cjs'), `
+const transpile = require(${JSON.stringify(path.join(repo, 'scripts/anonymous-xhs-phase0/ts-loader.cjs'))});
+module.exports = function(source) {
+ const original = 'loadChatAppSettings, loadChatMessages, loadChatContacts';
+ if (!source.includes(original)) throw Error('ChatRoom window probe import not found');
+ source = source.replace(original, 'loadChatAppSettings, loadChatMessages as actualLoadChatMessages, loadChatContacts');
+ source = source.replace('    const editingMessage =', \`    useLayoutEffect(() => {
+   (window as any).__windowState = {sessionId:session.id, ids:messages.filter(m=>!isTransientMessage(m)).map(m=>m.id), hasMore, projectedCount:projectedMessages.length};
+ }, [session.id, messages, hasMore, projectedMessages]);
+ (window as any).__windowActions = {
+   injectTransient: () => setMessages(prev => [...prev, {id:'ui-transient-window-probe',sessionId:session.id,role:'assistant',content:'Synthetic transient',createdAt:new Date().toISOString(),status:'sent'}]),
+   transient: () => setTransientMessages([{id:'ui-transient-window-preview',sessionId:session.id,role:'assistant',content:'Synthetic preview',createdAt:new Date().toISOString(),status:'sent'}]),
+   edit: (msg: any) => handleEditMessageStart(msg), quote: (msg: any) => setQuotingMessage(msg),
+   select: (ids: string[]) => {setIsMultiSelectMode(true);setSelectedMessageIds(new Set(ids));}, deleteSelected: handleMultiDeleteConfirmed,
+ };
+    const editingMessage =\`);
+ source += \`\nfunction loadChatMessages(sessionId: string, limit?: number) {
+ const rows = actualLoadChatMessages(sessionId, limit);
+ (window as any).__windowReads?.push({sessionId,limit:limit ?? null,returned:rows.length});
+ return rows;
+ }\`;
+ return transpile.call(this,source);
+};`);
     const mediaSpikeRules = await require('./chat-runtime-memory/media-spike-loaders.cjs')({ temp, repo });
     const wp = require('next/dist/compiled/webpack/webpack'); wp.init();
     await new Promise((resolve, reject) => wp.webpack({
@@ -100,6 +123,7 @@ module.exports = function(source) {
         resolve: { extensions: ['.tsx', '.ts', '.js'], alias: { '@': repo }, modules: [path.join(repo, 'node_modules')], fallback: { fs: false, path: false, crypto: false } },
         module: { rules: [{ test: /\.tsx?$/, exclude: /node_modules/, oneOf: [
             ...mediaSpikeRules,
+            { test: /[\\/]chat-room\.tsx$/, use: path.join(temp, 'window-probe-loader.cjs') },
             { test: /[\\/]tts-service\.ts$/, use: path.join(temp, 'tts-probe-loader.cjs') },
             { test: /[\\/]message-bubble\.tsx$/, use: path.join(temp, 'sticker-probe-loader.cjs') },
             { test: /[\\/]theme-storage\.ts$/, use: path.join(temp, 'asset-probe-loader.cjs') },
@@ -280,6 +304,8 @@ HTMLMediaElement.prototype.play=function(){window.__played.push(this.src);return
         assert.deepEqual(errors, []); check(true, 'lazy sticker scenarios have no browser page errors or unhandled rejections');
         await require('./chat-runtime-memory/media-spike-scenarios.cjs')({ page, check, waitForRequest, resolveReply });
         assert.deepEqual(errors, []); check(true, 'media spike and diagnostics scenarios have no browser page errors or unhandled rejections');
+        await require('./chat-runtime-memory/window-scenarios.cjs')({ page, check });
+        assert.deepEqual(errors, []); check(true, 'bounded message-window scenarios have no browser page errors');
         console.log(JSON.stringify({ checks: results.length, results, errors }, null, 2));
     } finally {
         for (const res of pending) res.destroy();

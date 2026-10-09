@@ -95,6 +95,40 @@ export function init(Shell: React.ComponentType) {
     };
     (window as unknown as { hostMemoryTest: typeof probe }).hostMemoryTest = probe;
 
+    // Synthetic window fixtures share the existing disposable browser origin.
+    let windowScene = 0;
+    let windowSession: chat.ChatSession;
+    let windowRows: chat.ChatMessage[] = [];
+    (window as any).windowTest = {
+        scene(count: number, mixed = false, group = false) {
+            const id = `window-${++windowScene}`;
+            const contactId = `${id}-character`;
+            const now = new Date().toISOString();
+            saveCharacters([...loadCharacters(), { id: contactId, name: contactId, avatar: null, persona: "", createdAt: now, updatedAt: now }]);
+            windowSession = { id, contactId, unreadCount: 0, updatedAt: now, isPinned: false, autoReplied: true,
+                ...(group ? { isGroup: true, groupName: "Window group", participantIds: [contactId, "B"] } : {}) };
+            chat.saveChatSessions([...chat.loadChatSessions(), windowSession]);
+            windowRows = [];
+            for (let i = 0; i < count; i++) {
+                const input: Omit<chat.ChatMessage, "id" | "createdAt" | "status"> = { sessionId: windowSession.id, role: i % 2 ? "assistant" : "user", content: `Window row ${i}` };
+                if (mixed && i % 10 === 0) Object.assign(input, { role: "tool", mediaType: "tool_result", content: `Hidden tool ${i}`, nativeToolResult: { toolCallId: `tool-${i}`, name: "synthetic", content: "synthetic result" } });
+                if (mixed && i >= 63 && i <= 65) Object.assign(input, { role: i === 64 ? "user" : "system", content: i === 63 ? "发起了语音通话" : i === 65 ? "挂断了语音通话，时长 0:01" : "Synthetic call line" });
+                if (mixed && i >= 74 && i <= 77) Object.assign(input, { role: "assistant", responseBatchId: "window-batch", responseRoundId: "window-round", rawResponseText: "Synthetic response batch" });
+                windowRows.push(chat.pushChatMessage(input));
+            }
+            (window as any).__windowReads = [];
+            root.render(<PhoneChatApp key={windowSession.id} initialSessionId={windowSession.id} onClose={() => root.render(null)} />);
+            return { id: windowSession.id, ids: windowRows.map(m => m.id) };
+        },
+        leave() { root.render(null); },
+        enter() {
+            (window as any).__windowReads = [];
+            root.render(<PhoneChatApp key={windowSession.id} initialSessionId={windowSession.id} onClose={() => root.render(null)} />);
+        },
+        rows() { return chat.loadChatMessages(windowSession.id); },
+        async persistedIds() { return (await chatDb.messages.where("sessionId").equals(windowSession.id).toArray()).sort(chat.compareChatMessages).map(m => m.id); },
+    };
+
     // Cache access is appended by the browser test loader, never shipped by Host.
     const cache = (bubbles as unknown as { __stickerCacheTest: {
         get: (id: string) => string | undefined; set: (id: string, url: string) => void;

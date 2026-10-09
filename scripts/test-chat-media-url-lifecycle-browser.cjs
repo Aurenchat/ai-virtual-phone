@@ -13,6 +13,8 @@ async function main() {
     await fs.writeFile(path.join(temp, 'bubble-loader.cjs'), `
 const transpile = require(${transpile});
 module.exports = function(source) {
+ // Git archive/Windows checkouts can use CRLF; probe the same effect in either case.
+ source = source.replace(/\\r\\n/g, '\\n');
  source = source.replace('const [resolution, setResolution]', 'const [resolution, actualSetResolution]');
  source = source.replace('    useEffect(() => {\\n        const requestId = ++requestIdRef.current;',
    '    function setResolution(value: any) { if(value) (window as any).__resolutionWrites++; actualSetResolution(value); }\\n    useEffect(() => {\\n        const requestId = ++requestIdRef.current;');

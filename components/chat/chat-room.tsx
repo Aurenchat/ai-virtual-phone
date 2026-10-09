@@ -1769,9 +1769,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         setOfflineTurns(loadChatOfflineTurns(session.id));
 
         // Publish the recent window immediately; rendered stickers resolve individually.
-        const allMsgs = loadChatMessages(session.id);
-        const msgs = allMsgs.length > INITIAL_LOAD ? allMsgs.slice(-INITIAL_LOAD) : allMsgs;
-        const nextHasMore = allMsgs.length > INITIAL_LOAD;
+        const recentMsgs = loadChatMessages(session.id, INITIAL_LOAD + 1);
+        const nextHasMore = recentMsgs.length > INITIAL_LOAD;
+        const msgs = nextHasMore ? recentMsgs.slice(-INITIAL_LOAD) : recentMsgs;
         hasMoreRef.current = nextHasMore;
         setHasMore(nextHasMore);
         needsInitialScrollRef.current = true;
@@ -1956,9 +1956,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 scrollTop: el.scrollTop,
             };
         }
-        const allMsgs = loadChatMessages(session.id);
-        const currentCount = messages.length;
-        const nextCount = Math.min(currentCount + LOAD_MORE_COUNT, allMsgs.length);
+        // Count stored rows, before hidden-message filtering or display projection.
+        const currentCount = messages.reduce((count, msg) => count + Number(!isTransientMessage(msg)), 0);
+        const recentMsgs = loadChatMessages(session.id, currentCount + LOAD_MORE_COUNT + 1);
+        const nextCount = Math.min(currentCount + LOAD_MORE_COUNT, recentMsgs.length);
         if (nextCount <= currentCount) {
             hasMoreRef.current = false;
             setHasMore(false);
@@ -1967,13 +1968,13 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             loadingMoreRef.current = false;
             return;
         }
-        const nextMessages = allMsgs.slice(-nextCount);
-        const nextHasMore = nextCount < allMsgs.length;
+        const nextMessages = recentMsgs.slice(-nextCount);
+        const nextHasMore = recentMsgs.length > nextCount;
         visibleMessagesRef.current = nextMessages;
         hasMoreRef.current = nextHasMore;
         setHasMore(nextHasMore);
         setMessages(nextMessages);
-    }, [captureScrollAnchor, hasMore, messages.length, session.id, stopLoadMoreAnchorTracking]);
+    }, [captureScrollAnchor, hasMore, messages, session.id, stopLoadMoreAnchorTracking]);
     // useLayoutEffect: runs synchronously after DOM mutation, before browser paint
     // Prevents flash of wrong scroll position, works reliably under transform: scale()
     const displayMessages = useMemo(() => {
