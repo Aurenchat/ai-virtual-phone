@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Character } from "@/lib/character-types";
+import { recordCrashCanvas, recordCrashCanvasGesture } from "@/lib/crash-diagnostics";
 import {
   createCharacter,
   exportCharacterAsJson,
@@ -728,6 +729,15 @@ function CharListView({
   const [pendingBgType, setPendingBgType] = useState<CanvasBgItem['type'] | null>(null);
   const [ghostPos, setGhostPos] = useState<{ x: number; y: number }>({ x: -9999, y: -9999 });
   const [importError, setImportError] = useState<string | null>(null);
+  const crashWorldRef = useRef<string | null>(null);
+  useEffect(() => {
+    const worldChanged = crashWorldRef.current !== currentWorldId;
+    crashWorldRef.current = currentWorldId;
+    recordCrashCanvas(true, worldCharacters.reduce((n, c) => n + Number(c.canvasX !== undefined), 0),
+      worldBgItems.length, relationLines.length, worldChanged);
+  }, [currentWorldId, characters, bgItems, worldGroups]);
+  useEffect(() => () => recordCrashCanvas(false), []);
+
   const placementActive = !!(pendingPlacementChar || pendingBgType);
 
   useEffect(() => {
@@ -792,6 +802,7 @@ function CharListView({
     if (!isEditing) return;
     if ((e.target as HTMLElement).closest('.char-polaroid-board-item') || (e.target as HTMLElement).closest('.char-bg-item')) return;
     if (linkFromId) setLinkFromId(null); // 点空白处取消拉线
+    if (!isDraggingCanvasRef.current) recordCrashCanvasGesture("pan", true);
     isDraggingCanvasRef.current = true;
     canvasPointerIdRef.current = e.pointerId;
     startPanRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
@@ -814,6 +825,7 @@ function CharListView({
   function handleCanvasPointerUp(e: React.PointerEvent) {
     if (!isDraggingCanvasRef.current) return;
     isDraggingCanvasRef.current = false;
+    recordCrashCanvasGesture("pan", false);
     canvasPointerIdRef.current = null;
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
       e.currentTarget.releasePointerCapture(e.pointerId);
@@ -830,6 +842,8 @@ function CharListView({
       if (!isEditingRef.current) return;
       if (e.touches.length === 2) {
         if (e.cancelable) e.preventDefault();
+        if (isDraggingCanvasRef.current) recordCrashCanvasGesture("pan", false);
+        if (!pinchRef.current) recordCrashCanvasGesture("pinch", true);
         isDraggingCanvasRef.current = false;
         const pointerId = canvasPointerIdRef.current;
         if (pointerId !== null && target.hasPointerCapture(pointerId)) {
@@ -873,6 +887,7 @@ function CharListView({
 
     function onTouchEnd(e: TouchEvent) {
       if (e.touches.length < 2) {
+        if (pinchRef.current) recordCrashCanvasGesture("pinch", false);
         pinchRef.current = null;
       }
     }

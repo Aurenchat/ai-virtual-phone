@@ -91,6 +91,15 @@ function read(key: string): GenerationDiagnostic | null {
 function write(key: string, record: GenerationDiagnostic) {
     try { localStorage.setItem(key, JSON.stringify(record)); } catch { /* Diagnostics cannot affect chat. */ }
 }
+// Only run boundaries notify the independent document breadcrumb. Stage writes stay unchanged.
+function notifyCrashRun(runId: string, source?: "chatroom" | "background") {
+    try {
+        if (typeof window !== "undefined") {
+            const bridge = window.__FLOAT_CRASH_DIAG_INTERNAL_V1__;
+            if (source) bridge?.runStart(runId, source); else bridge?.runEnd(runId);
+        }
+    } catch { /* A diagnostic failure cannot affect generation. */ }
+}
 export function readGenerationDiagnostics() {
     const runs: GenerationDiagnostic[] = [];
     for (let i = 0; i < SLOT_COUNT; i++) { const r = read(slotKey(i)); if (r) runs.push(r); }
@@ -117,6 +126,7 @@ export function startGenerationDiagnostic(runId: string, sessionId: string, isGr
         providerRequestStarted: false, providerRequestCount: 0, stageTimes: { GEN_TRIGGERED: 0 } };
     write(slotKey(slot), record);
     write(CURRENT, record);
+    notifyCrashRun(runId, source);
 }
 type DiagnosticValues = Partial<Pick<GenerationDiagnostic, NumericField | "historyCount" | "rawLength" | "errorName" | "completed" | "streaming" | "providerRequestStarted" | "longTermRetrievalFailed" | "coreMemoryRetrievalFailed" | "visionPrepEnabled">>;
 export function markGenerationDiagnostic(runId: string | undefined, stage: GenerationStage,
@@ -126,7 +136,7 @@ export function markGenerationDiagnostic(runId: string | undefined, stage: Gener
     const slot = liveSlots.get(runId);
     const current = read(CURRENT);
     const r = slot === undefined ? (current?.runId === runId ? current : null) : read(slotKey(slot));
-    if (!r || r.runId !== runId || r.completed) { if (values.completed === true) liveSlots.delete(runId); return; }
+    if (!r || r.runId !== runId || r.completed) { if (values.completed === true) { liveSlots.delete(runId); notifyCrashRun(runId); } return; }
     if (stage === "API_FIRST_DELTA" && r.stageTimes?.API_FIRST_DELTA !== undefined) return;
     if (stage === "GEN_ERROR") r.errorStage = r.lastStage;
     r.lastStage = stage;
@@ -145,5 +155,5 @@ export function markGenerationDiagnostic(runId: string | undefined, stage: Gener
     if (values.completed === true) r.completed = true;
     if (slot !== undefined) write(slotKey(slot), r);
     if (current?.runId === runId) write(CURRENT, r);
-    if (r.completed) liveSlots.delete(runId);
+    if (r.completed) { liveSlots.delete(runId); notifyCrashRun(runId); }
 }

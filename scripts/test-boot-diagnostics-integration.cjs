@@ -84,7 +84,15 @@ function fakeDexie(tables) { return { default: class {
       check(markers(after), markers(telemetryBaseline));
       continue;
     }
-    const strip = text => text.replace(/^import \{ markBootStage \} from [^\n]+\n/gm, '')
+    // Exclude only the exact approved P0 app telemetry hook, not arbitrary effects.
+    const crashImport = 'import { recordCrashApp } from "@/lib/crash-diagnostics";';
+    const crashEffect = '  useEffect(() => {\n    recordCrashApp(activeApp === null ? "desktop" : activeApp === "chat" ? "chat"\n      : activeApp === "characters" ? "characters" : activeApp === "settings" ? "settings" : "other");\n  }, [activeApp]);';
+    if (file === 'components/desktop-shell.tsx') {
+      check(after.includes(crashImport), true);
+      check(after.replace(/\r\n/g, '\n').includes(crashEffect), true);
+    }
+    const strip = text => text.replace(/\r\n/g, '\n').replace(crashImport, '').replace(crashEffect, '')
+      .replace(/^import \{ markBootStage \} from [^\n]+\n/gm, '')
       .replace(/  useEffect\(\(\) => \{\s*if \(desktopReady\) markBootStage\("SHELL_INTERACTIVE"\);\s*\}, \[desktopReady\]\);/g, '')
       .replace(/\.then\(messages => \{ markBootStage\("CHAT_MESSAGES_DONE"\); return messages; \}\)/g, '')
       .replace(/^\s*markBootStage\("[A-Z_]+"\);\s*$/gm, '')

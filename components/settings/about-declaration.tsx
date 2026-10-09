@@ -3,6 +3,7 @@
 import { Info, ShieldAlert, Heart } from "lucide-react";
 import { BootDiagnostics } from "./boot-diagnostics";
 import { ChatRuntimeDiagnostics } from "./chat-runtime-diagnostics";
+import { CrashDiagnostics } from "./crash-diagnostics";
 
 export function AboutDeclaration() {
     return (
@@ -33,6 +34,7 @@ export function AboutDeclaration() {
 
             <BootDiagnostics />
             <ChatRuntimeDiagnostics />
+            <CrashDiagnostics />
 
             <p className="card-section-label m-0 mx-2">相关信息</p>
 

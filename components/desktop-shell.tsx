@@ -1,5 +1,6 @@
 "use client";
 import { markBootStage } from "@/lib/boot-diagnostics";
+import { recordCrashApp } from "@/lib/crash-diagnostics";
 
 import { Component, memo, useCallback, useEffect, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ErrorInfo, type ReactNode } from "react";
 
@@ -1063,6 +1064,10 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
   const [glassPaintPass, setGlassPaintPass] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [activeApp, setActiveApp] = useState<DesktopIconId | null>(null);
+  useEffect(() => {
+    recordCrashApp(activeApp === null ? "desktop" : activeApp === "chat" ? "chat"
+      : activeApp === "characters" ? "characters" : activeApp === "settings" ? "settings" : "other");
+  }, [activeApp]);
   const [customApps, setCustomApps] = useState<InstalledCustomApp[]>([]);
   // 自定义 APP 桌面图标样式偏好（global = 忽略上传图标走全局效果）
   const [customAppIconStyles, setCustomAppIconStyles] = useState<Record<string, CustomAppIconStyle>>({});
