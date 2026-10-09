@@ -105,6 +105,7 @@ export class ChatEngineError extends Error {
 
 const LLM_IMAGE_MAX_SIDE = 512;
 const LLM_IMAGE_JPEG_QUALITY = 0.72;
+const VISION_BASE64_CHUNK_CHARS = 256 * 1024;
 
 function blobToDataUrl(blob: Blob): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -143,7 +144,22 @@ function dataUrlToBlob(dataUrl: string): Blob | null {
     const mimeType = match[1] || "application/octet-stream";
     const isBase64 = Boolean(match[2]);
     try {
-        const raw = isBase64 ? atob(match[3]) : decodeURIComponent(match[3]);
+        const payload = match[3];
+        const paddingIndex = payload.indexOf("=");
+        // Canonical base64 can be decoded in bounded, four-character-aligned
+        // chunks. Keep the legacy parser for whitespace/other encodings.
+        if (isBase64 && !/[^A-Za-z0-9+/=]/.test(payload)
+            && (paddingIndex === -1 || paddingIndex >= payload.length - 2)) {
+            const parts: BlobPart[] = [];
+            for (let offset = 0; offset < payload.length; offset += VISION_BASE64_CHUNK_CHARS) {
+                const chunk = atob(payload.slice(offset, offset + VISION_BASE64_CHUNK_CHARS));
+                const bytes = new Uint8Array(chunk.length);
+                for (let i = 0; i < chunk.length; i += 1) bytes[i] = chunk.charCodeAt(i);
+                parts.push(bytes);
+            }
+            return new Blob(parts, { type: mimeType });
+        }
+        const raw = isBase64 ? atob(payload) : decodeURIComponent(payload);
         const bytes = new Uint8Array(raw.length);
         for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
         return new Blob([bytes], { type: mimeType });
@@ -161,8 +177,10 @@ async function rasterizeImageBlobToJpegDataUrl(blob: Blob): Promise<string | nul
         return null;
     }
 
+    let image: HTMLImageElement | undefined;
+    let canvas: HTMLCanvasElement | undefined;
     try {
-        const image = await loadImageFromBlob(blob);
+        image = await loadImageFromBlob(blob);
         const sourceWidth = image.naturalWidth || image.width;
         const sourceHeight = image.naturalHeight || image.height;
         if (!sourceWidth || !sourceHeight) return null;
@@ -170,7 +188,7 @@ async function rasterizeImageBlobToJpegDataUrl(blob: Blob): Promise<string | nul
         const scale = Math.min(1, LLM_IMAGE_MAX_SIDE / Math.max(sourceWidth, sourceHeight));
         const width = Math.max(1, Math.round(sourceWidth * scale));
         const height = Math.max(1, Math.round(sourceHeight * scale));
-        const canvas = document.createElement("canvas");
+        canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
         const context = canvas.getContext("2d");
@@ -184,6 +202,11 @@ async function rasterizeImageBlobToJpegDataUrl(blob: Blob): Promise<string | nul
         return compressed ? blobToDataUrl(compressed) : null;
     } catch {
         return null;
+    } finally {
+        // drawImage/toBlob have finished. Release temporary decode/canvas
+        // resources before the encoded result is read; never alter the source.
+        if (image) image.removeAttribute("src");
+        if (canvas) { canvas.width = 0; canvas.height = 0; }
     }
 }
 
@@ -1888,9 +1911,16 @@ export async function buildChatPromptMessages(
     markGenerationDiagnostic(options?.diagnosticRunId, "PROMPT_HISTORY_PREP_DONE");
 
     if (config.enableImageRecognition) {
+        // Only media candidates can trigger image loads/decodes. Do not create
+        // an async promise for every text-only history message (often thousands).
+        const visionCandidates = promptHistory.filter(msg =>
+            isVisionPromptImageMessage(msg) && hasVisionPromptImageData(msg),
+        );
         markGenerationDiagnostic(options?.diagnosticRunId, "VISION_PREP_BEGIN");
-        for (const msg of promptHistory) {
+        for (const msg of visionCandidates) {
+            markGenerationDiagnostic(options?.diagnosticRunId, "VISION_IMAGE_PREP_BEGIN");
             await prepareVisionPromptImageMessage(msg);
+            markGenerationDiagnostic(options?.diagnosticRunId, "VISION_IMAGE_PREP_DONE");
         }
         markGenerationDiagnostic(options?.diagnosticRunId, "VISION_PREP_DONE");
     }
