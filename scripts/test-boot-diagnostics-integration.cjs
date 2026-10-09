@@ -91,13 +91,39 @@ function fakeDexie(tables) { return { default: class {
       check(after.includes(crashImport), true);
       check(after.replace(/\r\n/g, '\n').includes(crashEffect), true);
     }
+    // Only remove the three exact P3A opt-in persistence edits from this
+    // legacy whole-source assertion. Real commit behavior has its own IDB test.
+    let compatibleAfter = after.replace(/\r\n/g, '\n');
+    if (file === 'lib/chat-storage.ts') {
+      const approvedEdits = [
+        ['dbPutMessage, dbPutMessageConfirmed, dbDeleteMessage,', 'dbPutMessage, dbDeleteMessage,'],
+        ['}, options?: { deferPaymentWrite?: boolean; onMessageCommit?: (committed: Promise<boolean>) => void }): ChatMessage {',
+         '}, options?: { deferPaymentWrite?: boolean }): ChatMessage {'],
+        ['    if (!options?.deferPaymentWrite) {\n'
+          + '        // Keep all normal/payment callers on the original fire-and-forget path.\n'
+          + '        // Only an explicit background publisher opts into a commit confirmation.\n'
+          + '        if (options?.onMessageCommit) {\n'
+          + '            const committed = dbPutMessageConfirmed(newMsg);\n'
+          + '            options.onMessageCommit(committed);\n'
+          + '        } else {\n'
+          + '            dbPutMessage(newMsg);\n'
+          + '        }\n'
+          + '    }',
+         '    if (!options?.deferPaymentWrite) dbPutMessage(newMsg);'],
+      ];
+      for (const [approved, original] of approvedEdits) {
+        check(compatibleAfter.split(approved).length - 1, 1);
+        compatibleAfter = compatibleAfter.replace(approved, original);
+      }
+    }
+
     const strip = text => text.replace(/\r\n/g, '\n').replace(crashImport, '').replace(crashEffect, '')
       .replace(/^import \{ markBootStage \} from [^\n]+\n/gm, '')
       .replace(/  useEffect\(\(\) => \{\s*if \(desktopReady\) markBootStage\("SHELL_INTERACTIVE"\);\s*\}, \[desktopReady\]\);/g, '')
       .replace(/\.then\(messages => \{ markBootStage\("CHAT_MESSAGES_DONE"\); return messages; \}\)/g, '')
       .replace(/^\s*markBootStage\("[A-Z_]+"\);\s*$/gm, '')
       .replace(/\s+/g, '');
-    check(strip(after), strip(before));
+    check(strip(compatibleAfter), strip(before));
   }
   console.log(JSON.stringify({ integrationChecks: checks, status: 'passed', covers: 'real KV + ChatDB parallel completion, disabled equivalence, real ChatStorage index, runtime safe/guard branches, startup logic unchanged after marker removal' }, null, 2));
 })().catch(error => { console.error(error); process.exitCode = 1; });

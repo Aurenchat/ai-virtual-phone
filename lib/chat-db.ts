@@ -184,6 +184,20 @@ export function dbPutMessage(msg: ChatMessage): void {
     chatDb.messages.put(msg).catch(err => console.warn("[ChatDB] put message failed:", err));
 }
 
+/**
+ * Optional commit-confirming write for background AI publication only.
+ * Unlike a bare table.put(), the outer Dexie transaction resolves after commit.
+ * No retry or duplicate insert is attempted here; callers own failure handling.
+ */
+export function dbPutMessageConfirmed(msg: ChatMessage): Promise<boolean> {
+    return chatDb.transaction("rw", chatDb.messages, () => chatDb.messages.put(msg))
+        .then(() => true)
+        .catch(err => {
+            console.warn("[ChatDB] confirmed put message failed:", err);
+            return false;
+        });
+}
+
 export function dbPutMessages(msgs: ChatMessage[]): void {
     chatDb.messages.bulkPut(msgs).catch(err => console.warn("[ChatDB] bulkPut messages failed:", err));
 }

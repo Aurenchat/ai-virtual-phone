@@ -4,7 +4,7 @@ import { markBootStage } from "./boot-diagnostics";
 import {
     chatDb,
     initChatDb,
-    dbPutMessage, dbDeleteMessage, dbDeleteMessagesBySession, dbDeleteMessagesByIds,
+    dbPutMessage, dbPutMessageConfirmed, dbDeleteMessage, dbDeleteMessagesBySession, dbDeleteMessagesByIds,
     dbPutMessages, dbPutSessions, dbPutContacts, dbDeleteSession,
     dbReplaceContacts, dbReplaceSessions,
 } from "./chat-db";
@@ -1381,7 +1381,7 @@ export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "sta
     id?: string; // Stable payment publication/retry identity
     status?: ChatMessageStatus;
     createdAt?: string;
-}, options?: { deferPaymentWrite?: boolean }): ChatMessage {
+}, options?: { deferPaymentWrite?: boolean; onMessageCommit?: (committed: Promise<boolean>) => void }): ChatMessage {
     if (msg.id) {
         const existing = _messagesCache.find(item => item.id === msg.id);
         if (existing) return existing;
@@ -1406,7 +1406,16 @@ export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "sta
     }
 
     appendCachedMessage(newMsg, false);
-    if (!options?.deferPaymentWrite) dbPutMessage(newMsg);
+    if (!options?.deferPaymentWrite) {
+        // Keep all normal/payment callers on the original fire-and-forget path.
+        // Only an explicit background publisher opts into a commit confirmation.
+        if (options?.onMessageCommit) {
+            const committed = dbPutMessageConfirmed(newMsg);
+            options.onMessageCommit(committed);
+        } else {
+            dbPutMessage(newMsg);
+        }
+    }
 
     // Auto update session last message only for records that can produce a list preview.
     // 优化：直接增量更新内存会话缓存并异步写单条，避免每次发送都走 loadChatSessions +

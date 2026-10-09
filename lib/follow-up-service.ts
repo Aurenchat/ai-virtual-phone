@@ -946,6 +946,16 @@ export async function parseAndSaveResponse(
     const rawResponseText = options?.rawResponseText ?? rawText;
     const reasoningText = options?.reasoningText;
     void contextMessages;
+    // Background publishing keeps synchronous message IDs and UI semantics.
+    // Dispatch is held until all message write TRANSACTIONS have committed.
+    const messageCommits: Promise<boolean>[] = [];
+    const pushBackgroundCommittedMessage = (message: Parameters<typeof pushChatMessage>[0]): ChatMessage =>
+        pushChatMessage(message, { onMessageCommit: committed => { messageCommits.push(committed); } });
+    const awaitMessageCommits = async (): Promise<void> => {
+        if ((await Promise.all(messageCommits)).some(committed => !committed)) {
+            throw new Error("Background message IndexedDB commit not confirmed");
+        }
+    };
     const sessions = loadChatSessions();
     const sess = sessions.find(s => s.id === sessionId);
     const previousState = sess && !sess.isGroup ? getLatestCharacterStateValues(sess.contactId) : [];
@@ -1015,7 +1025,7 @@ export async function parseAndSaveResponse(
     // Save call trigger as system message (persists even when user is not in chat room)
     if (triggerCall) {
         const callLabel = triggerCall === "voice" ? "语音通话" : "视频通话";
-        pushChatMessage({
+        pushBackgroundCommittedMessage({
             sessionId,
             role: "system",
             content: `[我发起了${callLabel}]`,
@@ -1028,7 +1038,7 @@ export async function parseAndSaveResponse(
 
     if (filteredParts.length === 0) {
         if (statusPanel || innerMonologue || reasoningText) {
-            pushChatMessage({
+            pushBackgroundCommittedMessage({
                 sessionId,
                 role: "assistant",
                 content: "",
@@ -1047,7 +1057,7 @@ export async function parseAndSaveResponse(
         }
         if (shortcutMarker) {
             const baseMs = options?.createdAt ? Date.parse(options.createdAt) : NaN;
-            pushChatMessage({
+            pushBackgroundCommittedMessage({
                 sessionId,
                 role: "assistant",
                 content: shortcutMarker.text,
@@ -1058,7 +1068,7 @@ export async function parseAndSaveResponse(
                 senderName: options?.senderName,
             });
             markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
-            pushChatMessage({
+            pushBackgroundCommittedMessage({
                 sessionId,
                 role: "system",
                 content: `发出快捷动作「${shortcutMarker.name}」`,
@@ -1067,6 +1077,8 @@ export async function parseAndSaveResponse(
             });
             markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
         }
+        // Never notify the room of this branch until its messages have committed.
+        await awaitMessageCommits();
         // Emit call trigger event for chat-room to pick up
         if (triggerCall && typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("ai-call-trigger", { detail: { sessionId, type: triggerCall } }));
@@ -1093,7 +1105,7 @@ export async function parseAndSaveResponse(
     };
     const saveShortcutMarkerPair = () => {
         if (!shortcutMarker) return;
-        savedMessages.push(pushChatMessage({
+        savedMessages.push(pushBackgroundCommittedMessage({
             sessionId,
             role: "assistant",
             content: shortcutMarker.text,
@@ -1104,7 +1116,7 @@ export async function parseAndSaveResponse(
             senderName: options?.senderName,
         }));
         markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
-        savedMessages.push(pushChatMessage({
+        savedMessages.push(pushBackgroundCommittedMessage({
             sessionId,
             role: "system",
             content: `发出快捷动作「${shortcutMarker.name}」`,
@@ -1117,7 +1129,7 @@ export async function parseAndSaveResponse(
         if (i === markerPartIdx) saveShortcutMarkerPair();
         const generatedPart = buildGeneratedFollowUpImageMessage(filteredParts[i]);
         const createdAt = nextCreatedAt();
-        const saved = pushChatMessage({
+        const saved = pushBackgroundCommittedMessage({
             sessionId,
             role: "assistant",
             content: generatedPart.content,
@@ -1151,6 +1163,8 @@ export async function parseAndSaveResponse(
     }
     if (markerPartIdx >= filteredParts.length) saveShortcutMarkerPair();
 
+    // PUBLISH_DONE means transaction commit is confirmed, not just memory-cache append.
+    await awaitMessageCommits();
     markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISH_DONE");
     markGenerationDiagnostic(options?.diagnosticRunId, "MESSAGE_DISPATCH_BEGIN");
     await dispatchBackgroundMessagesOneByOne(sessionId, savedMessages, options?.silent === true);
