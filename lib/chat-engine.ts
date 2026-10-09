@@ -1867,7 +1867,10 @@ export async function buildChatPromptMessages(
         && (options?.forceEnableTools === true || presetIncludesToolsMacro(preset, resolvedAppId, effectiveAppTags));
     const usesNativeActions = Boolean(toolsEnabled && nativeToolProtocolForConfig(config));
     markGenerationDiagnostic(options?.diagnosticRunId, "SHORT_TERM_BEGIN");
+    markGenerationDiagnostic(options?.diagnosticRunId, "MEMORY_REVISION_READ_BEGIN");
     await readMemoryRevisions();
+    markGenerationDiagnostic(options?.diagnosticRunId, "MEMORY_REVISION_READ_DONE");
+    markGenerationDiagnostic(options?.diagnosticRunId, "SHORT_TERM_ASSEMBLY_BEGIN");
     const { recentBlocks, truncatedHistory, wbActivationContext, unifiedRecentItems } = prepareShortTermContext(character.id, resolvedAppId, {
         history: historyForPrompt,
         includeDirectChatEntries: isOfflineMode,
@@ -1875,16 +1878,21 @@ export async function buildChatPromptMessages(
         excludeOfflineSessionId: options?.excludeOfflineSessionId,
         promptTimestampOptions,
     });
+    markGenerationDiagnostic(options?.diagnosticRunId, "SHORT_TERM_ASSEMBLY_DONE");
     markGenerationDiagnostic(options?.diagnosticRunId, "SHORT_TERM_READY", { survivingHistoryCount: truncatedHistory.length, survivingRecentItemCount: unifiedRecentItems.length });
+    markGenerationDiagnostic(options?.diagnosticRunId, "PROMPT_HISTORY_PREP_BEGIN", { visionPrepEnabled: Boolean(config.enableImageRecognition) });
     const promptHistory = applyVisionImagePromptLimit(
         truncatedHistory.map(msg => ({ ...msg })),
         session.visionImagePromptLimit,
     );
+    markGenerationDiagnostic(options?.diagnosticRunId, "PROMPT_HISTORY_PREP_DONE");
 
     if (config.enableImageRecognition) {
+        markGenerationDiagnostic(options?.diagnosticRunId, "VISION_PREP_BEGIN");
         for (const msg of promptHistory) {
             await prepareVisionPromptImageMessage(msg);
         }
+        markGenerationDiagnostic(options?.diagnosticRunId, "VISION_PREP_DONE");
     }
 
     markGenerationDiagnostic(options?.diagnosticRunId, "MEMORY_RETRIEVAL_BEGIN");

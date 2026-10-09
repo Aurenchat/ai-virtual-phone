@@ -3,10 +3,14 @@ export type GenerationStage = "GEN_TRIGGERED" | "HISTORY_LOAD_BEGIN" | "HISTORY_
     | "CONTEXT_PREP_BEGIN" | "SHORT_TERM_BEGIN" | "SHORT_TERM_READY" | "MEMORY_RETRIEVAL_BEGIN" | "LONG_TERM_READY" | "CORE_MEMORY_READY"
     | "MEMORY_RETRIEVAL_READY" | "PROMPT_ASSEMBLY_BEGIN" | "PROMPT_ASSEMBLED" | "PROVIDER_PAYLOAD_BEGIN" | "PROVIDER_REQUEST_BEGIN" | "PROVIDER_RESPONSE_HEADERS"
     | "PROVIDER_RESPONSE_RECEIVED" | "RESPONSE_RECEIVED" | "PARSE_DONE" | "PUBLISHING" | "PUBLISH_DONE"
-    | "MESSAGE_DISPATCH_BEGIN" | "MESSAGE_DISPATCH_DONE" | "GEN_ERROR" | "GEN_FINALLY";
+    | "MESSAGE_DISPATCH_BEGIN" | "MESSAGE_DISPATCH_DONE" | "GEN_ERROR" | "GEN_FINALLY"
+    | "MEMORY_REVISION_READ_BEGIN" | "MEMORY_REVISION_READ_DONE" | "SHORT_TERM_ASSEMBLY_BEGIN" | "SHORT_TERM_ASSEMBLY_DONE"
+    | "PROMPT_HISTORY_PREP_BEGIN" | "PROMPT_HISTORY_PREP_DONE" | "VISION_PREP_BEGIN" | "VISION_PREP_DONE"
+    | "PUBLISH_ITEM_BEGIN" | "PUSH_MESSAGE_RETURNED" | "UI_STATE_QUEUED" | "NOTICE_DISPATCH_DONE"
+    | "BROWSER_NOTIFICATION_CALLED" | "PUBLISH_SYNC_DONE" | "STAGGER_WAIT_BEGIN" | "STAGGER_WAIT_DONE";
 const NUMERIC_FIELDS = ["shortTermBudget", "longTermBudget", "coreMemoryBudget", "survivingHistoryCount",
     "survivingRecentItemCount", "longTermSelectedCount", "coreMemorySelectedCount", "llmMessageCount", "requestTokenEstimate",
-    "providerRequestCount", "dispatchedCount"] as const;
+    "providerRequestCount", "dispatchedCount", "publishItemIndex"] as const;
 type NumericField = typeof NUMERIC_FIELDS[number];
 export interface GenerationDiagnostic {
     version: 1;
@@ -40,13 +44,20 @@ export interface GenerationDiagnostic {
     requestTokenEstimate?: number;
     providerRequestCount?: number;
     dispatchedCount?: number;
+    /** One-based index of the most recently traced publish item; only first two are traced. */
+    publishItemIndex?: number;
+    visionPrepEnabled?: boolean;
 }
 const CURRENT = "ai_phone_chat_generation_diag_current_v1";
 const PREVIOUS = "ai_phone_chat_generation_diag_previous_v1";
 const STAGES: GenerationStage[] = ["GEN_TRIGGERED", "HISTORY_LOAD_BEGIN", "HISTORY_LOADED", "API_BEGIN", "CONTEXT_PREP_BEGIN", "SHORT_TERM_BEGIN", "SHORT_TERM_READY",
     "MEMORY_RETRIEVAL_BEGIN", "LONG_TERM_READY", "CORE_MEMORY_READY", "MEMORY_RETRIEVAL_READY", "PROMPT_ASSEMBLY_BEGIN", "PROMPT_ASSEMBLED",
     "PROVIDER_PAYLOAD_BEGIN", "PROVIDER_REQUEST_BEGIN", "PROVIDER_RESPONSE_HEADERS", "PROVIDER_RESPONSE_RECEIVED", "API_FIRST_DELTA",
-    "RESPONSE_RECEIVED", "PARSE_DONE", "PUBLISHING", "PUBLISH_DONE", "MESSAGE_DISPATCH_BEGIN", "MESSAGE_DISPATCH_DONE", "GEN_ERROR", "GEN_FINALLY"];
+    "RESPONSE_RECEIVED", "PARSE_DONE", "PUBLISHING", "PUBLISH_DONE", "MESSAGE_DISPATCH_BEGIN", "MESSAGE_DISPATCH_DONE", "GEN_ERROR", "GEN_FINALLY",
+    "MEMORY_REVISION_READ_BEGIN", "MEMORY_REVISION_READ_DONE", "SHORT_TERM_ASSEMBLY_BEGIN", "SHORT_TERM_ASSEMBLY_DONE",
+    "PROMPT_HISTORY_PREP_BEGIN", "PROMPT_HISTORY_PREP_DONE", "VISION_PREP_BEGIN", "VISION_PREP_DONE",
+    "PUBLISH_ITEM_BEGIN", "PUSH_MESSAGE_RETURNED", "UI_STATE_QUEUED", "NOTICE_DISPATCH_DONE",
+    "BROWSER_NOTIFICATION_CALLED", "PUBLISH_SYNC_DONE", "STAGGER_WAIT_BEGIN", "STAGGER_WAIT_DONE"];
 // Fixed sidecar slots preserve concurrent runs without changing current/previous semantics.
 const SLOT_COUNT = 8;
 const slotKey = (slot: number) => `ai_phone_chat_generation_diag_slot_${slot}_v1`;
@@ -67,7 +78,7 @@ function read(key: string): GenerationDiagnostic | null {
             publishedCount: count(r.publishedCount), completed: r.completed,
             ...(typeof r.errorName === "string" && /^[\w.-]{1,80}$/.test(r.errorName) ? { errorName: r.errorName } : {}) };
         for (const key of NUMERIC_FIELDS) if (typeof r[key] === "number" && Number.isFinite(r[key])) record[key] = count(r[key]);
-        for (const key of ["streaming", "providerRequestStarted", "longTermRetrievalFailed", "coreMemoryRetrievalFailed"] as const) if (typeof r[key] === "boolean") record[key] = r[key];
+        for (const key of ["streaming", "providerRequestStarted", "longTermRetrievalFailed", "coreMemoryRetrievalFailed", "visionPrepEnabled"] as const) if (typeof r[key] === "boolean") record[key] = r[key];
         if (r.source === "chatroom" || r.source === "background") record.source = r.source;
         if (STAGES.includes(r.errorStage)) record.errorStage = r.errorStage;
         if (r.stageTimes && typeof r.stageTimes === "object") {
@@ -107,7 +118,7 @@ export function startGenerationDiagnostic(runId: string, sessionId: string, isGr
     write(slotKey(slot), record);
     write(CURRENT, record);
 }
-type DiagnosticValues = Partial<Pick<GenerationDiagnostic, NumericField | "historyCount" | "rawLength" | "errorName" | "completed" | "streaming" | "providerRequestStarted" | "longTermRetrievalFailed" | "coreMemoryRetrievalFailed">>;
+type DiagnosticValues = Partial<Pick<GenerationDiagnostic, NumericField | "historyCount" | "rawLength" | "errorName" | "completed" | "streaming" | "providerRequestStarted" | "longTermRetrievalFailed" | "coreMemoryRetrievalFailed" | "visionPrepEnabled">>;
 export function markGenerationDiagnostic(runId: string | undefined, stage: GenerationStage,
     values: DiagnosticValues = {},
     addedDrafts = 0, addedPublished = 0) {
@@ -124,7 +135,7 @@ export function markGenerationDiagnostic(runId: string | undefined, stage: Gener
     // First occurrence per stage; lastStageAt still tracks later tool rounds/publishes.
     if (r.stageTimes[stage] === undefined) r.stageTimes[stage] = Math.max(0, r.lastStageAt - r.startedAt);
     for (const key of NUMERIC_FIELDS) if (values[key] !== undefined) r[key] = count(values[key]);
-    for (const key of ["streaming", "providerRequestStarted", "longTermRetrievalFailed", "coreMemoryRetrievalFailed"] as const) if (typeof values[key] === "boolean") r[key] = values[key];
+    for (const key of ["streaming", "providerRequestStarted", "longTermRetrievalFailed", "coreMemoryRetrievalFailed", "visionPrepEnabled"] as const) if (typeof values[key] === "boolean") r[key] = values[key];
     if (stage === "PROVIDER_REQUEST_BEGIN") { r.providerRequestStarted = true; r.providerRequestCount = count(r.providerRequestCount) + 1; }
     if (values.historyCount !== undefined) r.historyCount = count(values.historyCount);
     if (values.rawLength !== undefined) r.rawLength += count(values.rawLength);

@@ -271,7 +271,7 @@ HTMLMediaElement.prototype.play=function(){window.__played.push(this.src);return
         resolveReply('Paced reply one\n\nPaced reply two\n\nPaced reply three');
         await page.locator('.chat-room-wrapper').getByText('Paced reply one', { exact: true }).waitFor();
         check(await page.locator('.chat-room-wrapper').getByText('Paced reply two', { exact: true }).count() === 0, 'non-instant reply publishes its first bubble before the remaining bubbles');
-        check(await page.evaluate(() => { const r = window.mediaSpikeTest.generation().current; return r.lastStage === 'PUBLISHING' && r.publishedCount === 1 && r.draftCount === 3 && !r.completed; }), 'first real staged publish leaves an incomplete breadcrumb with full draft count');
+        check(await page.evaluate(() => { const r = window.mediaSpikeTest.generation().current; return r.stageTimes?.PUBLISHING !== undefined && r.stageTimes?.STAGGER_WAIT_BEGIN !== undefined && r.publishedCount === 1 && r.draftCount === 3 && !r.completed; }), 'first staged publish records first bubble and the wait before the second bubble');
         await page.locator('.chat-room-wrapper').getByText('Paced reply three', { exact: true }).waitFor();
         const pacing = await page.evaluate(() => window.hostMemoryTest.pacing());
         check(await page.evaluate(() => {

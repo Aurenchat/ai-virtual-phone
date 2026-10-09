@@ -96,7 +96,7 @@ async function main() {
         assert.equal(result.parts.length, 1); assert.equal(r.historyCount, 6906); assert.equal(r.survivingHistoryCount, 10);
         assert.equal(r.survivingRecentItemCount, 12); assert.equal(r.longTermSelectedCount, 2); assert.equal(r.coreMemorySelectedCount, 1);
         assert.equal(r.shortTermBudget, 50000); assert.equal(r.providerRequestStarted, true); assert.equal(r.streaming, false); assert.equal(r.llmMessageCount, 11);
-        for (const stage of ['CONTEXT_PREP_BEGIN', 'SHORT_TERM_READY', 'LONG_TERM_READY', 'CORE_MEMORY_READY', 'PROMPT_ASSEMBLED', 'PROVIDER_PAYLOAD_BEGIN', 'PROVIDER_REQUEST_BEGIN', 'PROVIDER_RESPONSE_RECEIVED']) assert.equal(typeof r.stageTimes[stage], 'number');
+        for (const stage of ['CONTEXT_PREP_BEGIN', 'MEMORY_REVISION_READ_BEGIN', 'MEMORY_REVISION_READ_DONE', 'SHORT_TERM_ASSEMBLY_BEGIN', 'SHORT_TERM_ASSEMBLY_DONE', 'SHORT_TERM_READY', 'PROMPT_HISTORY_PREP_BEGIN', 'PROMPT_HISTORY_PREP_DONE', 'LONG_TERM_READY', 'CORE_MEMORY_READY', 'PROMPT_ASSEMBLED', 'PROVIDER_PAYLOAD_BEGIN', 'PROVIDER_REQUEST_BEGIN', 'PROVIDER_RESPONSE_RECEIVED']) assert.equal(typeof r.stageTimes[stage], 'number');
     });
     const old = fixture(true); old.start('baseline');
     const oldResult = await old.run('baseline');
@@ -117,7 +117,7 @@ async function main() {
     });
 
     for (const [failure, expected, started] of [
-        ['character', 'CONTEXT_PREP_BEGIN', false], ['context', 'SHORT_TERM_BEGIN', false],
+        ['character', 'CONTEXT_PREP_BEGIN', false], ['context', 'SHORT_TERM_ASSEMBLY_BEGIN', false],
         ['plugins', 'PROMPT_ASSEMBLED', false], ['body', 'PROVIDER_PAYLOAD_BEGIN', false],
         ['network', 'PROVIDER_REQUEST_BEGIN', true], ['parse', 'PROVIDER_RESPONSE_RECEIVED', true],
     ]) {

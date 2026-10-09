@@ -42,7 +42,7 @@ function Record({ label, record }: { label: string; record?: GenerationDiagnosti
         if (record.errorStage) fields.push(["errorStage", record.errorStage]);
         for (const key of ["shortTermBudget", "longTermBudget", "coreMemoryBudget", "survivingHistoryCount", "survivingRecentItemCount",
             "longTermSelectedCount", "coreMemorySelectedCount", "llmMessageCount", "requestTokenEstimate", "providerRequestCount",
-            "dispatchedCount", "providerRequestStarted", "streaming", "longTermRetrievalFailed", "coreMemoryRetrievalFailed"] as const) {
+            "dispatchedCount", "publishItemIndex", "providerRequestStarted", "streaming", "visionPrepEnabled", "longTermRetrievalFailed", "coreMemoryRetrievalFailed"] as const) {
             if (record[key] !== undefined) fields.push([key, String(record[key])]);
         }
         for (const [stage, ms] of Object.entries(record.stageTimes || {})) fields.push([`${stage} 首次`, `+${ms} ms`]);

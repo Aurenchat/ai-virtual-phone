@@ -3000,18 +3000,28 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         };
 
         markGenerationDiagnostic(options?.diagnosticRunId, "PARSE_DONE", {}, messageDrafts.length);
-        const publishVisibleMessage = (entry: { draft: AssistantMessageDraft; afterPublish?: (message: ChatMessage) => void }): ChatMessage => {
+        const publishVisibleMessage = (entry: { draft: AssistantMessageDraft; afterPublish?: (message: ChatMessage) => void }, itemIndex: number): ChatMessage => {
             throwIfGenerationStopped(options);
+            // Only the first two bubbles receive fine-grained breadcrumbs to bound sync storage work.
+            const tracePublish = itemIndex < 2;
+            const publishValues = { publishItemIndex: itemIndex + 1 };
+            if (tracePublish) markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISH_ITEM_BEGIN", publishValues);
             const msg = pushChatMessage(entry.draft);
+            if (tracePublish) markGenerationDiagnostic(options?.diagnosticRunId, "PUSH_MESSAGE_RETURNED", publishValues);
             markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
             setMessages(prev => [...prev, msg]);
+            if (tracePublish) markGenerationDiagnostic(options?.diagnosticRunId, "UI_STATE_QUEUED", publishValues);
             dispatchVisibleNotice(msg);
+            if (tracePublish) markGenerationDiagnostic(options?.diagnosticRunId, "NOTICE_DISPATCH_DONE", publishValues);
             const body = getNoticeBody(msg);
             if (body) {
                 sendBrowserNotification(charN, { body: body.slice(0, 60), icon: character?.avatar || undefined });
+                if (tracePublish) markGenerationDiagnostic(options?.diagnosticRunId, "BROWSER_NOTIFICATION_CALLED", publishValues);
             }
             const afterPublishResult = entry.afterPublish?.(msg);
             if (afterPublishResult) imageReplacementTasks.push(Promise.resolve(afterPublishResult));
+            // This means only that the synchronous callback returned; async media work may continue.
+            if (tracePublish) markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISH_SYNC_DONE", publishValues);
             return msg;
         };
 
@@ -3020,11 +3030,13 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         if (messageDrafts.length <= 1 || options?.instantReveal) {
             messageDrafts.forEach(publishVisibleMessage);
         } else {
-            publishVisibleMessage(messageDrafts[0]);
+            publishVisibleMessage(messageDrafts[0], 0);
             for (let i = 1; i < messageDrafts.length; i++) {
+                if (i === 1) markGenerationDiagnostic(options?.diagnosticRunId, "STAGGER_WAIT_BEGIN", { publishItemIndex: i + 1 });
                 await abortableDelay(800, options?.signal);
+                if (i === 1) markGenerationDiagnostic(options?.diagnosticRunId, "STAGGER_WAIT_DONE", { publishItemIndex: i + 1 });
                 throwIfGenerationStopped(options);
-                publishVisibleMessage(messageDrafts[i]);
+                publishVisibleMessage(messageDrafts[i], i);
             }
         }
         markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISH_DONE");
