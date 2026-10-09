@@ -163,11 +163,31 @@ function formatDiaryEntryForTimeline(entry: DiaryEntry, timeAware: boolean, time
  * @param characterId - The character to load data for
  * @param options.afterTimestamp - Only include entries after this ISO timestamp
  */
+/**
+ * Keep at most `limit` newest timeline events, preserving original insertion
+ * order among retained events. Ties remove the earliest inserted item, exactly
+ * matching stable Array.sort(timestamp).slice(-limit) semantics.
+ * For current chat activation ONLY: these events do not enter recent_chat
+ * when the current conversation is already present in the prompt history.
+ */
+function pushNewestActivationEvent<T extends { timestamp: string }>(tail: T[], entry: T, limit: number): void {
+    tail.push(entry);
+    if (tail.length <= limit) return;
+    let oldest = 0;
+    for (let i = 1; i < tail.length; i++) {
+        if (tail[i].timestamp.localeCompare(tail[oldest].timestamp) < 0) oldest = i;
+    }
+    tail.splice(oldest, 1);
+}
+
 export function loadNativeTimeline(
     characterId: string,
     options?: {
         afterTimestamp?: string;
         userName?: string;
+        // Internal optimization: retain only activation-relevant current-chat
+        // events. Do not use for non-chat consumers or full-history exports.
+        directChatActivationTailOnly?: boolean;
         appId?: import("./settings-types").ContentAppId;
         excludeOfflineSessionId?: string;
         timeAware?: boolean;
@@ -270,6 +290,12 @@ export function loadNativeTimeline(
 
     if (session) {
         const messages = loadChatMessages(session.id);
+        const activationTail: NativeTimelineEntry[] = [];
+        const activationTailOnly = options?.directChatActivationTailOnly === true;
+        const appendCurrentChatEvent = (entry: NativeTimelineEntry): void => {
+            if (activationTailOnly) pushNewestActivationEvent(activationTail, entry, 10);
+            else entries.push(entry);
+        };
         for (const msg of messages) {
             if (msg.isRetracted) continue;
             if (isPromptHiddenChatMessage(msg)) continue;
@@ -283,7 +309,7 @@ export function loadNativeTimeline(
                 if (msg.mediaType === "tool_notice") continue;
                 if (msg.mediaType === "memory_write_request") continue;
                 if (isSystemInstructionMessage(msg)) {
-                    entries.push({
+                    appendCurrentChatEvent({
                         id: msg.id,
                         sourceApp: "chat",
                         sourceDetail: "system",
@@ -295,7 +321,7 @@ export function loadNativeTimeline(
                 // Music not found — reformat for prompt
                 if (msg.mediaType === "music_not_found") {
                     const mTitle = msg.mediaData?.musicTitle || "未知歌曲";
-                    entries.push({
+                    appendCurrentChatEvent({
                         id: msg.id,
                         sourceApp: "chat",
                         sourceDetail: "system",
@@ -304,7 +330,7 @@ export function loadNativeTimeline(
                     });
                     continue;
                 }
-                entries.push({
+                appendCurrentChatEvent({
                     id: msg.id,
                     sourceApp: "chat",
                     sourceDetail: "system",
@@ -370,7 +396,7 @@ export function loadNativeTimeline(
 
             if (!content.trim()) continue;
 
-            entries.push({
+            appendCurrentChatEvent({
                 id: msg.id,
                 sourceApp: "chat",
                 sourceDetail: "direct",
@@ -378,6 +404,7 @@ export function loadNativeTimeline(
                 content: `${msgLabel} ${sender}: ${content}`,
             });
         }
+        if (activationTailOnly) entries.push(...activationTail);
     }
 
     // ── Moments posts & comments (grouped by post) ──
@@ -931,8 +958,10 @@ export function prepareShortTermContext(
     unifiedRecentItems: UnifiedRecentItem[];
 } {
     const timeAware = resolvePromptTimeAware(options?.timeAware);
+    const skipDirectChatEntries = appId === "chat" && !options?.includeDirectChatEntries;
     let timeline = loadNativeTimeline(characterId, {
         userName: options?.userName,
+        directChatActivationTailOnly: skipDirectChatEntries,
         appId: appId as import("./settings-types").ContentAppId,
         excludeOfflineSessionId: options?.excludeOfflineSessionId,
         timeAware,
@@ -949,7 +978,6 @@ export function prepareShortTermContext(
     const history = options?.history ?? [];
     const characterName = loadCharacters().find(c => c.id === characterId)?.name ?? "角色";
     const wrapsCurrentHistory = appId === "chat" || appId === "group_chat" || appId === "story" || appId === "vn" || appId === "adventure";
-    const skipDirectChatEntries = appId === "chat" && !options?.includeDirectChatEntries;
 
     // ── Collect non-history entries per block ──
     const raw: { tag: string; order: number; entries: NativeTimelineEntry[] }[] = [];
