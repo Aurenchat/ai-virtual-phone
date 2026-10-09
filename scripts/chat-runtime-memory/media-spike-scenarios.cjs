@@ -167,7 +167,7 @@ module.exports = async function scenarios({ page, check, waitForRequest, resolve
     await page.locator('.chat-room-wrapper').waitFor();
     await page.evaluate(() => window.mediaSpikeTest.triggerGroup());
     await waitForRequest();
-    check(await page.evaluate(() => { const r = window.mediaSpikeTest.generation().current; return r.isGroup && r.lastStage === 'API_BEGIN' && !r.completed; }), 'group generation records pending API diagnostics');
+    check(await page.evaluate(() => { const r = window.mediaSpikeTest.generation().current; return r.isGroup && r.lastStage === 'PROVIDER_REQUEST_BEGIN' && r.providerRequestStarted === true && !r.completed; }), 'group generation records pending API diagnostics');
     resolveReply('[Memory A]: Group diagnostic reply one\n\nGroup diagnostic reply two');
     await page.waitForFunction(() => window.mediaSpikeTest.generation().current?.completed);
     const group = await page.evaluate(() => window.mediaSpikeTest.generation().current);

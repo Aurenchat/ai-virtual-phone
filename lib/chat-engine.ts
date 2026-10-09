@@ -56,6 +56,7 @@ import {
 import { setDebugPromptSnapshot, type DebugPromptSnapshot } from "./debug-store";
 import { extractFinishReason } from "./api-helpers";
 import { fetchLlmPayload } from "./llm-http";
+import { markGenerationDiagnostic } from "./chat-generation-diagnostics";
 import { loadMemoryConfig, incrementEventCounter } from "./memory-storage";
 import { retrieveCoreMemoriesForPrompt, retrieveMemoriesForPrompt } from "./memory-service";
 import { formatCoreMemories, formatLongTermMemories } from "./memory-injector";
@@ -349,6 +350,7 @@ export type DebugPromptRequestOptions = {
 };
 
 type ChatPromptBuildOptions = {
+    diagnosticRunId?: string;
     followUpCount?: number;
     followUpDelay?: number;
     timedWakeElapsedMinutes?: number;
@@ -798,6 +800,7 @@ export async function sendLLMStreamRequest(
         appTags?: string[];
         followUpCount?: number;
         debugSessionId?: string;
+        diagnosticRunId?: string;
         signal?: AbortSignal;
     },
     callbacks?: ChatCompletionStreamCallbacks,
@@ -806,9 +809,11 @@ export async function sendLLMStreamRequest(
     const afterPlugins = await applyChatPluginLlmRequest(preset, messages, pluginPurpose, options?.debugSessionId);
     const effectivePreset = afterPlugins.preset;
     const originalOnDelta = callbacks?.onDelta;
+    let firstDiagnosticDelta = true;
     const pluginCallbacks: ChatCompletionStreamCallbacks | undefined = callbacks ? {
         ...callbacks,
         onDelta: (text: string) => {
+            if (firstDiagnosticDelta && text) { firstDiagnosticDelta = false; markGenerationDiagnostic(options?.diagnosticRunId, "API_FIRST_DELTA"); }
             emitChatPluginEvent("llm.streamChunk", { chunk: text, sessionId: options?.debugSessionId, purpose: pluginPurpose });
             return originalOnDelta?.(text);
         },
@@ -821,7 +826,8 @@ export async function sendLLMStreamRequest(
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
 
     try {
-        const response = await fetchLlmPayload(request, { signal: llmAbort.signal });
+        const response = await fetchLlmPayload(request, { signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: true });
+        markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_HEADERS");
         if (!response.ok) {
             const errorText = await response.text();
             throw new ChatEngineError(`API Stream Error ${response.status}: ${errorText}`);
@@ -838,6 +844,7 @@ export async function sendLLMStreamRequest(
             },
         };
         const { content: streamedContent, rawResponse } = await readSseStream(response, request.providerKind, streamLogCallbacks, !options?.skipTimestampStrip);
+        markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_RECEIVED");
         if (!streamedContent.trim()) {
             throw new ChatEngineError("流式响应没有解析到文本增量。");
         }
@@ -901,6 +908,7 @@ export async function sendLLMRequest(
         appTags?: string[];
         followUpCount?: number;
         debugSessionId?: string;
+        diagnosticRunId?: string;
         signal?: AbortSignal;
     },
 ): Promise<string> {
@@ -913,6 +921,7 @@ export async function sendLLMRequest(
     const requestBodyJson = JSON.stringify(request.body);
     const requestBodySize = requestBodyJson.length;
     const requestTokenEstimate = Math.ceil(requestBodySize / 3);
+    markGenerationDiagnostic(options?.diagnosticRunId, "PROMPT_ASSEMBLED", { llmMessageCount: request.messagesForLog.length, requestTokenEstimate });
     const messageSizes = request.messagesForLog.map((message) => (
         typeof message.content === "string" ? message.content.length : JSON.stringify(message.content).length
     ));
@@ -940,14 +949,16 @@ export async function sendLLMRequest(
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
 
     try {
-        const response = await fetchLlmPayload(request, { signal: llmAbort.signal });
+        const response = await fetchLlmPayload(request, { signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: false });
 
+        markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_HEADERS");
         if (!response.ok) {
             const errorText = await response.text();
             throw new ChatEngineError(`API Error ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
+        markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_RECEIVED");
         const parsed = parseProviderResponse(request.providerKind, data);
         let rawOutput = parsed.content || "";
 
@@ -1093,6 +1104,7 @@ export async function sendLLMToolStreamRequest(
         appTags?: string[];
         followUpCount?: number;
         debugSessionId?: string;
+        diagnosticRunId?: string;
         signal?: AbortSignal;
         /** 单次最大输出 token：按调用覆盖预设值（工坊输出护栏用） */
         maxTokens?: number;
@@ -1114,10 +1126,12 @@ export async function sendLLMToolStreamRequest(
     const contentStripper = createStreamingTimestampStripper();
     const toolDrafts = new Map<number, StreamToolCallDraft>();
     const firedToolCallStarts = new Set<number>();
+    let firstDiagnosticDelta = true;
 
     try {
-        const response = await fetchLlmPayload(request, { signal: llmAbort.signal });
+        const response = await fetchLlmPayload(request, { signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: true });
 
+        markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_HEADERS");
         if (!response.ok) {
             const errorText = await response.text();
             throw new ChatEngineError(`API Tool Stream Error ${response.status}: ${errorText}`);
@@ -1142,6 +1156,7 @@ export async function sendLLMToolStreamRequest(
                         if (cleanDelta) {
                             content += cleanDelta;
                             emitChatPluginEvent("llm.streamChunk", { chunk: cleanDelta, sessionId: options?.debugSessionId, purpose: pluginPurpose });
+                            if (firstDiagnosticDelta) { firstDiagnosticDelta = false; markGenerationDiagnostic(options?.diagnosticRunId, "API_FIRST_DELTA"); }
                             await callbacks?.onDelta?.(cleanDelta);
                         }
                     }
@@ -1191,6 +1206,7 @@ export async function sendLLMToolStreamRequest(
         const finalContent = contentStripper.flush();
         if (finalContent) {
             content += finalContent;
+            if (firstDiagnosticDelta) { firstDiagnosticDelta = false; markGenerationDiagnostic(options?.diagnosticRunId, "API_FIRST_DELTA"); }
             await callbacks?.onDelta?.(finalContent);
         }
         content = await applyChatPluginLlmResponse(content, pluginPurpose, options?.debugSessionId);
@@ -1210,6 +1226,7 @@ export async function sendLLMToolStreamRequest(
             reasoning: reasoning || undefined,
         });
 
+        markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_RECEIVED");
         if (!content && toolCalls.length === 0 && truncatedNames.length === 0) {
             throw new ChatEngineError("原生动作流式响应没有解析到文本或动作。");
         }
@@ -1251,6 +1268,7 @@ export async function sendLLMToolRequest(
         appTags?: string[];
         followUpCount?: number;
         debugSessionId?: string;
+        diagnosticRunId?: string;
         signal?: AbortSignal;
     },
 ): Promise<LLMToolRequestResult> {
@@ -1264,14 +1282,16 @@ export async function sendLLMToolRequest(
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
 
     try {
-        const response = await fetchLlmPayload(request, { signal: llmAbort.signal });
+        const response = await fetchLlmPayload(request, { signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: false });
 
+        markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_HEADERS");
         if (!response.ok) {
             const errorText = await response.text();
             throw new ChatEngineError(`API Tool Error ${response.status}: ${errorText}`);
         }
 
         const data = await response.json();
+        markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_RECEIVED");
         const parsed = parseProviderResponse(request.providerKind, data);
         let rawOutput = parsed.content || "";
         if (options?.includeReasoning && parsed.reasoning) {
@@ -1778,6 +1798,7 @@ export async function buildChatPromptMessages(
     userIdentity: ReturnType<typeof resolveUserIdentity>;
     toolsEnabled: boolean;
 }> {
+    markGenerationDiagnostic(options?.diagnosticRunId, "CONTEXT_PREP_BEGIN");
     const chars = loadCharacters();
     const character = chars.find(c => c.id === session.contactId);
     if (!character) throw new ChatEngineError(`Character not found: ${session.contactId}`);
@@ -1837,6 +1858,7 @@ export async function buildChatPromptMessages(
     const promptTimeContext = buildCharacterTimeContext(character.timeZone, now);
     const promptTimestampOptions = getPromptTimestampOptionsForTimeContext(promptTimeContext);
     const memConfig = loadMemoryConfig();
+    markGenerationDiagnostic(options?.diagnosticRunId, "CONTEXT_PREP_BEGIN", { shortTermBudget: memConfig.shortTermTokenBudget, longTermBudget: memConfig.longTermTokenBudget, coreMemoryBudget: memConfig.coreMemoryTokenBudget });
     const isOfflineMode = options?.appTags?.includes("offline") === true;
     const effectiveAppTags = mergeAppTags(options?.appTags, promptProfile?.appTags, resolvedAppId);
     const toolsAllowed = options?.toolsAllowed !== false && !isOfflineMode;
@@ -1844,6 +1866,7 @@ export async function buildChatPromptMessages(
     const toolsEnabled = enabledTools.length > 0
         && (options?.forceEnableTools === true || presetIncludesToolsMacro(preset, resolvedAppId, effectiveAppTags));
     const usesNativeActions = Boolean(toolsEnabled && nativeToolProtocolForConfig(config));
+    markGenerationDiagnostic(options?.diagnosticRunId, "SHORT_TERM_BEGIN");
     await readMemoryRevisions();
     const { recentBlocks, truncatedHistory, wbActivationContext, unifiedRecentItems } = prepareShortTermContext(character.id, resolvedAppId, {
         history: historyForPrompt,
@@ -1852,6 +1875,7 @@ export async function buildChatPromptMessages(
         excludeOfflineSessionId: options?.excludeOfflineSessionId,
         promptTimestampOptions,
     });
+    markGenerationDiagnostic(options?.diagnosticRunId, "SHORT_TERM_READY", { survivingHistoryCount: truncatedHistory.length, survivingRecentItemCount: unifiedRecentItems.length });
     const promptHistory = applyVisionImagePromptLimit(
         truncatedHistory.map(msg => ({ ...msg })),
         session.visionImagePromptLimit,
@@ -1863,13 +1887,15 @@ export async function buildChatPromptMessages(
         }
     }
 
+    markGenerationDiagnostic(options?.diagnosticRunId, "MEMORY_RETRIEVAL_BEGIN");
     const [memResults, coreResults, musicLocal, musicCloud] = await Promise.all([
-        retrieveMemoriesForPrompt(character.id, wbActivationContext, memConfig).catch(() => null),
-        retrieveCoreMemoriesForPrompt(character.id, memConfig).catch(() => null),
+        retrieveMemoriesForPrompt(character.id, wbActivationContext, memConfig).catch(() => { markGenerationDiagnostic(options?.diagnosticRunId, "LONG_TERM_READY", { longTermRetrievalFailed: true }); return null; }).then(result => { markGenerationDiagnostic(options?.diagnosticRunId, "LONG_TERM_READY", { longTermSelectedCount: result?.length ?? 0 }); return result; }),
+        retrieveCoreMemoriesForPrompt(character.id, memConfig).catch(() => { markGenerationDiagnostic(options?.diagnosticRunId, "CORE_MEMORY_READY", { coreMemoryRetrievalFailed: true }); return null; }).then(result => { markGenerationDiagnostic(options?.diagnosticRunId, "CORE_MEMORY_READY", { coreMemorySelectedCount: result?.length ?? 0 }); return result; }),
         buildMusicLocalMacro(),
         buildMusicCloudMacro(),
     ]);
 
+    markGenerationDiagnostic(options?.diagnosticRunId, "MEMORY_RETRIEVAL_READY");
     const longTermMemories = memResults ? formatLongTermMemories(memResults) : "";
     const coreMemories = coreResults ? formatCoreMemories(coreResults) : "";
     const scheduleSummary = buildCalendarScheduleMarker("character", character.id, getWeekStartIso(now));
@@ -1897,6 +1923,7 @@ export async function buildChatPromptMessages(
         )
         : "";
 
+    markGenerationDiagnostic(options?.diagnosticRunId, "PROMPT_ASSEMBLY_BEGIN");
     const llmMessages = assemblePromptPayload({
         character,
         history: promptHistory,
@@ -1955,6 +1982,7 @@ export async function buildChatPromptMessages(
     }
     appendEmptyGenerateGuardMessage(llmMessages, config, historyForPrompt);
 
+    markGenerationDiagnostic(options?.diagnosticRunId, "PROMPT_ASSEMBLED", { llmMessageCount: llmMessages.length });
     return { llmMessages, character, config, preset, regexes, userIdentity, toolsEnabled };
 }
 
@@ -2155,6 +2183,7 @@ async function generateNativeChatCompletion(
                         appTags: requestAppTags,
                         followUpCount: options?.followUpCount,
                         debugSessionId: session.id,
+                        diagnosticRunId: options?.diagnosticRunId,
                         signal: options?.signal,
                     },
                     {
@@ -2178,6 +2207,7 @@ async function generateNativeChatCompletion(
                         appTags: requestAppTags,
                         followUpCount: options?.followUpCount,
                         debugSessionId: session.id,
+                        diagnosticRunId: options?.diagnosticRunId,
                         signal: options?.signal,
                     },
                 );
@@ -2606,6 +2636,7 @@ async function generateChatCompletionCore(
                     appTags: requestAppTags,
                     followUpCount: options?.followUpCount,
                     debugSessionId: session.id,
+                    diagnosticRunId: options?.diagnosticRunId,
                     signal: options?.signal,
                 }, {
                     onDelta: (text) => callbacks?.onStreamDelta?.(text),
@@ -2620,6 +2651,7 @@ async function generateChatCompletionCore(
                     appTags: requestAppTags,
                     followUpCount: options?.followUpCount,
                     debugSessionId: session.id,
+                    diagnosticRunId: options?.diagnosticRunId,
                     signal: options?.signal,
                     // 预设开启「线上标签解析」时不透传原生思维链（改由下方标签提取）
                     onReasoning: onlineThinking.enabled ? undefined : callbacks?.onReasoning,
@@ -2834,6 +2866,7 @@ async function generateChatCompletionCore(
                             appTags: requestAppTags,
                             followUpCount: options?.followUpCount,
                             debugSessionId: session.id,
+                            diagnosticRunId: options?.diagnosticRunId,
                             signal: options?.signal,
                         }, {
                             onDelta: (text) => callbacks?.onStreamDelta?.(text),
@@ -2848,6 +2881,7 @@ async function generateChatCompletionCore(
                             appTags: requestAppTags,
                             followUpCount: options?.followUpCount,
                             debugSessionId: session.id,
+                            diagnosticRunId: options?.diagnosticRunId,
                             signal: options?.signal,
                             onReasoning: onlineThinking.enabled ? undefined : callbacks?.onReasoning,
                         });

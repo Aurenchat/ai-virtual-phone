@@ -19,6 +19,13 @@ import {
 } from "./chat-storage";
 import type { ChatMessage, StateValue } from "./chat-storage";
 import { generateChatCompletion, flattenCompletionResult } from "./chat-engine";
+import { startGenerationDiagnostic, markGenerationDiagnostic } from "./chat-generation-diagnostics";
+
+function startBackgroundDiagnostic(sessionId: string, isGroup: boolean): string {
+    const runId = `bg_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    startGenerationDiagnostic(runId, sessionId, isGroup, "background");
+    return runId;
+}
 import { armFollowUpBailout, armIdleReconnectBailout, cancelBailoutKey, cancelBailoutPrefix, cancelFollowUpBailout, startBailoutHeartbeat } from "./push-bailout-client";
 import { isWithinPushQuietHours } from "./push-client";
 import {
@@ -210,14 +217,18 @@ export async function requestBackgroundChatReply(sessionId: string): Promise<{ o
     if (!session) return { ok: false, skipped: "missing_session" };
 
     backgroundReplyFiringSet.add(sessionId);
+    let diagnosticRunId: string | undefined;
     try {
+        diagnosticRunId = startBackgroundDiagnostic(session.id, Boolean(session.isGroup));
+        markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOAD_BEGIN");
         const latestMessages = loadChatMessages(session.id);
+        markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOADED", { historyCount: latestMessages.length });
         backgroundGeneratingSessions.add(session.id);
         window.dispatchEvent(new CustomEvent("followup-started", { detail: { sessionId: session.id } }));
         const rounds = await generateBackgroundCompletionRounds(
             session,
             latestMessages,
-            { appTags: session.isGroup ? undefined : ["chat", "text"] },
+            { diagnosticRunId, appTags: session.isGroup ? undefined : ["chat", "text"] },
         );
         if (isBackgroundGenerationCancelled(session.id)) return { ok: false, skipped: "cancelled" };
         const { hasVisible, stateValues } = await saveBackgroundCompletionRounds(
@@ -226,11 +237,13 @@ export async function requestBackgroundChatReply(sessionId: string): Promise<{ o
             0,
             undefined,
             latestMessages,
+            { diagnosticRunId },
         );
         if (hasVisible) scheduleFollowUp(session.id, 0, stateValues);
         window.dispatchEvent(new CustomEvent("followup-fired", { detail: { sessionId: session.id } }));
         return { ok: true };
     } catch (error: any) {
+        markGenerationDiagnostic(diagnosticRunId, "GEN_ERROR", { errorName: error instanceof Error ? error.name : "Error" });
         console.error("[BackgroundReply] Error:", error);
         pushChatMessage({
             sessionId,
@@ -240,6 +253,7 @@ export async function requestBackgroundChatReply(sessionId: string): Promise<{ o
         window.dispatchEvent(new CustomEvent("followup-fired", { detail: { sessionId } }));
         return { ok: false };
     } finally {
+        markGenerationDiagnostic(diagnosticRunId, "GEN_FINALLY", { completed: true });
         backgroundGeneratingSessions.delete(sessionId);
         cancelledBackgroundSessions.delete(sessionId);
         backgroundReplyFiringSet.delete(sessionId);
@@ -294,6 +308,7 @@ async function generateBackgroundCompletionRounds(
     const result = await generateChatCompletion(session, messages, options, {
         onReasoning: (t) => { pendingReasoning = t; },
         onTextPart: (text, _senderInfo, meta) => {
+            markGenerationDiagnostic(options?.diagnosticRunId, "RESPONSE_RECEIVED", { rawLength: text.length });
             if (!text.trim()) return;
             const reasoningText = pendingReasoning;
             pendingReasoning = undefined;
@@ -307,7 +322,10 @@ async function generateBackgroundCompletionRounds(
     });
     if (rounds.length === 0) {
         const fallback = flattenCompletionResult(result);
-        if (fallback.trim()) rounds.push({ text: fallback, rawResponseText: fallback, reasoningText: pendingReasoning });
+        if (fallback.trim()) {
+            markGenerationDiagnostic(options?.diagnosticRunId, "RESPONSE_RECEIVED", { rawLength: fallback.length });
+            rounds.push({ text: fallback, rawResponseText: fallback, reasoningText: pendingReasoning });
+        }
     }
     return rounds;
 }
@@ -318,7 +336,7 @@ async function saveBackgroundCompletionRounds(
     currentCount: number,
     followUpIndex: number | undefined,
     contextMessages: ChatMessage[],
-    options?: { senderCharacterId?: string; senderName?: string; silent?: boolean },
+    options?: { senderCharacterId?: string; senderName?: string; silent?: boolean; diagnosticRunId?: string },
 ): Promise<{ hasVisible: boolean; newCount: number; stateValues: StateValue[] }> {
     let hasVisible = false;
     let newCount = currentCount;
@@ -429,12 +447,16 @@ async function fireFollowUp(sched: { sessionId: string; count: number; delaySec?
     firingSet.add(sched.sessionId);
     clearFollowUpSchedule(sched.sessionId); // clear before firing
 
+    let diagnosticRunId: string | undefined;
     try {
         const sessions = loadChatSessions();
         const session = sessions.find(s => s.id === sched.sessionId);
         if (!session) return;
 
+        diagnosticRunId = startBackgroundDiagnostic(session.id, Boolean(session.isGroup));
+        markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOAD_BEGIN");
         const latestMessages = loadChatMessages(session.id);
+        markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOADED", { historyCount: latestMessages.length });
 
         const count = sched.count + 1;
 
@@ -489,7 +511,7 @@ async function fireFollowUp(sched: { sessionId: string; count: number; delaySec?
             rounds = await generateBackgroundCompletionRounds(
                 session,
                 messagesWithHint,
-                { followUpCount: count, followUpDelay: sched.delaySec ?? 60, appTags: ["chat", "text", "followup"] },
+                { diagnosticRunId, followUpCount: count, followUpDelay: sched.delaySec ?? 60, appTags: ["chat", "text", "followup"] },
             );
         } finally {
             stopBailoutHeartbeat();
@@ -502,7 +524,7 @@ async function fireFollowUp(sched: { sessionId: string; count: number; delaySec?
             return;
         }
 
-        const { hasVisible, newCount, stateValues } = await saveBackgroundCompletionRounds(rounds, session.id, sched.count, count, latestMessages);
+        const { hasVisible, newCount, stateValues } = await saveBackgroundCompletionRounds(rounds, session.id, sched.count, count, latestMessages, { diagnosticRunId });
         console.log(`[FollowUp] Result: hasVisible=${hasVisible}, newCount=${newCount}`);
 
         // 本地已完成这一轮，撤销服务端对应的兜底预约（只撤本轮的精确键，
@@ -517,6 +539,7 @@ async function fireFollowUp(sched: { sessionId: string; count: number; delaySec?
         window.dispatchEvent(new CustomEvent("followup-fired", { detail: { sessionId: session.id } }));
 
     } catch (error: any) {
+        markGenerationDiagnostic(diagnosticRunId, "GEN_ERROR", { errorName: error instanceof Error ? error.name : "Error" });
         console.error(`[FollowUp] Error:`, error);
         pushChatMessage({
             sessionId: sched.sessionId,
@@ -525,6 +548,7 @@ async function fireFollowUp(sched: { sessionId: string; count: number; delaySec?
         });
         window.dispatchEvent(new CustomEvent("followup-fired", { detail: { sessionId: sched.sessionId } }));
     } finally {
+        markGenerationDiagnostic(diagnosticRunId, "GEN_FINALLY", { completed: true });
         backgroundGeneratingSessions.delete(sched.sessionId);
         cancelledBackgroundSessions.delete(sched.sessionId);
         firingSet.delete(sched.sessionId);
@@ -573,6 +597,7 @@ function pollIdleReconnect(now: number) {
 
 async function fireIdleReconnect(rule: IdleReconnectRule, lastUserAt: number) {
     idleReconnectFiringSet.add(rule.id);
+    let diagnosticRunId: string | undefined;
     try {
         const session = loadChatSessions().find(s => s.id === rule.sessionId);
         if (!session || session.isGroup || session.contactId !== rule.characterId) return;
@@ -580,7 +605,10 @@ async function fireIdleReconnect(rule: IdleReconnectRule, lastUserAt: number) {
         // 本地接手当前这次生成，先撤销服务端同规则排队任务；生成成功后才记连发次数。
         void cancelBailoutPrefix(`idle:${rule.id}:`);
 
+        diagnosticRunId = startBackgroundDiagnostic(session.id, Boolean(session.isGroup));
+        markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOAD_BEGIN");
         const latestMessages = loadChatMessages(session.id);
+        markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOADED", { historyCount: latestMessages.length });
         const elapsedMinutes = Math.max(1, Math.round((Date.now() - lastUserAt) / 60000));
 
         backgroundGeneratingSessions.add(session.id);
@@ -590,6 +618,7 @@ async function fireIdleReconnect(rule: IdleReconnectRule, lastUserAt: number) {
             session,
             latestMessages,
             {
+                diagnosticRunId,
                 appTags: ["chat", "text", "idle_wake"],
                 timedWakeElapsedMinutes: elapsedMinutes,
             },
@@ -609,6 +638,7 @@ async function fireIdleReconnect(rule: IdleReconnectRule, lastUserAt: number) {
             0,
             undefined,
             latestMessages,
+            { diagnosticRunId },
         );
         markIdleReconnectFired(rule.id, Date.now());
         if (hasVisible) scheduleFollowUp(session.id, 0, stateValues);
@@ -618,9 +648,11 @@ async function fireIdleReconnect(rule: IdleReconnectRule, lastUserAt: number) {
         const refreshed = loadIdleReconnectRules().find(item => item.id === rule.id);
         if (refreshed) void armIdleReconnectBailout(refreshed);
     } catch (error: unknown) {
+        markGenerationDiagnostic(diagnosticRunId, "GEN_ERROR", { errorName: error instanceof Error ? error.name : "Error" });
         console.error("[IdleReconnect] Error:", error);
         window.dispatchEvent(new CustomEvent("followup-fired", { detail: { sessionId: rule.sessionId } }));
     } finally {
+        markGenerationDiagnostic(diagnosticRunId, "GEN_FINALLY", { completed: true });
         backgroundGeneratingSessions.delete(rule.sessionId);
         cancelledBackgroundSessions.delete(rule.sessionId);
         idleReconnectFiringSet.delete(rule.id);
@@ -633,12 +665,16 @@ async function fireTimedWake(sched: TimedWakeSchedule) {
     // 本地接手触发：撤销服务端兜底预约（生成中被杀由发送保险单接管）
     cancelBailoutKey(`timedwake:${sched.id}`);
 
+    let diagnosticRunId: string | undefined;
     try {
         const sessions = loadChatSessions();
         const session = sessions.find(s => s.id === sched.sessionId);
         if (!session || session.contactId !== sched.characterId) return;
 
+        diagnosticRunId = startBackgroundDiagnostic(session.id, Boolean(session.isGroup));
+        markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOAD_BEGIN");
         const latestMessages = loadChatMessages(session.id);
+        markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOADED", { historyCount: latestMessages.length });
         const elapsedMinutes = resolveTimedWakeElapsedMinutes(sched, latestMessages, Date.now());
 
         console.log("[TimedWake] Dispatching followup-started for session:", session.id);
@@ -651,6 +687,7 @@ async function fireTimedWake(sched: TimedWakeSchedule) {
             session,
             latestMessages,
             {
+                diagnosticRunId,
                 appTags: ["chat", "text", wakeTag],
                 timedWakeElapsedMinutes: elapsedMinutes,
                 timedWakeIntent: sched.intent,
@@ -668,6 +705,7 @@ async function fireTimedWake(sched: TimedWakeSchedule) {
             0,
             undefined,
             latestMessages,
+            { diagnosticRunId },
         );
         console.log(`[TimedWake] Result: hasVisible=${hasVisible}`);
 
@@ -677,6 +715,7 @@ async function fireTimedWake(sched: TimedWakeSchedule) {
 
         window.dispatchEvent(new CustomEvent("followup-fired", { detail: { sessionId: session.id } }));
     } catch (error: any) {
+        markGenerationDiagnostic(diagnosticRunId, "GEN_ERROR", { errorName: error instanceof Error ? error.name : "Error" });
         console.error("[TimedWake] Error:", error);
         const failureLabel = sched.source === "user" ? "定时主动消息" : "稍后主动联系";
         pushChatMessage({
@@ -686,6 +725,7 @@ async function fireTimedWake(sched: TimedWakeSchedule) {
         });
         window.dispatchEvent(new CustomEvent("followup-fired", { detail: { sessionId: sched.sessionId } }));
     } finally {
+        markGenerationDiagnostic(diagnosticRunId, "GEN_FINALLY", { completed: true });
         backgroundGeneratingSessions.delete(sched.sessionId);
         cancelledBackgroundSessions.delete(sched.sessionId);
         timedWakeFiringSet.delete(sched.id);
@@ -700,13 +740,17 @@ async function fireMenstrualPeriodCare(input: {
     const firingKey = `${input.characterId}:${input.event.cycleKey}`;
     periodCareFiringSet.add(firingKey);
 
+    let diagnosticRunId: string | undefined;
     try {
         const sessions = loadChatSessions();
         const session = sessions.find(s => s.id === input.sessionId);
         if (!session || session.isGroup || session.contactId !== input.characterId) return;
         if (hasMenstrualPeriodCareTriggered(input.characterId, input.event.cycleKey)) return;
 
+        diagnosticRunId = startBackgroundDiagnostic(session.id, Boolean(session.isGroup));
+        markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOAD_BEGIN");
         const latestMessages = loadChatMessages(session.id);
+        markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOADED", { historyCount: latestMessages.length });
 
         console.log("[PeriodCare] Dispatching followup-started for session:", session.id);
         backgroundGeneratingSessions.add(session.id);
@@ -716,6 +760,7 @@ async function fireMenstrualPeriodCare(input: {
             session,
             latestMessages,
             {
+                diagnosticRunId,
                 appTags: ["chat", "text", "period_care"],
                 periodCareContext: input.event.context,
             },
@@ -732,6 +777,7 @@ async function fireMenstrualPeriodCare(input: {
             0,
             undefined,
             latestMessages,
+            { diagnosticRunId },
         );
         saveMenstrualPeriodCareTrigger({
             characterId: input.characterId,
@@ -747,6 +793,7 @@ async function fireMenstrualPeriodCare(input: {
 
         window.dispatchEvent(new CustomEvent("followup-fired", { detail: { sessionId: session.id } }));
     } catch (error: any) {
+        markGenerationDiagnostic(diagnosticRunId, "GEN_ERROR", { errorName: error instanceof Error ? error.name : "Error" });
         console.error("[PeriodCare] Error:", error);
         pushChatMessage({
             sessionId: input.sessionId,
@@ -755,6 +802,7 @@ async function fireMenstrualPeriodCare(input: {
         });
         window.dispatchEvent(new CustomEvent("followup-fired", { detail: { sessionId: input.sessionId } }));
     } finally {
+        markGenerationDiagnostic(diagnosticRunId, "GEN_FINALLY", { completed: true });
         backgroundGeneratingSessions.delete(input.sessionId);
         cancelledBackgroundSessions.delete(input.sessionId);
         periodCareFiringSet.delete(firingKey);
@@ -879,6 +927,7 @@ export async function parseAndSaveResponse(
     followUpIndex: number | undefined,
     contextMessages: ChatMessage[],
     options?: {
+        diagnosticRunId?: string;
         senderCharacterId?: string;
         senderName?: string;
         silent?: boolean;
@@ -960,6 +1009,9 @@ export async function parseAndSaveResponse(
         filteredParts.push(p);
     }
 
+    markGenerationDiagnostic(options?.diagnosticRunId, "PARSE_DONE", {}, filteredParts.length + Number(Boolean(triggerCall))
+        + Number(filteredParts.length === 0 && Boolean(statusPanel || innerMonologue || reasoningText)) + (shortcutMarker ? 2 : 0));
+
     // Save call trigger as system message (persists even when user is not in chat room)
     if (triggerCall) {
         const callLabel = triggerCall === "voice" ? "语音通话" : "视频通话";
@@ -971,6 +1023,7 @@ export async function parseAndSaveResponse(
             responseBatchId: createResponseBatchId(),
             rawResponseText: `[我发起了${callLabel}]`,
         });
+        markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
     }
 
     if (filteredParts.length === 0) {
@@ -990,6 +1043,7 @@ export async function parseAndSaveResponse(
                 freshStateValues,
                 ...(followUpIndex ? { followUpIndex } : {}),
             });
+            markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
         }
         if (shortcutMarker) {
             const baseMs = options?.createdAt ? Date.parse(options.createdAt) : NaN;
@@ -1003,6 +1057,7 @@ export async function parseAndSaveResponse(
                 senderCharacterId: options?.senderCharacterId,
                 senderName: options?.senderName,
             });
+            markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
             pushChatMessage({
                 sessionId,
                 role: "system",
@@ -1010,11 +1065,13 @@ export async function parseAndSaveResponse(
                 createdAt: Number.isFinite(baseMs) ? new Date(baseMs + 2).toISOString() : undefined,
                 mediaType: "tool_notice",
             });
+            markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
         }
         // Emit call trigger event for chat-room to pick up
         if (triggerCall && typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("ai-call-trigger", { detail: { sessionId, type: triggerCall } }));
         }
+        markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISH_DONE");
         return { hasVisible: false, newCount: MAX_FOLLOW_UPS, stateValues };
     }
 
@@ -1023,6 +1080,7 @@ export async function parseAndSaveResponse(
     let metaIdx = filteredParts.findIndex(canCarryFollowUpPanel);
     if (metaIdx === -1 && (statusPanel || innerMonologue || reasoningText || stateValues.length > 0)) {
         filteredParts.push({ content: "" });
+        markGenerationDiagnostic(options?.diagnosticRunId, "PARSE_DONE", {}, 1);
         metaIdx = filteredParts.length - 1;
     }
     const markerPartIdx = findShortcutMarkerPartIdx(filteredParts);
@@ -1045,6 +1103,7 @@ export async function parseAndSaveResponse(
             senderCharacterId: options?.senderCharacterId,
             senderName: options?.senderName,
         }));
+        markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
         savedMessages.push(pushChatMessage({
             sessionId,
             role: "system",
@@ -1052,6 +1111,7 @@ export async function parseAndSaveResponse(
             createdAt: nextCreatedAt(),
             mediaType: "tool_notice",
         }));
+        markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
     };
     for (let i = 0; i < filteredParts.length; i++) {
         if (i === markerPartIdx) saveShortcutMarkerPair();
@@ -1077,6 +1137,7 @@ export async function parseAndSaveResponse(
             senderName: options?.senderName,
             ...(followUpIndex ? { followUpIndex } : {}),
         });
+        markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
         if (isPendingChatGeneratedImageMessage(saved)) {
             imageReplacementTasks.push(
                 generateAndApplyChatGeneratedImage(saved, sess?.contactId)
@@ -1090,7 +1151,10 @@ export async function parseAndSaveResponse(
     }
     if (markerPartIdx >= filteredParts.length) saveShortcutMarkerPair();
 
+    markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISH_DONE");
+    markGenerationDiagnostic(options?.diagnosticRunId, "MESSAGE_DISPATCH_BEGIN");
     await dispatchBackgroundMessagesOneByOne(sessionId, savedMessages, options?.silent === true);
+    markGenerationDiagnostic(options?.diagnosticRunId, "MESSAGE_DISPATCH_DONE", { dispatchedCount: savedMessages.length });
     if (imageReplacementTasks.length > 0) {
         await Promise.allSettled(imageReplacementTasks);
     }

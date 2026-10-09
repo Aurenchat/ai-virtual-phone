@@ -1,5 +1,6 @@
 // lib/group-chat-engine.ts
 // Group chat engine: single API call for all characters.
+import { markGenerationDiagnostic } from "./chat-generation-diagnostics";
 
 import { ChatSession, ChatMessage, loadChatAppSettings, createResponseBatchId, createResponseRoundId, createToolExecutionId, loadChatSessions, getLatestCharacterStateValues, isSessionStreamingEnabled } from "./chat-storage";
 import { extractTextToolDirectiveText } from "./text-tool-protocol";
@@ -281,6 +282,7 @@ function scheduleGroupMemorySummarization(
  * Shared prompt builder for group chat — used by both generate and preview.
  */
 export type GroupChatPromptBuildOptions = {
+    diagnosticRunId?: string;
     appTags?: string[];
     excludeOfflineSessionId?: string;
     disableTools?: boolean;
@@ -293,6 +295,7 @@ async function buildGroupChatPromptMessages(
     history: ChatMessage[],
     options?: GroupChatPromptBuildOptions,
 ): Promise<{ llmMessages: LLMMessage[]; config: ApiConfig; preset: PresetConfig | null; regexes: RegexConfig[]; nameToId: Map<string, string>; memberNames: string[]; enabledTools: import("./tool-storage").EnabledTool[]; userName: string; appTags: string[] }> {
+    markGenerationDiagnostic(options?.diagnosticRunId, "CONTEXT_PREP_BEGIN");
     const chars = loadCharacters();
     const charMap = new Map(chars.map(c => [c.id, c]));
     const participantIds = session.participantIds || [];
@@ -330,6 +333,9 @@ async function buildGroupChatPromptMessages(
     const isOfflineMode = activeAppTags.includes("offline");
 
     const memConfig = loadMemoryConfig();
+    markGenerationDiagnostic(options?.diagnosticRunId, "SHORT_TERM_BEGIN", { shortTermBudget: memConfig.shortTermTokenBudget, longTermBudget: memConfig.longTermTokenBudget, coreMemoryBudget: memConfig.coreMemoryTokenBudget });
+    let longTermSelectedCount = 0, coreMemorySelectedCount = 0;
+    let memoryRetrievalStarted = false;
     const allWorldBooks = loadWorldBooks();
 
     const now = new Date();
@@ -352,11 +358,14 @@ async function buildGroupChatPromptMessages(
             promptTimestampOptions: getPromptTimestampOptionsForTimeContext(memberTimeContext),
         });
         let coreMemories = "", longTermMemories = "";
+        if (!memoryRetrievalStarted) { memoryRetrievalStarted = true; markGenerationDiagnostic(options?.diagnosticRunId, "MEMORY_RETRIEVAL_BEGIN"); }
         try {
             const [coreResults, results] = await Promise.all([
                 retrieveCoreMemoriesForPrompt(charId, memConfig),
                 retrieveMemoriesForPrompt(charId, wbActivationContext, memConfig),
             ]);
+            coreMemorySelectedCount += coreResults.length;
+            longTermSelectedCount += results.length;
             coreMemories = formatCoreMemories(coreResults);
             longTermMemories = formatLongTermMemories(results);
         } catch { /* ignore */ }
@@ -372,6 +381,9 @@ async function buildGroupChatPromptMessages(
     });
 
     const memberResults = await Promise.all(memberDataPromises);
+    markGenerationDiagnostic(options?.diagnosticRunId, "LONG_TERM_READY", { longTermSelectedCount });
+    markGenerationDiagnostic(options?.diagnosticRunId, "CORE_MEMORY_READY", { coreMemorySelectedCount });
+    markGenerationDiagnostic(options?.diagnosticRunId, "MEMORY_RETRIEVAL_READY");
     const members = memberResults.filter(Boolean) as GroupMemberData[];
     if (members.length === 0) throw new ChatEngineError("No valid group members found.");
 
@@ -398,6 +410,7 @@ async function buildGroupChatPromptMessages(
         includeNativeToolHistory: usesNativeActions,
         promptTimestampOptions: groupPromptTimestampOptions,
     });
+    markGenerationDiagnostic(options?.diagnosticRunId, "SHORT_TERM_READY", { survivingHistoryCount: truncatedAnnotatedHistory.length, survivingRecentItemCount: unifiedRecentItems.length });
     const promptHistory = applyVisionImagePromptLimit(
         truncatedAnnotatedHistory.map(msg => ({ ...msg })),
         session.visionImagePromptLimit,
@@ -457,6 +470,7 @@ async function buildGroupChatPromptMessages(
         userName,
     );
 
+    markGenerationDiagnostic(options?.diagnosticRunId, "PROMPT_ASSEMBLY_BEGIN");
     const llmMessages = assembleGroupPromptPayload({
         members,
         history: promptHistory,
@@ -506,6 +520,7 @@ async function buildGroupChatPromptMessages(
     }
     appendEmptyGenerateGuardMessage(llmMessages, config, history);
 
+    markGenerationDiagnostic(options?.diagnosticRunId, "PROMPT_ASSEMBLED", { llmMessageCount: llmMessages.length });
     return { llmMessages, config, preset, regexes, nameToId, memberNames, enabledTools, userName, appTags: activeAppTags };
 }
 
@@ -565,6 +580,7 @@ async function runNativeGroupToolLoop(params: {
     userName: string;
     appTags: string[];
     signal?: AbortSignal;
+    diagnosticRunId?: string;
     callbacks?: ChatCompletionCallbacks;
 }): Promise<string> {
     const { session, llmMessages, config, preset, regexes, nameToId, memberNames, enabledTools, appTags, signal, callbacks } = params;
@@ -596,6 +612,7 @@ async function runNativeGroupToolLoop(params: {
                     appId: "group_chat",
                     appTags,
                     debugSessionId: session.id,
+                    diagnosticRunId: params.diagnosticRunId,
                     signal,
                 }, {
                     onDelta: (text) => callbacks?.onStreamDelta?.(text),
@@ -608,6 +625,7 @@ async function runNativeGroupToolLoop(params: {
                     appId: "group_chat",
                     appTags,
                     debugSessionId: session.id,
+                    diagnosticRunId: params.diagnosticRunId,
                     signal,
                 });
             }
@@ -804,6 +822,7 @@ export async function generateGroupChatCompletion(
         disableTools: options?.disableTools,
         promptProfile: options?.promptProfile,
         apiConfigId: options?.apiConfigId,
+        diagnosticRunId: options?.diagnosticRunId,
     });
     const chars = loadCharacters();
     const participantIds = session.participantIds || [];
@@ -828,6 +847,7 @@ export async function generateGroupChatCompletion(
             userName,
             appTags,
             signal: options?.signal,
+            diagnosticRunId: options?.diagnosticRunId,
             callbacks,
         });
     } else {
@@ -848,6 +868,7 @@ export async function generateGroupChatCompletion(
                     appId: "group_chat",
                     appTags,
                     debugSessionId: session.id,
+                    diagnosticRunId: options?.diagnosticRunId,
                     signal: options?.signal,
                 }, {
                     onDelta: (text) => callbacks?.onStreamDelta?.(text),
@@ -861,6 +882,7 @@ export async function generateGroupChatCompletion(
                     appId: "group_chat",
                     appTags,
                     debugSessionId: session.id,
+                    diagnosticRunId: options?.diagnosticRunId,
                     signal: options?.signal,
                     // 预设开启「线上标签解析」时不透传原生思维链（改由下方标签提取）
                     onReasoning: onlineThinkingEnabled ? undefined : callbacks?.onReasoning,
@@ -1023,6 +1045,7 @@ export async function generateGroupChatCompletion(
                             appId: "group_chat",
                             appTags,
                             debugSessionId: session.id,
+                            diagnosticRunId: options?.diagnosticRunId,
                             signal: options?.signal,
                         }, {
                             onDelta: (text) => callbacks?.onStreamDelta?.(text),
@@ -1036,6 +1059,7 @@ export async function generateGroupChatCompletion(
                             appId: "group_chat",
                             appTags,
                             debugSessionId: session.id,
+                            diagnosticRunId: options?.diagnosticRunId,
                             signal: options?.signal,
                             // 预设开启「线上标签解析」时不透传原生思维链（改由下方标签提取）
                             onReasoning: onlineThinkingEnabled ? undefined : callbacks?.onReasoning,
@@ -1115,6 +1139,7 @@ export async function generateGroupRawCompletion(
         appId: options?.appId ?? "group_chat",
         appTags: options?.appTags ?? [],
         debugSessionId: session.id,
+        diagnosticRunId: options?.diagnosticRunId,
         signal: options?.signal,
     });
     return {

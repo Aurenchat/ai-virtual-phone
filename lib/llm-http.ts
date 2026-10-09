@@ -6,32 +6,38 @@
 
 import type { LlmRequestPayload } from "./llm-provider-adapter";
 import { protectProviderBody } from "./custom-app-protected-policy";
+import { markGenerationDiagnostic } from "./chat-generation-diagnostics";
 
 export type FetchLlmPayloadOptions = {
     signal?: AbortSignal;
+    diagnosticRunId?: string;
+    diagnosticStreaming?: boolean;
 };
 
 export async function fetchLlmPayload(
     payload: LlmRequestPayload,
     options: FetchLlmPayloadOptions = {},
 ): Promise<Response> {
+    markGenerationDiagnostic(options.diagnosticRunId, "PROVIDER_PAYLOAD_BEGIN");
     const bodyText = JSON.stringify(await protectProviderBody(payload.body, payload.providerKind));
     if (payload.serverProxy) {
-        return fetch("/api/llm-proxy", {
+        const proxyBody = JSON.stringify({ url: payload.url, headers: payload.headers, body: bodyText });
+        const pending = fetch("/api/llm-proxy", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                url: payload.url,
-                headers: payload.headers,
-                body: bodyText,
-            }),
+            body: proxyBody,
             signal: options.signal,
         });
+        markGenerationDiagnostic(options.diagnosticRunId, "PROVIDER_REQUEST_BEGIN", { streaming: options.diagnosticStreaming });
+        return pending;
     }
-    return fetch(payload.url, {
+    const pending = fetch(payload.url, {
         method: "POST",
         headers: payload.headers,
         body: bodyText,
         signal: options.signal,
     });
+    // fetch has returned its Promise: local invocation occurred, remote receipt is unknown.
+    markGenerationDiagnostic(options.diagnosticRunId, "PROVIDER_REQUEST_BEGIN", { streaming: options.diagnosticStreaming });
+    return pending;
 }

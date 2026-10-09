@@ -249,7 +249,7 @@ HTMLMediaElement.prototype.play=function(){window.__played.push(this.src);return
         await page.evaluate(() => window.hostMemoryTest.reply());
         await page.waitForFunction(() => !!window.hostMemoryTest.lock());
         await waitForRequest();
-        check(await page.evaluate(() => { const r = window.mediaSpikeTest.generation().current; return r.lastStage === 'API_BEGIN' && !r.completed && r.historyCount > 0; }), 'pending real generation records API_BEGIN without content');
+        check(await page.evaluate(() => { const r = window.mediaSpikeTest.generation().current; return r.lastStage === 'PROVIDER_REQUEST_BEGIN' && r.providerRequestStarted === true && !r.completed && r.historyCount > 0; }), 'pending real generation records actual provider request without content');
         await back(); check(await count() === 0, 'pending generation room truly unmounted');
         resolveReply('Deferred reply persisted.');
         await page.waitForFunction(() => window.hostMemoryTest.messages().some(m => m.role === 'assistant' && m.content.includes('Deferred reply persisted.')) && !window.hostMemoryTest.lock());
@@ -279,6 +279,8 @@ HTMLMediaElement.prototype.play=function(){window.__played.push(this.src);return
             const writes = window.__diagWrites.filter(w => w.record.runId === current.runId).map(w => w.record);
             return writes.some(r => r.lastStage === 'PARSE_DONE' && r.draftCount === 3 && r.publishedCount === 0)
                 && writes.some(r => r.lastStage === 'PUBLISHING' && r.publishedCount === 1 && r.draftCount === 3)
+                && writes.some(r => r.lastStage === 'PUBLISHING' && r.publishedCount === 2 && r.draftCount === 3)
+                && writes.some(r => r.lastStage === 'PUBLISHING' && r.publishedCount === 3 && r.draftCount === 3)
                 && writes.some(r => r.lastStage === 'PUBLISH_DONE' && r.publishedCount === 3 && !r.completed);
         }), 'real staged publish records parse, first publish and publish done before finally');
         check(pacing['Paced reply two'] - pacing['Paced reply one'] >= 700 && pacing['Paced reply three'] - pacing['Paced reply two'] >= 700, 'non-instant reply retains the 800ms delays between successive bubbles');

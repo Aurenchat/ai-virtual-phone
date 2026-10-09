@@ -3255,7 +3255,6 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
         markGenerationDiagnostic(generationRunId, "HISTORY_LOADED", { historyCount: history.length });
         try {
-            markGenerationDiagnostic(generationRunId, "API_BEGIN");
             if (session.isGroup) {
                 let roundReasoning: string | undefined;
                 const results = await generateGroupChatCompletion(
@@ -3296,6 +3295,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     },
                     {
                         signal: generationRun.controller.signal,
+                        diagnosticRunId: generationRunId,
                         appTags: theaterMode ? ["group_chat"] : undefined,
                     },
                 );
@@ -3309,6 +3309,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     {
                         appTags: theaterMode ? ["chat"] : ["chat", "text"],
                         signal: generationRun.controller.signal,
+                        diagnosticRunId: generationRunId,
                     },
                     {
                         onReasoning: (t) => { capturedReasoning = t; },
@@ -3584,9 +3585,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         streamAccumRef.current = "";
         setStreamPreview(null);
         try {
+            markGenerationDiagnostic(generationRunId, "HISTORY_LOAD_BEGIN");
             const latestMessages = loadChatMessages(session.id);
             markGenerationDiagnostic(generationRunId, "HISTORY_LOADED", { historyCount: latestMessages.length });
-            markGenerationDiagnostic(generationRunId, "API_BEGIN");
             if (session.isGroup) {
                 const streamedImageReplacementTasks: Promise<unknown>[] = [];
                 // 每轮 LLM 调用的思维链：中间轮挂到该轮首条气泡，最终轮传给 processGroupParts
@@ -3760,6 +3761,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     },
                 }, {
                     signal: generationRun.controller.signal,
+                    diagnosticRunId: generationRunId,
                     appTags: theaterMode ? ["group_chat"] : undefined,
                 });
                 if (!isCurrentGeneration()) return;
@@ -3776,6 +3778,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 const result = await generateChatCompletion(session, latestMessages, {
                     appTags: theaterMode ? ["chat"] : ["chat", "text"],
                     signal: generationRun.controller.signal,
+                    diagnosticRunId: generationRunId,
                 }, {
                     onReasoning: (t) => { pendingReasoning = t; },
                     onStreamDelta: (delta) => {
