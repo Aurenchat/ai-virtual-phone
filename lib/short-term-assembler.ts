@@ -163,22 +163,6 @@ function formatDiaryEntryForTimeline(entry: DiaryEntry, timeAware: boolean, time
  * @param characterId - The character to load data for
  * @param options.afterTimestamp - Only include entries after this ISO timestamp
  */
-/**
- * Keep at most `limit` newest timeline events, preserving original insertion
- * order among retained events. Ties remove the earliest inserted item, exactly
- * matching stable Array.sort(timestamp).slice(-limit) semantics.
- * For current chat activation ONLY: these events do not enter recent_chat
- * when the current conversation is already present in the prompt history.
- */
-function pushNewestActivationEvent<T extends { timestamp: string }>(tail: T[], entry: T, limit: number): void {
-    tail.push(entry);
-    if (tail.length <= limit) return;
-    let oldest = 0;
-    for (let i = 1; i < tail.length; i++) {
-        if (tail[i].timestamp.localeCompare(tail[oldest].timestamp) < 0) oldest = i;
-    }
-    tail.splice(oldest, 1);
-}
 
 export function loadNativeTimeline(
     characterId: string,
@@ -290,54 +274,48 @@ export function loadNativeTimeline(
 
     if (session) {
         const messages = loadChatMessages(session.id);
-        const activationTail: NativeTimelineEntry[] = [];
-        const activationTailOnly = options?.directChatActivationTailOnly === true;
-        const appendCurrentChatEvent = (entry: NativeTimelineEntry): void => {
-            if (activationTailOnly) pushNewestActivationEvent(activationTail, entry, 10);
-            else entries.push(entry);
-        };
-        for (const msg of messages) {
-            if (msg.isRetracted) continue;
-            if (isPromptHiddenChatMessage(msg)) continue;
-            if (options?.afterTimestamp && msg.createdAt <= options.afterTimestamp) continue;
+        // The direct-chat event formatter is shared by full timeline consumers
+        // and the read-only 10-entry worldbook activation tail.
+        // Keep all rich media/system/reading/prompt visibility semantics in one place.
+        const formatDirectChatEntry = (msg: ChatMessage): NativeTimelineEntry | null => {
+            if (msg.isRetracted) return null;
+            if (isPromptHiddenChatMessage(msg)) return null;
+            if (options?.afterTimestamp && msg.createdAt <= options.afterTimestamp) return null;
 
             const msgLabel = formatPromptEventLabel("私聊", msg.createdAt, timeAware, timestampOptions);
 
             if (msg.role === "system") {
                 // UI-only notification — skip from prompt
-                if (msg.mediaType === "music_notify") continue;
-                if (msg.mediaType === "tool_notice") continue;
-                if (msg.mediaType === "memory_write_request") continue;
+                if (msg.mediaType === "music_notify") return null;
+                if (msg.mediaType === "tool_notice") return null;
+                if (msg.mediaType === "memory_write_request") return null;
                 if (isSystemInstructionMessage(msg)) {
-                    appendCurrentChatEvent({
+                    return ({
                         id: msg.id,
                         sourceApp: "chat",
                         sourceDetail: "system",
                         timestamp: msg.createdAt,
                         content: `${msgLabel} [系统指令] ${msg.content || ""}`,
                     });
-                    continue;
                 }
                 // Music not found — reformat for prompt
                 if (msg.mediaType === "music_not_found") {
                     const mTitle = msg.mediaData?.musicTitle || "未知歌曲";
-                    appendCurrentChatEvent({
+                    return ({
                         id: msg.id,
                         sourceApp: "chat",
                         sourceDetail: "system",
                         timestamp: msg.createdAt,
                         content: `${msgLabel} ${mTitle}未被检索到，播放失败`,
                     });
-                    continue;
                 }
-                appendCurrentChatEvent({
+                return ({
                     id: msg.id,
                     sourceApp: "chat",
                     sourceDetail: "system",
                     timestamp: msg.createdAt,
                     content: `${msgLabel} ${msg.content || ""}`,
                 });
-                continue;
             }
 
             const sender = msg.role === "user" ? userName : msg.role === "tool" ? "工具" : charName;
@@ -394,17 +372,51 @@ export function loadNativeTimeline(
                 }
             }
 
-            if (!content.trim()) continue;
+            if (!content.trim()) return null;
 
-            appendCurrentChatEvent({
+            return ({
                 id: msg.id,
                 sourceApp: "chat",
                 sourceDetail: "direct",
                 timestamp: msg.createdAt,
                 content: `${msgLabel} ${sender}: ${content}`,
             });
+        };
+
+        if (options?.directChatActivationTailOnly === true) {
+            // P1 retained only the newest 10, but formatted every historical
+            // chat event first. Rank cheap message references instead and format
+            // only the newest *valid* events. The index tie-break reproduces
+            // P1's "discard oldest inserted on equal timestamp" behavior.
+            // No trimming of stored history or alteration of other consumers.
+            const candidates: number[] = [];
+            for (let index = 0; index < messages.length; index++) {
+                const msg = messages[index];
+                if (msg.isRetracted || isPromptHiddenChatMessage(msg)) continue;
+                if (options?.afterTimestamp && msg.createdAt <= options.afterTimestamp) continue;
+                candidates.push(index);
+            }
+            candidates.sort((left, right) =>
+                messages[right].createdAt.localeCompare(messages[left].createdAt) || right - left
+            );
+            const retained: { index: number; entry: NativeTimelineEntry }[] = [];
+            for (const index of candidates) {
+                const entry = formatDirectChatEntry(messages[index]);
+                if (!entry) continue;
+                retained.push({ index, entry });
+                if (retained.length === 10) break;
+            }
+            // Other timeline sources are appended after private chat. Preserve
+            // original insertion order for stable cross-source timestamp ties.
+            retained.sort((left, right) => left.index - right.index);
+            for (const { entry } of retained) entries.push(entry);
+        } else {
+            // Other apps, exports, and offline paths retain FULL timeline data.
+            for (const msg of messages) {
+                const entry = formatDirectChatEntry(msg);
+                if (entry) entries.push(entry);
+            }
         }
-        if (activationTailOnly) entries.push(...activationTail);
     }
 
     // ── Moments posts & comments (grouped by post) ──
