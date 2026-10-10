@@ -2013,6 +2013,7 @@ export function MediaImageWithPreview({
     onError,
     onRegenerate,
     regenerating,
+    loading = "eager",
 }: {
     url: string;
     title: string;
@@ -2020,6 +2021,7 @@ export function MediaImageWithPreview({
     onError?: () => void;
     onRegenerate?: () => void;
     regenerating?: boolean;
+    loading?: "eager" | "lazy";
 }) {
     const [preview, setPreview] = useState(false);
     const saveName = filename || title;
@@ -2028,7 +2030,7 @@ export function MediaImageWithPreview({
             <div className="chat-media-file-wrap">
                 <div className="chat-media-file-card chat-media-file-image" onClick={(e) => { e.stopPropagation(); setPreview(true); }}>
                     {title && <div className="chat-media-file-title">{title}</div>}
-                    <img src={url} alt={title} style={{ cursor: "pointer" }} onError={onError} />
+                    <img src={url} alt={title} loading={loading} decoding={loading === "lazy" ? "async" : undefined} style={{ cursor: "pointer" }} onError={onError} />
                 </div>
             </div>
             {preview && (

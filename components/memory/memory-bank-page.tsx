@@ -1,9 +1,10 @@
 "use client";
 
-import { Component, useState, useEffect, useCallback, type CSSProperties, type ReactNode } from "react";
+import { Component, useState, useEffect, useCallback, useRef, type CSSProperties, type ReactNode } from "react";
 import { Trash2, Zap, Clock, Users, Archive, AlertCircle, Search, Brain, FileText, MoreHorizontal, Plus, Edit3, X, Check, ChevronRight, Filter, type LucideIcon } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { MemoryTimeline } from "./memory-timeline";
+import { MemoryEntryVirtualList } from "./memory-entry-virtual-list";
 import { Toggle } from "@/components/ui/form";
 import { loadCharacters } from "@/lib/character-storage";
 import type { Character } from "@/lib/character-types";
@@ -185,6 +186,7 @@ type Props = {
 
 export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }: Props) {
     const [config, setConfig] = useState<MemoryConfig>(loadMemoryConfig);
+    const memoryScrollRef = useRef<HTMLDivElement>(null);
     const [characters, setCharacters] = useState<CharacterMemoryInfo[]>([]);
     const [activeTab, setActiveTab] = useState<MemoryTab>("short");
     const [coreEntries, setCoreEntries] = useState<MemoryEntry[]>([]);
@@ -564,6 +566,67 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
 
     const renderMemoryEntries = (type: MemoryEntry["type"], entries: MemoryEntry[], emptyText: string) => {
         const label = type === "core" ? "核心记忆" : "长期记忆";
+        // Keep the existing card JSX and its editing/deletion/expand handlers intact.
+        const renderMemoryEntryCard = (entry: MemoryEntry) => (
+            <div
+                key={entry.id}
+                className={`g-card memory-report-card${entryMenuId === entry.id ? " is-menu-open" : ""}`}
+                onClick={() => {
+                    if (entryMenuId) {
+                        setEntryMenuId(null);
+                        return;
+                    }
+                    setExpandedId(expandedId === entry.id ? null : entry.id);
+                }}
+            >
+                <div className="mem-report-head">
+                    <span className="ts-11 text-secondary" style={{ letterSpacing: "1px" }}>[ DATE: {relativeTime(entry.createdAt)} ]</span>
+                    <div className="mem-report-actions">
+                        <span className={`mem-origin-badge ${isManualMemoryEntry(entry) ? "is-manual" : ""}`}>
+                            {isManualMemoryEntry(entry) ? "MANUAL" : "AUTO"}
+                        </span>
+                        <div className="mem-entry-menu-wrap">
+                            <button
+                                className="mem-entry-menu-btn"
+                                onClick={(event) => {
+                                    event.stopPropagation();
+                                    setEntryMenuId(prev => prev === entry.id ? null : entry.id);
+                                }}
+                                title="更多"
+                            >
+                                <MoreHorizontal size={18} />
+                            </button>
+                            {entryMenuId === entry.id && (
+                                <div className="mem-entry-menu" onClick={event => event.stopPropagation()}>
+                                    <button onClick={() => openEditMemoryEditor(entry)}>
+                                        <Edit3 size={13} />
+                                        <span>编辑</span>
+                                    </button>
+                                    <button
+                                        className="is-danger"
+                                        onClick={() => {
+                                            setEntryMenuId(null);
+                                            setConfirmDeleteEntryId(entry.id);
+                                        }}
+                                    >
+                                        <Trash2 size={13} />
+                                        <span>删除</span>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                <div className="ts-12 leading-[1.7]">
+                    {expandedId === entry.id
+                        ? entry.content
+                        : entry.content.length > 100
+                            ? entry.content.slice(0, 100) + "..."
+                            : entry.content
+                    }
+                </div>
+            </div>
+        );
         return (
             <>
                 {entries.length > 0 && (
@@ -600,66 +663,14 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                         </button>
                     </div>
                 ) : (
-                    entries.map(entry => (
-                        <div
-                            key={entry.id}
-                            className={`g-card memory-report-card${entryMenuId === entry.id ? " is-menu-open" : ""}`}
-                            onClick={() => {
-                                if (entryMenuId) {
-                                    setEntryMenuId(null);
-                                    return;
-                                }
-                                setExpandedId(expandedId === entry.id ? null : entry.id);
-                            }}
-                        >
-                            <div className="mem-report-head">
-                                <span className="ts-11 text-secondary" style={{ letterSpacing: "1px" }}>[ DATE: {relativeTime(entry.createdAt)} ]</span>
-                                <div className="mem-report-actions">
-                                    <span className={`mem-origin-badge ${isManualMemoryEntry(entry) ? "is-manual" : ""}`}>
-                                        {isManualMemoryEntry(entry) ? "MANUAL" : "AUTO"}
-                                    </span>
-                                    <div className="mem-entry-menu-wrap">
-                                        <button
-                                            className="mem-entry-menu-btn"
-                                            onClick={(event) => {
-                                                event.stopPropagation();
-                                                setEntryMenuId(prev => prev === entry.id ? null : entry.id);
-                                            }}
-                                            title="更多"
-                                        >
-                                            <MoreHorizontal size={18} />
-                                        </button>
-                                        {entryMenuId === entry.id && (
-                                            <div className="mem-entry-menu" onClick={event => event.stopPropagation()}>
-                                                <button onClick={() => openEditMemoryEditor(entry)}>
-                                                    <Edit3 size={13} />
-                                                    <span>编辑</span>
-                                                </button>
-                                                <button
-                                                    className="is-danger"
-                                                    onClick={() => {
-                                                        setEntryMenuId(null);
-                                                        setConfirmDeleteEntryId(entry.id);
-                                                    }}
-                                                >
-                                                    <Trash2 size={13} />
-                                                    <span>删除</span>
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="ts-12 leading-[1.7]">
-                                {expandedId === entry.id
-                                    ? entry.content
-                                    : entry.content.length > 100
-                                        ? entry.content.slice(0, 100) + "..."
-                                        : entry.content
-                                }
-                            </div>
-                        </div>
-                    ))
+                    type === "long_term" ? (
+                        <MemoryEntryVirtualList
+                            entries={entries}
+                            scrollRootRef={memoryScrollRef}
+                            pinnedIds={[expandedId, entryMenuId]}
+                            renderEntry={renderMemoryEntryCard}
+                        />
+                    ) : entries.map(renderMemoryEntryCard)
                 )}
             </>
         );
@@ -671,7 +682,7 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
         return (
             <div className="flex flex-col absolute inset-0 overflow-hidden" style={{ padding: "0 16px" }}>
                 {/* Content */}
-                <div className="memory-detail-scroll flex-1 overflow-y-auto flex flex-col gap-2 min-h-0">
+                <div ref={memoryScrollRef} className="memory-detail-scroll flex-1 overflow-y-auto flex flex-col gap-2 min-h-0">
                     <MemoryDetailBoundary>
                     {loading ? (
                         <p className="text-center ts-14 mt-10 text-secondary">

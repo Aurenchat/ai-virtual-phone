@@ -7,6 +7,7 @@ import { resolveUserIdentity } from "@/lib/settings-storage";
 import { saveChatImageToIndexedDB, getChatImageFromIndexedDB } from "@/lib/chat-asset-storage";
 import type { MomentComment, MomentPost } from "@/lib/moments-types";
 import { MomentPostCard } from "./moment-post-card";
+import { MomentPostViewport } from "./moment-post-viewport";
 import { MomentsCompose } from "./moments-compose";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { PageShell } from "@/components/ui/page-shell";
@@ -50,6 +51,8 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
     const [coverUrl, setCoverUrl] = useState<string | null>(null);
     const coverInputRef = useRef<HTMLInputElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
+    // Per-post measured heights survive temporary offscreen unmounts.
+    const momentHeightCacheRef = useRef(new Map<string, number>());
     const userIdentity = resolveUserIdentity(undefined, "chat");
     const [signature, setSignature] = useState(() => {
         if (typeof window !== "undefined") {
@@ -154,8 +157,10 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
         }
 
         const targetTop = target.getBoundingClientRect().top;
+        // Already-loaded images don't need another observer or forced decode.
+        // Only pending images can still change the anchor's vertical position.
         const imagesAboveAnchor = Array.from(el.querySelectorAll("img"))
-            .filter(img => img.getBoundingClientRect().top < targetTop);
+            .filter(img => !img.complete && img.getBoundingClientRect().top < targetTop);
 
         if (imagesAboveAnchor.length === 0) {
             stopLoadMoreAnchorTracking();
@@ -177,7 +182,6 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
         imagesAboveAnchor.forEach(img => {
             img.addEventListener("load", restoreAfterImageResize, { once: true });
             img.addEventListener("error", restoreAfterImageResize, { once: true });
-            img.decode?.().then(restoreAfterImageResize).catch(() => {});
         });
 
         loadMoreAnchorTimerRef.current = window.setTimeout(() => {
@@ -188,6 +192,11 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
     }, [getScrollElement, restoreScrollAnchor, stopLoadMoreAnchorTracking]);
 
     const visiblePosts = posts.slice(0, visiblePostCount);
+    // Approximate height only until a post is first rendered and measured.
+    // Real heights are cached by post ID, preventing jumps when scrolling back.
+    const estimatePostHeight = (post: MomentPost) =>
+        165 + Math.min(320, Math.ceil((post.content?.length ?? 0) / 35) * 24)
+        + (post.photoUrl ? 310 : 0);
     const hasMorePosts = visiblePostCount < posts.length;
 
     const handleLoadMorePosts = useCallback(() => {
@@ -546,15 +555,23 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
                         还没有动态，发一条吧
                     </div>
                 ) : (
-                    visiblePosts.map(post => (
-                        <MomentPostCard
+                    visiblePosts.map((post, index) => (
+                        <MomentPostViewport
                             key={post.id}
-                            post={post}
-                            onUpdate={refreshPosts}
-                            onRequestDelete={setConfirmDeleteId}
-                            onOpenCommentComposer={openCommentComposer}
-                            onOpenReplyComposer={openReplyComposer}
-                        />
+                            postId={post.id}
+                            scrollContainerRef={scrollRef}
+                            heightCache={momentHeightCacheRef.current}
+                            estimatedHeight={estimatePostHeight(post)}
+                            initiallyMount={index < MOMENTS_INITIAL_POST_COUNT}
+                        >
+                            <MomentPostCard
+                                post={post}
+                                onUpdate={refreshPosts}
+                                onRequestDelete={setConfirmDeleteId}
+                                onOpenCommentComposer={openCommentComposer}
+                                onOpenReplyComposer={openReplyComposer}
+                            />
+                        </MomentPostViewport>
                     ))
                 )}
                 {hasMorePosts && (

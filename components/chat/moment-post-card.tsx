@@ -35,7 +35,7 @@ type Props = {
 const DEFAULT_MOMENT_AVATAR_SRC = "/images/default-moment-avatar.png";
 
 function MomentDefaultAvatar({ alt = "" }: { alt?: string }) {
-    return <img src={DEFAULT_MOMENT_AVATAR_SRC} alt={alt} className="feed-default-avatar w-full h-full object-cover" />;
+    return <img src={DEFAULT_MOMENT_AVATAR_SRC} alt={alt} loading="lazy" decoding="async" className="feed-default-avatar w-full h-full object-cover" />;
 }
 
 export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentComposer, onOpenReplyComposer }: Props) {
@@ -303,14 +303,14 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
     }, [characterId, onUpdate, photoPromptDraft, photoUseReferenceDraft, post]);
 
     return (
-        <div data-moment-post-id={post.id} className="feed-post relative border-b-[2.5px] border-[var(--c-card-border)] pb-5 mb-5 w-full bg-transparent px-4 pt-2">
+        <div className="feed-post relative border-b-[2.5px] border-[var(--c-card-border)] pb-5 mb-5 w-full bg-transparent px-4 pt-2">
             {/* Header row: avatar + name */}
             <div className="feed-post-header flex items-center gap-3 mb-3">
                 <div
                     className="feed-post-author-avatar w-[40px] h-[40px] rounded-full shrink-0 bg-[var(--c-input)] overflow-hidden flex items-center justify-center"
                 >
                     {authorAvatar ? (
-                        <img src={authorAvatar} alt="" className="feed-post-author-avatar-image w-full h-full object-cover" />
+                        <img src={authorAvatar} alt="" loading="lazy" decoding="async" className="feed-post-author-avatar-image w-full h-full object-cover" />
                     ) : (
                         <MomentDefaultAvatar />
                     )}
@@ -378,6 +378,7 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
             <div className="feed-post-media mb-3 w-full flex flex-col gap-2">
                 {resolvedPhotoUrl && (
                     <MediaImageWithPreview
+                        loading="lazy"
                         url={resolvedPhotoUrl}
                         title=""
                         filename={`moment-${post.id}.png`}

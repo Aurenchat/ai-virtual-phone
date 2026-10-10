@@ -35,6 +35,7 @@ import {
 } from "@/lib/character-world-storage";
 import { WorldTabStrip, WorldCaseSheet, NewWorldSheet } from "@/components/character/world-tabs";
 import { RelationLinkDialog, RelationPairSheet } from "@/components/character/relation-dialogs";
+import { CanvasRelationOverlay } from "@/components/character/canvas-relation-overlay";
 import { loadMomentsConfig, saveMomentsConfig } from "@/lib/moments-storage";
 import type { CanvasBgItem } from "@/lib/character-types";
 import { PageShell } from "@/components/ui/page-shell";
@@ -1252,6 +1253,8 @@ function CharListView({
                       alt={char.name}
                       className="char-polaroid-img"
                       draggable={false}
+                      loading="lazy"
+                      decoding="async"
                       style={{
                         objectPosition: `${100 - (char.polaroidImageX ?? 50)}% ${100 - (char.polaroidImageY ?? 50)}%`,
                         transform: `scale(${char.polaroidImageZoom ?? 1})`,
@@ -1271,57 +1274,12 @@ function CharListView({
             })}
 
             {/* 把拉线放在所有卡片的最后渲染，并设置超高 zIndex，使其盖在所有照片之上 */}
-            <svg className="absolute top-0 left-0 w-[10000px] h-[10000px] pointer-events-none overflow-visible" style={{ zIndex: 99999 }}>
-              {relationLines.map(line => {
-                const a = worldCharacters.find(c => c.id === line.aId);
-                const b = worldCharacters.find(c => c.id === line.bId);
-                if (!a || !b || a.canvasX === undefined || a.canvasY === undefined || b.canvasX === undefined || b.canvasY === undefined) return null;
-                const x1 = a.canvasX + 60, y1 = a.canvasY + 60;
-                const x2 = b.canvasX + 60, y2 = b.canvasY + 60;
-                return (
-                  <g key={line.key}>
-                    {/* 连线阴影 (更淡的阴影) */}
-                    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="rgba(0,0,0,0.04)" strokeWidth="2" transform="translate(1, 1.5)" strokeDasharray="6 3" />
-                    {/* 虚线（颜色更深） */}
-                    <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#222222" strokeWidth="1.5" opacity={0.9} strokeDasharray="6 3" />
-
-                    {/* 图钉 (Pushpins - 更深的主色，更浅的阴影) */}
-                    <g transform={`translate(${x1}, ${y1})`}>
-                      <circle cx="1.5" cy="2" r="4.5" fill="rgba(0,0,0,0.12)" />
-                      <circle cx="0" cy="0" r="4.5" fill="#111111" />
-                      <circle cx="-1.5" cy="-1.5" r="1.5" fill="#555555" opacity="0.9" />
-                    </g>
-                    <g transform={`translate(${x2}, ${y2})`}>
-                      <circle cx="1.5" cy="2" r="4.5" fill="rgba(0,0,0,0.12)" />
-                      <circle cx="0" cy="0" r="4.5" fill="#111111" />
-                      <circle cx="-1.5" cy="-1.5" r="1.5" fill="#555555" opacity="0.9" />
-                    </g>
-                    {/* 关系标签 */}
-                    <foreignObject
-                      x={(x1 + x2) / 2 - 100}
-                      y={(y1 + y2) / 2 - 15}
-                      width={200}
-                      height={30}
-                      className="overflow-visible pointer-events-none"
-                    >
-                      <div className="flex items-center justify-center w-full h-full pointer-events-none">
-                        <span
-                          className={`bg-[#111111] px-2 py-0.5 text-[11px] text-white border border-[#333333] rounded-[4px] font-bold ${isEditing ? 'cursor-pointer pointer-events-auto hover:bg-[#222222] transition-colors' : 'pointer-events-none'}`}
-                          style={{
-                            fontFamily: '"Courier New", monospace',
-                            boxShadow: '1px 2px 4px rgba(0,0,0,0.06)',
-                            transform: 'rotate(-2deg)',
-                          }}
-                          onClick={isEditing ? () => setPairSheet({ aId: line.aId, bId: line.bId }) : undefined}
-                        >
-                          {line.labels.join(" / ")}
-                        </span>
-                      </div>
-                    </foreignObject>
-                  </g>
-                );
-              })}
-            </svg>
+            <CanvasRelationOverlay
+              relations={relationLines}
+              characters={worldCharacters}
+              isEditing={isEditing}
+              onEditPair={(aId, bId) => setPairSheet({ aId, bId })}
+            />
           </div>
         )}
 
