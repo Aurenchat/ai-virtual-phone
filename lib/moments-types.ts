@@ -11,6 +11,9 @@ export type MomentPost = {
     photoUseReferenceImage?: boolean; // AI-generated photo should use character reference image
     photoGenerationStatus?: "pending" | "failed" | "generated";
     photoGenerationPrompt?: string;
+    /** Manual photos have no AI prompt. Revision guards background AI writes. */
+    photoSource?: "ai_generated" | "manual_upload";
+    photoGenerationRevision?: string;
     photoGenerationError?: string;
     photoCompressedAt?: string;
     photoCleanedAt?: string;
@@ -35,6 +38,8 @@ export type MomentComment = {
     authorName?: string;            // display name for NPC (no characterId)
     content: string;
     replyToCommentId?: string;
+    /** Prompt owner for an NPC comment; NOT the NPC's identity. */
+    generationSourceCharacterId?: string;
     replyToAuthorId?: string;       // stored for display convenience ("回复 XXX")
     replyToAuthorType?: "user" | "character" | "npc";
     replyToAuthorName?: string;     // display name of the replied-to author (for NPC)

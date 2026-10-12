@@ -46,6 +46,11 @@ export function dbPutPost(post: MomentPost): void {
     momentsDb.posts.put(post).catch(err => console.warn("[MomentsDB] put post failed:", err));
 }
 
+/** Manual replacements must report a failed durable write to their caller. */
+export async function dbPutPostConfirmed(post: MomentPost): Promise<void> {
+    await momentsDb.posts.put(post);
+}
+
 export function dbDeletePost(id: string): void {
     momentsDb.posts.delete(id).catch(err => console.warn("[MomentsDB] delete post failed:", err));
 }

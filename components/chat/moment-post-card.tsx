@@ -7,6 +7,7 @@ import { BilingualTextBlock, MediaImageWithPreview } from "@/components/chat/mes
 import { MediaPreviewOverlay } from "@/components/chat/media-preview-overlay";
 import {
     loadMomentComments,
+    loadMomentPosts,
     toggleMomentLike,
     loadMomentsConfig,
     updateMomentPost,
@@ -19,9 +20,11 @@ import { buildTwoLevelMomentThreads } from "@/lib/moments-comment-threading";
 import { getChatImageFromIndexedDB } from "@/lib/chat-asset-storage";
 import { splitBilingualText } from "@/lib/bilingual-text";
 import { retryMomentGeneratedPhoto } from "@/lib/generated-image-retry";
+import { regenerateMomentComment } from "@/lib/moments-engine";
+import { replaceMomentPhotoFromLocalFile } from "@/lib/moments-manual-photo";
 import { hasCharacterReferenceImage } from "@/lib/image-generation-service";
 import { GeneratedImageErrorDialog } from "./generated-image-error-dialog";
-import { Trash2, MoreHorizontal, MapPin, Heart, MessageCircle, Pencil } from "lucide-react";
+import { Trash2, MoreHorizontal, MapPin, Heart, MessageCircle, Pencil, RefreshCw, Upload } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui";
 
 type Props = {
@@ -61,6 +64,11 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
     const [editingComment, setEditingComment] = useState<MomentComment | null>(null);
     const [commentDraft, setCommentDraft] = useState("");
     const [deleteCommentTarget, setDeleteCommentTarget] = useState<MomentComment | null>(null);
+    const [regeneratingCommentIds, setRegeneratingCommentIds] = useState<string[]>([]);
+    const [manualActionError, setManualActionError] = useState("");
+    const [photoUploading, setPhotoUploading] = useState(false);
+    const photoUploadInFlight = useRef(false);
+    const photoFileInputRef = useRef<HTMLInputElement>(null);
 
     // Resolve asset:// photo URLs from IndexedDB
     const [resolvedPhotoUrl, setResolvedPhotoUrl] = useState<string | null>(null);
@@ -176,8 +184,10 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
         const photoDescription = postPhotoDescDraft.trim();
         updateMomentPost(post.id, {
             content,
-            photoDescription: photoDescription || undefined,
-            photoUseReferenceImage: photoDescription ? postUseReferenceDraft : false,
+            ...(loadMomentPosts().find(item => item.id === post.id)?.photoSource === "manual_upload" ? {} : {
+                photoDescription: photoDescription || undefined,
+                photoUseReferenceImage: photoDescription ? postUseReferenceDraft : false,
+            }),
             location: postLocationDraft.trim() || undefined,
         });
         setEditingPostOpen(false);
@@ -215,6 +225,42 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
             }
         }
         return Math.max(0, deleteIds.size - 1);
+    };
+
+    const handleRegenerateComment = async (comment: MomentComment) => {
+        if (comment.authorType === "user" || regeneratingCommentIds.includes(comment.id)) return;
+        setRegeneratingCommentIds(ids => [...ids, comment.id]);
+        try {
+            await regenerateMomentComment(post.id, comment.id);
+            setComments(loadMomentComments(post.id));
+            onUpdate();
+        } catch (error) {
+            setManualActionError(error instanceof Error ? error.message : String(error));
+        } finally {
+            setRegeneratingCommentIds(ids => ids.filter(id => id !== comment.id));
+        }
+    };
+
+    const handleLocalPhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.currentTarget.files?.[0];
+        event.currentTarget.value = ""; // reselecting the same image must still work
+        if (!file || photoUploadInFlight.current) return;
+        photoUploadInFlight.current = true;
+        setPhotoUploading(true);
+        setShowPostActions(false);
+        try {
+            await replaceMomentPhotoFromLocalFile(post.id, file);
+            setShowFallbackPreview(false);
+            setShowPhotoPromptEditor(false);
+            setPhotoPromptDraft("");
+            setPhotoUseReferenceDraft(false);
+            onUpdate();
+        } catch (error) {
+            setManualActionError(error instanceof Error ? error.message : String(error));
+        } finally {
+            photoUploadInFlight.current = false;
+            setPhotoUploading(false);
+        }
     };
 
     const handleConfirmCommentDelete = () => {
@@ -258,15 +304,15 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
     const canRetryPhoto = Boolean(fallbackPhotoDescription);
     const canRegeneratePhoto = Boolean(resolvedPhotoUrl)
         && Boolean(post.photoUrl)
-        && Boolean(post.photoDescription?.trim());
+        && (Boolean(post.photoDescription?.trim()) || post.photoSource === "manual_upload");
     const openPhotoPromptEditor = useCallback(() => {
         const latestHasRef = hasCharacterReferenceImage(characterId);
         setHasRef(latestHasRef);
-        setPhotoPromptDraft(post.photoDescription?.trim() || "");
+        setPhotoPromptDraft(post.photoSource === "manual_upload" ? "" : (post.photoDescription?.trim() || ""));
         setPhotoUseReferenceDraft(latestHasRef && post.photoUseReferenceImage === true);
         setPhotoRetryError("");
         setShowPhotoPromptEditor(true);
-    }, [characterId, post.photoDescription, post.photoUseReferenceImage]);
+    }, [characterId, post.photoDescription, post.photoSource, post.photoUseReferenceImage]);
     const handleRegeneratePhotoWithPrompt = useCallback(() => {
         const nextDescription = photoPromptDraft.trim();
         if (!nextDescription) {
@@ -304,6 +350,16 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
 
     return (
         <div className="feed-post relative border-b-[2.5px] border-[var(--c-card-border)] pb-5 mb-5 w-full bg-transparent px-4 pt-2">
+            {post.authorType === "character" && (
+                <input
+                    ref={photoFileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    aria-label="从相册替换图片"
+                    onChange={handleLocalPhotoChange}
+                />
+            )}
             {/* Header row: avatar + name */}
             <div className="feed-post-header flex items-center gap-3 mb-3">
                 <div
@@ -337,6 +393,19 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
                             <Pencil size={14} strokeWidth={1.75} />
                             <span>编辑动态</span>
                         </button>
+                        {post.authorType === "character" && (
+                            <button
+                                type="button"
+                                disabled={photoUploading}
+                                onClick={() => {
+                                    setShowPostActions(false);
+                                    photoFileInputRef.current?.click();
+                                }}
+                            >
+                                <Upload size={14} strokeWidth={1.75} />
+                                <span>{photoUploading ? "图片上传中…" : "从相册替换图片"}</span>
+                            </button>
+                        )}
                         {onRequestDelete && (
                             <button
                                 type="button"
@@ -468,6 +537,17 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
                     onClose={() => setPhotoFailureNotice("")}
                 />
             )}
+            {manualActionError && typeof document !== "undefined" && createPortal(
+                <div className="modal-overlay" data-ui="modal" onClick={() => setManualActionError("")}>
+                    <div className="modal-dialog" data-ui="modal-dialog" onClick={e => e.stopPropagation()}>
+                        <div className="modal-header" data-ui="modal-header"><h3 className="modal-title">操作失败</h3></div>
+                        <div className="modal-body"><p>{manualActionError}</p></div>
+                        <div className="modal-footer" data-ui="modal-footer">
+                            <button className="ui-btn ui-btn-primary" onClick={() => setManualActionError("")}>知道了</button>
+                        </div>
+                    </div>
+                </div>, document.body
+            )}
 
             {editingPostOpen && typeof document !== "undefined" && createPortal(
                 <div className="modal-overlay" data-ui="modal" onClick={() => setEditingPostOpen(false)}>
@@ -485,6 +565,7 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
                                     placeholder="输入动态正文"
                                 />
                             </label>
+                            {post.photoSource !== "manual_upload" && <>
                             <label className="feed-post-edit-field">
                                 <span>图片描述</span>
                                 <textarea
@@ -503,6 +584,7 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
                                 />
                                 <span>图片使用角色参考图</span>
                             </label>
+                            </>}
                             <label className="feed-post-edit-field">
                                 <span>地点</span>
                                 <input
@@ -671,6 +753,14 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
                                                         回复
                                                     </button>
                                                     <div className="ml-auto flex items-center gap-1 -mr-[6px]">
+                                                        {root.authorType !== "user" && (
+                                                            <button type="button" title="重新生成评论" aria-label="重新生成评论"
+                                                                disabled={regeneratingCommentIds.includes(root.id)}
+                                                                className="feed-comment-icon-button"
+                                                                onClick={e => { e.stopPropagation(); void handleRegenerateComment(root); }}>
+                                                                <RefreshCw size={13} strokeWidth={1.75} className={regeneratingCommentIds.includes(root.id) ? "animate-spin" : ""} />
+                                                            </button>
+                                                        )}
                                                         <button
                                                             type="button"
                                                             title="编辑"
@@ -756,6 +846,14 @@ export function MomentPostCard({ post, onUpdate, onRequestDelete, onOpenCommentC
                                                                         回复
                                                                     </button>
                                                                     <div className="ml-auto flex items-center gap-1 -mr-[6px]">
+                                                                        {reply.authorType !== "user" && (
+                                                                            <button type="button" title="重新生成评论" aria-label="重新生成评论"
+                                                                                disabled={regeneratingCommentIds.includes(reply.id)}
+                                                                                className="feed-comment-icon-button"
+                                                                                onClick={e => { e.stopPropagation(); void handleRegenerateComment(reply); }}>
+                                                                                <RefreshCw size={13} strokeWidth={1.75} className={regeneratingCommentIds.includes(reply.id) ? "animate-spin" : ""} />
+                                                                            </button>
+                                                                        )}
                                                                         <button
                                                                             type="button"
                                                                             title="编辑"

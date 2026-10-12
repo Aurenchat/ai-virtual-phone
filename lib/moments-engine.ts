@@ -10,6 +10,7 @@ import type { Character } from "./character-types";
 import {
     addMomentPost,
     addMomentComment,
+    updateMomentComment,
     findRecentDuplicateMomentPost,
     toggleMomentLike,
     loadMomentPosts,
@@ -55,7 +56,9 @@ import { DEFAULT_MOMENTS_BILINGUAL_PROMPT, resolveBilingualPrompt } from "./bili
 import { generateImageFromConfiguredApi } from "./image-generation-service";
 import { isAbortError, throwIfAborted } from "./abort-utils";
 import { getChatImageFromIndexedDB, saveChatImageToIndexedDB } from "./chat-asset-storage";
+import { isCurrentMomentPhotoRevision, newMomentPhotoRevision } from "./moments-manual-photo";
 import {
+    canCharacterSeeMomentPost,
     getVisibleMomentCommentsForCharacter,
     getVisibleMomentLikesForCharacter,
     isMomentCommentVisibleToCharacter,
@@ -180,7 +183,8 @@ function buildMomentsBilingualInstruction(enabled: boolean, customPrompt?: strin
  */
 async function resolveAssemblerInput(
     characterId: string,
-    task: "post" | "comment" | "npc" | "npc_reply" | "reply"
+    task: "post" | "comment" | "npc" | "npc_reply" | "reply",
+    options?: { omitPrivateContext?: boolean },
 ): Promise<AssemblerResult | null> {
     const chars = loadCharacters();
     const character = chars.find(c => c.id === characterId);
@@ -221,7 +225,7 @@ async function resolveAssemblerInput(
     let coreMemories = "";
     let longTermMemories = "";
     const memConfig = loadMemoryConfig();
-    if (task !== "npc") {
+    if (task !== "npc" && !options?.omitPrivateContext) {
         try {
             const coreResultsPromise = retrieveCoreMemoriesForPrompt(characterId, memConfig);
             // Use native timeline as retrieval context (same cross-app data as short-term memory)
@@ -256,7 +260,9 @@ async function resolveAssemblerInput(
 
     // 9. Build AssemblerInput — unified short-term context
     const isNPC = task === "npc" || task === "npc_reply";
-    const { recentBlocks, wbActivationContext, unifiedRecentItems } = prepareShortTermContext(characterId, "moments");
+    const { recentBlocks, wbActivationContext, unifiedRecentItems } = options?.omitPrivateContext
+        ? { recentBlocks: [], wbActivationContext: "", unifiedRecentItems: [] }
+        : prepareShortTermContext(characterId, "moments");
 
     // Calendar schedule (NPC doesn't get character's schedule)
     const scheduleSummary = isNPC ? undefined : buildCalendarScheduleMarker("character", characterId, getWeekStartIso(new Date()));
@@ -635,6 +641,7 @@ async function generateNPCReactionsViaLLM(
                     ...actor,
                     content,
                     createdAt: nextNpcCommentCreatedAt(),
+                    generationSourceCharacterId: character.id,
                     ...replyTarget,
                 });
                 npcCommentsCreated.push(newComment);
@@ -680,6 +687,7 @@ async function generateNPCReactionsViaLLM(
                 ...actor,
                 content,
                 createdAt: nextNpcCommentCreatedAt(),
+                generationSourceCharacterId: character.id,
                 ...replyFields,
             } as Parameters<typeof addMomentComment>[0]);
             npcCommentsCreated.push(newComment);
@@ -899,6 +907,7 @@ async function generateTargetedNPCReply(
         authorType: "npc",
         authorId: `npc_reply_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
         authorName: targetNpcName,
+        generationSourceCharacterId: character.id,
         content: cleaned,
         replyToCommentId: triggeringComment.id,
         replyToAuthorId: "user",
@@ -1143,6 +1152,157 @@ export function onUserComment(postId: string): void {
     triggerCharacterReplyIfNeeded(post, [latestComment]);
 }
 
+// ── On-demand per-comment regeneration (never creates social events) ──
+
+const regeneratingMomentComments = new Set<string>();
+
+/** Legacy user posts cannot identify an NPC's world from an arbitrary viewer. */
+function resolveCommentRegenerationSource(post: MomentPost, target: MomentComment): string {
+    const characters = loadCharacters();
+    let sourceId: string | undefined;
+    if (target.authorType === "character") {
+        sourceId = target.authorId;
+    } else if (target.generationSourceCharacterId) {
+        // A missing/deleted explicit owner must never fall back to a different one.
+        sourceId = target.generationSourceCharacterId;
+    } else if (post.authorType === "character") {
+        sourceId = post.authorId;
+    } else if (post.visibility.length === 1) {
+        sourceId = post.visibility[0];
+    }
+    if (!sourceId || !characters.some(character => character.id === sourceId)) {
+        throw new Error("无法安全确定这条评论的原生成上下文，未重新生成");
+    }
+    if (!canCharacterSeeMomentPost(post, sourceId)
+        || !isMomentCommentVisibleToCharacter(post, target, sourceId)
+        || (target.replyToAuthorType === "character" && target.replyToAuthorId
+            && !isMomentRealCharacterAllowedForViewer(sourceId, target.replyToAuthorId))) {
+        throw new Error("评论的生成上下文已不可见，未重新生成");
+    }
+    // Check the actual reply ancestor as well as denormalized reply fields.
+    const comments = loadMomentComments(post.id);
+    const visited = new Set<string>([target.id]);
+    let parentId = target.replyToCommentId;
+    while (parentId) {
+        const parent = comments.find(comment => comment.id === parentId);
+        if (!parent || visited.has(parentId)
+            || !isMomentCommentVisibleToCharacter(post, parent, sourceId)
+            || (parent.authorType === "character"
+                && !isMomentRealCharacterAllowedForViewer(sourceId, parent.authorId))
+            || (parent.authorType === "npc" && parent.generationSourceCharacterId
+                && !isMomentRealCharacterAllowedForViewer(sourceId, parent.generationSourceCharacterId))
+            || (parent.authorType === "npc" && !parent.generationSourceCharacterId
+                && post.authorType === "user" && post.visibility.length !== 1)) {
+            throw new Error("回复关系的上下文已不可见，未重新生成");
+        }
+        visited.add(parentId);
+        parentId = parent.replyToCommentId;
+    }
+    return sourceId;
+}
+
+/** Rewrite just one non-user comment, keeping its exact identity and reply links. */
+export async function regenerateMomentComment(postId: string, commentId: string): Promise<MomentComment> {
+    if (regeneratingMomentComments.has(commentId)) {
+        throw new Error("这条评论正在重新生成中");
+    }
+    const post = loadMomentPosts().find(p => p.id === postId);
+    const target = loadMomentComments(postId).find(c => c.id === commentId);
+    if (!post || !target || target.authorType === "user") {
+        throw new Error("仅能重新生成当前存在的非用户评论");
+    }
+    const characters = loadCharacters();
+    const sourceCharacterId = resolveCommentRegenerationSource(post, target);
+    const isNPC = target.authorType === "npc";
+    if (isNPC && !target.authorName?.trim()) {
+        throw new Error("这条 NPC 评论缺少作者名称，未重新生成");
+    }
+    // The NPC reply preset produces one author's text, unlike the batch NPC preset.
+    const task = isNPC ? "npc_reply" : (target.replyToCommentId || target.replyToAuthorId ? "reply" : "comment");
+    const sourceName = target.authorType === "npc"
+        ? (target.authorName || "NPC")
+        : (characters.find(c => c.id === target.authorId)?.name || "角色");
+    const replyTarget = target.replyToAuthorName
+        || (target.replyToAuthorType === "user" ? getUserName(sourceCharacterId)
+            : target.replyToAuthorType === "character"
+                ? (characters.find(c => c.id === target.replyToAuthorId)?.name || "角色")
+                : target.replyToAuthorId || "");
+
+    regeneratingMomentComments.add(commentId);
+    try {
+        const resolved = await resolveAssemblerInput(sourceCharacterId, task, { omitPrivateContext: isNPC });
+        if (!resolved?.apiConfig) throw new Error("无法获取角色的朋友圈 API 配置");
+        const { input, apiConfig, preset } = resolved;
+        const snapshot = buildMomentUiSnapshot(post, sourceCharacterId, {
+            redactCommentId: commentId,
+            regenerationContext: true,
+        });
+        // Current Moments data comes exclusively from the filtered/redacted snapshot.
+        // NPCs do not inherit the context owner's private chat or memories.
+        const llmMessages = assemblePromptPayload({
+            ...input,
+            recentBlocks: isNPC ? [] : input.recentBlocks?.filter(block => block.tag !== "recent_moments"),
+            unifiedRecentItems: isNPC ? [] : input.unifiedRecentItems?.filter(item => item.kind !== "event" || item.sourceApp !== "moments"),
+            ...(isNPC ? {
+                coreMemories: "", longTermMemories: "", scheduleSummary: undefined,
+                worldBookActivationContext: snapshot,
+            } : {}),
+        });
+        const instructions = [
+            "【朋友圈单条评论重写】",
+            `必须扮演的评论作者：${sourceName}（${target.authorType === "npc" ? "独立NPC，不是提示词上下文角色" : "角色本人"}）`,
+            replyTarget ? `这条评论原本回复：${replyTarget}。必须保留回复对象。` : "这是一条独立评论，不要变成回复。",
+            "只输出一条全新的评论正文。不要输出评论者昵称、回复标签、JSON、系统说明或动作标签。",
+            "结合帖子和其他可见评论自然表达，注意下面可能已有的回复，保持语义兼容。",
+            "旧评论正文已从界面快照遮蔽，不应复述旧内容。",
+            "这次仅替换显示文本，不发布新评论或执行任何其他动作。",
+        ];
+        llmMessages.push(await buildMomentSnapshotMessage(post, sourceCharacterId, apiConfig,
+            "moments_comment_regeneration", {
+                redactCommentId: commentId,
+                regenerationContext: true,
+                prefixLines: instructions,
+            }));
+        const response = await callLLM(apiConfig, preset, llmMessages,
+            sourceName, input.regexes, input.appTags, input.userIdentity?.name);
+        if (!response) throw new Error("模型未返回有效评论，请重试");
+        // No dispatchActions(), incrementEventCounter(), summarization, or reply trigger.
+        const { cleanText } = parseActionTags(response);
+        const content = cleanText
+            .replace(/^\s*\[评论\]\s*/i, "")
+            .replace(/\[\/评论\]\s*$/i, "")
+            .replace(/^\s*\[回复[^\]]*\]\s*/i, "")
+            .replace(/\[\/回复[^\]]*\]\s*$/i, "")
+            .trim();
+        if (!content || content.includes("[不回复]")) {
+            throw new Error("模型没有生成可用的评论正文");
+        }
+        const currentPost = loadMomentPosts().find(p => p.id === postId);
+        const current = loadMomentComments(postId).find(c => c.id === commentId);
+        // Reject stale responses: delete/edit in another component must win.
+        if (!currentPost || !current || currentPost.content !== post.content
+            || currentPost.photoUrl !== post.photoUrl
+            || currentPost.photoGenerationRevision !== post.photoGenerationRevision
+            || current.authorType !== target.authorType
+            || current.authorId !== target.authorId || current.content !== target.content
+            || current.authorName !== target.authorName || current.createdAt !== target.createdAt
+            || current.generationSourceCharacterId !== target.generationSourceCharacterId
+            || current.replyToCommentId !== target.replyToCommentId
+            || current.replyToAuthorId !== target.replyToAuthorId
+            || current.replyToAuthorType !== target.replyToAuthorType
+            || current.replyToAuthorName !== target.replyToAuthorName
+            || resolveCommentRegenerationSource(currentPost, current) !== sourceCharacterId) {
+            throw new Error("评论在生成期间发生了变化，未覆盖现有内容");
+        }
+        const updated = updateMomentComment(commentId, { content });
+        if (!updated) throw new Error("评论已删除，未写入生成结果");
+        dispatchMomentsUpdated();
+        return updated;
+    } finally {
+        regeneratingMomentComments.delete(commentId);
+    }
+}
+
 // ── Response Parser ──
 
 export function parseMomentPostResponse(rawText: string): {
@@ -1188,6 +1348,11 @@ export function attachMomentPhotoInBackground(
     useReferenceImage: boolean,
     signal?: AbortSignal,
 ): void {
+    const revision = newMomentPhotoRevision();
+    if (!updateMomentPost(postId, {
+        photoSource: "ai_generated",
+        photoGenerationRevision: revision,
+    })) return;
     void (async () => {
         let photoUrl: string | undefined;
         let errorMessage: string | undefined;
@@ -1198,6 +1363,9 @@ export function attachMomentPhotoInBackground(
             aborted = isAbortError(error);
             errorMessage = error instanceof Error ? error.message : String(error);
         }
+        // In particular, do not overwrite an image manually uploaded during
+        // the slow network request (or a newer retry/re-generation result).
+        if (!isCurrentMomentPhotoRevision(postId, revision)) return;
         const reason = errorMessage || "生图配置未启用或生成失败";
         updateMomentPost(postId, photoUrl
             ? { photoUrl, photoGenerationStatus: "generated", photoGenerationError: undefined }
@@ -1296,6 +1464,9 @@ function buildMomentUiSnapshot(
     options?: {
         triggeringCommentIds?: string[];
         snapshotTitle?: string;
+        redactCommentId?: string;
+        hasAttachedImage?: boolean;
+        regenerationContext?: boolean;
     },
 ): string {
     const userName = getUserName(characterId);
@@ -1303,10 +1474,40 @@ function buildMomentUiSnapshot(
     const authorName = post.authorType === "user"
         ? userName
         : (chars.find(c => c.id === post.authorId)?.name ?? "某人");
-    const allComments = loadMomentComments(post.id);
-    const comments = characterId
+    const allComments = loadMomentComments(post.id).filter(comment => {
+        if (!options?.regenerationContext || !characterId) return true;
+        if (comment.authorType === "character"
+            && !isMomentRealCharacterAllowedForViewer(characterId, comment.authorId)) return false;
+        if (comment.authorType === "npc") {
+            const owner = comment.generationSourceCharacterId
+                || (post.authorType === "character" ? post.authorId
+                    : post.visibility.length === 1 ? post.visibility[0] : undefined);
+            if (!owner || !isMomentRealCharacterAllowedForViewer(characterId, owner)) return false;
+        }
+        return true;
+    }).map(comment =>
+        comment.id === options?.redactCommentId
+            ? { ...comment, content: "（这条评论的旧正文已隐藏，等待重新生成）" }
+            : comment
+    );
+    const visibleComments = characterId
         ? getVisibleMomentCommentsForCharacter(post, characterId, allComments)
         : allComments;
+    const visibleCommentMap = new Map(visibleComments.map(comment => [comment.id, comment]));
+    const comments = options?.regenerationContext
+        ? visibleComments.filter(comment => {
+            const seen = new Set<string>([comment.id]);
+            let parentId = comment.replyToCommentId;
+            while (parentId) {
+                const parent = visibleCommentMap.get(parentId);
+                // A reply to a hidden NPC must not disclose their name or context.
+                if (!parent || seen.has(parentId)) return false;
+                seen.add(parentId);
+                parentId = parent.replyToCommentId;
+            }
+            return true;
+        })
+        : visibleComments;
     const commentThreads = buildTwoLevelMomentThreads(comments);
     const commentIndexMap = new Map<string, string>();
     comments
@@ -1321,11 +1522,19 @@ function buildMomentUiSnapshot(
     parts.push(`发帖人：${authorName}`);
     parts.push(`正文：${post.content}`);
     if (post.location) parts.push(`地点：${post.location}`);
-    if (post.photoUrl) parts.push("配图：见附图");
-    else if (post.photoDescription) parts.push(`配图：${post.photoDescription}`);
-    const likes = characterId
+    if (post.photoUrl) {
+        if (post.photoSource === "manual_upload" && !options?.hasAttachedImage) {
+            parts.push("配图：有本地上传的图片，但本次未提供可识别的图像内容；禁止推测图片内容");
+        } else {
+            parts.push("配图：见附图");
+        }
+    } else if (post.photoSource !== "manual_upload" && post.photoDescription) parts.push(`配图：${post.photoDescription}`);
+    const visibleLikes = characterId
         ? getVisibleMomentLikesForCharacter(post, characterId, post.likes)
         : post.likes;
+    const likes = options?.regenerationContext && post.authorType === "user" && post.visibility.length !== 1
+        ? visibleLikes.filter(like => like.authorType !== "npc") // Legacy likes have no NPC provenance.
+        : visibleLikes;
     if (likes.length > 0) {
         const likeNames = likes.map((like) =>
             resolveMomentAuthorName(like.authorType, like.authorId, userName, chars, like.authorName)
@@ -1386,15 +1595,20 @@ async function buildMomentSnapshotMessage(
         triggeringCommentIds?: string[];
         snapshotTitle?: string;
         prefixLines?: string[];
+        redactCommentId?: string;
+        regenerationContext?: boolean;
     },
 ): Promise<LLMMessage> {
-    const snapshot = buildMomentUiSnapshot(post, characterId, options);
-    const text = options?.prefixLines?.length
-        ? [...options.prefixLines, snapshot].join("\n")
-        : snapshot;
     const imageUrl = apiConfig?.enableImageRecognition
         ? await resolveMomentPhotoForVision(post)
         : null;
+    const snapshot = buildMomentUiSnapshot(post, characterId, {
+        ...options,
+        hasAttachedImage: Boolean(imageUrl),
+    });
+    const text = options?.prefixLines?.length
+        ? [...options.prefixLines, snapshot].join("\n")
+        : snapshot;
 
     if (!imageUrl) {
         return {

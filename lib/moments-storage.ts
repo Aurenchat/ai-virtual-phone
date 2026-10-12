@@ -9,6 +9,7 @@ import { canCharacterSeeMomentPost, getVisibleMomentCommentsForCharacter } from 
 import {
     initMomentsDb,
     dbPutPost,
+    dbPutPostConfirmed,
     dbDeletePost,
     dbReplacePosts,
     dbPutComment,
@@ -126,6 +127,24 @@ export function updateMomentPost(postId: string, patch: Partial<MomentPost>): Mo
     _postsCache[idx] = updated;
     dbPutPost(updated);
     return updated;
+}
+
+/** Reserve the new revision immediately, then confirm the durable post write.
+ * On failure, roll back only our own cache row; concurrent edits/deletion win.
+ */
+export async function updateMomentPostPersisted(postId: string, patch: Partial<MomentPost>): Promise<MomentPost | null> {
+    const posts = loadMomentPosts();
+    const original = posts.find(post => post.id === postId);
+    if (!original) return null;
+    const updated: MomentPost = { ...original, ...patch, id: original.id };
+    _postsCache = posts.map(post => post === original ? updated : post);
+    try {
+        await dbPutPostConfirmed(updated);
+    } catch (error) {
+        _postsCache = loadMomentPosts().map(post => post === updated ? original : post);
+        throw error;
+    }
+    return loadMomentPosts().find(post => post.id === postId) ?? null;
 }
 
 export function deleteMomentPost(postId: string): void {

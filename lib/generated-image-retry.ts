@@ -3,6 +3,8 @@ import { syncChatGeneratedImagePromptText, updateChatMessage, type ChatMessage }
 import { generatedImageFilename, generateImageFromConfiguredApi } from "./image-generation-service";
 import { updateMomentPost } from "./moments-storage";
 import type { MomentPost } from "./moments-types";
+import { loadMomentPosts } from "./moments-storage";
+import { isCurrentMomentPhotoRevision, newMomentPhotoRevision } from "./moments-manual-photo";
 
 function errorToMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
@@ -136,20 +138,28 @@ export async function retryMomentGeneratedPhoto(
     nextDescription?: string,
     useReferenceImage?: boolean,
 ): Promise<MomentPost> {
-    const description = (nextDescription ?? post.photoDescription)?.trim();
+    const current = loadMomentPosts().find(item => item.id === post.id);
+    if (!current) throw new Error("原朋友圈不存在，无法生成图片");
+    const description = (nextDescription ?? (current.photoSource === "manual_upload" ? undefined : current.photoDescription))?.trim();
     if (!description) throw new Error("缺少图片描述，无法重新生成");
 
     const effectiveUseReference = useReferenceImage !== undefined
         ? useReferenceImage
-        : (post.photoUseReferenceImage === true);
+        : (current.photoUseReferenceImage === true);
 
-    // 同聊天：重试先置 pending 并广播，卡片立刻显示"图片生成中…"；成功/失败都会再写状态。
-    updateMomentPost(post.id, {
+    // Claim a unique image revision. An older generation or a manual upload
+    // invalidates this claim, so its late completion cannot overwrite the post.
+    const revision = newMomentPhotoRevision();
+    const pending = updateMomentPost(post.id, {
         photoDescription: description,
+        photoGenerationPrompt: undefined,
         photoUseReferenceImage: effectiveUseReference,
+        photoSource: "ai_generated",
+        photoGenerationRevision: revision,
         photoGenerationStatus: "pending",
         photoGenerationError: undefined,
     });
+    if (!pending) throw new Error("原朋友圈不存在，无法生成图片");
     dispatchMomentsUpdated();
 
     try {
@@ -161,6 +171,12 @@ export async function retryMomentGeneratedPhoto(
         if (!generated) throw new Error("生图配置未启用或不完整");
 
         const assetId = await saveChatImageToIndexedDB(generated.blob);
+        if (!assetId) throw new Error("图片存储失败");
+        if (!isCurrentMomentPhotoRevision(post.id, revision)) {
+            const latest = loadMomentPosts().find(item => item.id === post.id);
+            if (latest) return latest;
+            throw new Error("原朋友圈已删除");
+        }
         const updated = updateMomentPost(post.id, {
             photoUrl: `asset://${assetId}`,
             photoDescription: description,
@@ -173,6 +189,11 @@ export async function retryMomentGeneratedPhoto(
         dispatchMomentsUpdated();
         return updated;
     } catch (error) {
+        if (!isCurrentMomentPhotoRevision(post.id, revision)) {
+            const latest = loadMomentPosts().find(item => item.id === post.id);
+            if (latest) return latest; // A manual replacement or newer request won.
+            throw error;
+        }
         updateMomentPost(post.id, {
             photoDescription: description,
             photoUseReferenceImage: effectiveUseReference,
