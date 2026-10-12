@@ -153,7 +153,7 @@ async function testNativeRoutes(engineSource) {
   };
   const engine = loadTs('./xiaohongshu-engine', {
     './xiaohongshu-vision': moduleExports,
-    './chat-asset-storage': { getChatImageFromIndexedDB: async id => { reads.push(id); return loader(id); } },
+    './xiaohongshu-image-assets': { getXiaohongshuVisionDataUrl: async id => { reads.push(id); return loader(id); } },
     './chat-engine': { ChatEngineError: Error, previewMessagesForApi: previewMessages,
       sendLLMRequest: async (config, preset, messages) => {
         sends.push({ messages: plain(messages), body: plain(provider.buildProviderRequest(

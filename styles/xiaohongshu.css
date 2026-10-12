@@ -2903,3 +2903,19 @@ textarea.xhs-profile-edit-pill.xhs-profile-edit-bio {
   font-size: calc(12.5px*var(--app-text-scale,1));
   animation: xhsFadeIn 0.18s ease-out;
 }
+
+/* Native Xiaohongshu full-original viewer. Portal escapes scroll/transform clipping. */
+.xhs-full-image-viewer { position: fixed; inset: 0; z-index: 2147483000; background: rgba(0,0,0,.96); color: white; display: flex; flex-direction: column; }
+.xhs-full-image-toolbar { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; justify-content: space-between; align-items: center; padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 10px; font-size: 13px; background: linear-gradient(to bottom, rgba(0,0,0,.5), transparent); }
+.xhs-full-image-toolbar > div { display: flex; gap: 8px; }
+.xhs-full-image-toolbar button, .xhs-full-image-nav { display: grid; place-items: center; border: 0; border-radius: 100px; min-width: 40px; min-height: 40px; background: rgba(255,255,255,.14); color: white; }
+.xhs-full-image-stage { flex: 1; min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.xhs-full-image-stage img { display: block; width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; will-change: transform; pointer-events: none; }
+.xhs-full-image-stage span { color: #ddd; font-size: 13px; }
+.xhs-full-image-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; }
+.xhs-full-image-nav--left { left: 8px; }
+.xhs-full-image-nav--right { right: 8px; }
+.xhs-full-image-nav:disabled { opacity: .25; }
+.xhs-note-detail-media .xhs-note-real-image-frame[role="button"], .xhs-note-detail-media .xhs-note-slider-item[role="button"] { cursor: zoom-in; }
+.xhs-full-image-stage { position: absolute; inset: calc(env(safe-area-inset-top, 0px) + 58px) env(safe-area-inset-right, 0px) calc(env(safe-area-inset-bottom, 0px) + 12px) env(safe-area-inset-left, 0px); }
+.xhs-full-image-notice { position: absolute; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); left: 12px; right: 12px; text-align: center; font-size: 12px; }

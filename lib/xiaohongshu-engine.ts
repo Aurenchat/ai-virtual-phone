@@ -1,4 +1,4 @@
-import { getChatImageFromIndexedDB } from "./chat-asset-storage";
+import { getXiaohongshuVisionDataUrl } from "./xiaohongshu-image-assets";
 import {
   getXiaohongshuNoteImageIds,
   makeXiaohongshuVisionMessage as makeVisionMessage,
@@ -924,7 +924,7 @@ async function sendWithOptionalVisionFallback(
 }
 
 async function resolveNoteImageBatch(note: XiaohongshuNote): Promise<XiaohongshuVisionBatch> {
-  return resolveXiaohongshuVisionImages(note, getChatImageFromIndexedDB);
+  return resolveXiaohongshuVisionImages(note, getXiaohongshuVisionDataUrl);
 }
 
 export function formatXiaohongshuFeedContext(notes: XiaohongshuNote[]): string {

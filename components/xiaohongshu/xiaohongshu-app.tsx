@@ -26,6 +26,11 @@ import {
 } from "lucide-react";
 
 import { getChatImageFromIndexedDB, saveChatImageToIndexedDB } from "@/lib/chat-asset-storage";
+import { deleteThemeAsset } from "@/lib/theme-storage";
+import { makeXiaohongshuThumbnail, saveXiaohongshuImagePair, xhsOriginalFileError } from "@/lib/xiaohongshu-image-assets";
+import { getXiaohongshuNoteImageIds } from "@/lib/xiaohongshu-vision";
+import { XhsLazyImage } from "@/components/xiaohongshu/xhs-lazy-image";
+import { XiaohongshuImageViewer } from "@/components/xiaohongshu/xhs-image-viewer";
 import { loadCharacters } from "@/lib/character-storage";
 import type { Character } from "@/lib/character-types";
 import { incrementEventCounter } from "@/lib/memory-storage";
@@ -409,29 +414,40 @@ function NoteDetailSlider({
   note,
   imageIds,
   imageMap,
+  onOpenImage,
 }: {
   note: XiaohongshuNote;
   imageIds: string[];
   imageMap: Record<string, string>;
+  onOpenImage?: (index: number) => void;
 }) {
   const [activeSlide, setActiveSlide] = useState(0);
+  const lastScrollAt = useRef(0);
+  const pressStart = useRef<{ x: number; y: number } | null>(null);
+  const dragged = useRef(false);
   return (
     <div className="xhs-note-slider-container" style={getImageFrameStyle(note.imageWidth, note.imageHeight)}>
       <div
         className="xhs-note-slider-track"
         onScroll={(e) => {
           const el = e.currentTarget;
+          lastScrollAt.current = Date.now();
           const index = Math.round(el.scrollLeft / (el.clientWidth || 1));
           setActiveSlide(index);
         }}
       >
         {imageIds.map((id, idx) => (
-          <div key={id || idx} className="xhs-note-slider-item">
-            {imageMap[id] ? (
-              <img src={imageMap[id]} alt={`Slide ${idx + 1}`} className="xhs-note-real-image" />
-            ) : (
-              <div className="cp-xhs-cover cp-xhs-cover--ivory" style={{ width: "100%", height: "100%" }} />
-            )}
+          <div key={id || idx} className="xhs-note-slider-item" role={onOpenImage ? "button" : undefined}
+            tabIndex={onOpenImage ? 0 : undefined}
+            onPointerDown={event => { pressStart.current = { x: event.clientX, y: event.clientY }; dragged.current = false; }}
+            onPointerMove={event => {
+              const start = pressStart.current;
+              if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > 10) dragged.current = true;
+            }}
+            onPointerCancel={() => { dragged.current = true; pressStart.current = null; }}
+            onClick={() => { if (!dragged.current && Date.now() - lastScrollAt.current > 220) onOpenImage?.(idx); }}
+            onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpenImage?.(idx); } }}>
+            <XhsLazyImage assetId={id} fallbackSrc={imageMap[id]} alt={`Slide ${idx + 1}`} className="xhs-note-real-image" />
           </div>
         ))}
       </div>
@@ -453,12 +469,14 @@ function NoteImage({
   hideTextImageDescription = false,
   collapseBilingualTranslation,
   isDetail,
+  onOpenImage,
 }: {
   note: XiaohongshuNote;
   imageMap: Record<string, string>;
   hideTextImageDescription?: boolean;
   collapseBilingualTranslation: boolean;
   isDetail?: boolean;
+  onOpenImage?: (index: number) => void;
 }) {
   const imageIds = (note.imageAssetIds && note.imageAssetIds.length > 0)
     ? note.imageAssetIds
@@ -466,8 +484,8 @@ function NoteImage({
   if (note.type === "video") {
     return (
       <div className={`cp-xhs-cover cp-xhs-cover--video cp-xhs-cover--${note.tone}`} style={VIDEO_XHS_IMAGE_FRAME_STYLE}>
-        {note.imageAssetId && imageMap[note.imageAssetId] ? (
-          <img src={imageMap[note.imageAssetId]} alt="" className="xhs-video-real-image" />
+        {note.imageAssetId ? (
+          <XhsLazyImage assetId={note.imageAssetId} fallbackSrc={imageMap[note.imageAssetId]} alt="" className="xhs-video-real-image" />
         ) : (
           <span>
             {note.videoDescription || note.imageDescription ? (
@@ -482,14 +500,17 @@ function NoteImage({
       </div>
     );
   }
-  if (imageIds.length > 0 && imageIds.some(id => Boolean(imageMap[id]))) {
+  if (imageIds.length > 0) {
     if (isDetail && imageIds.length > 1) {
-      return <NoteDetailSlider note={note} imageIds={imageIds} imageMap={imageMap} />;
+      return <NoteDetailSlider note={note} imageIds={imageIds} imageMap={imageMap} onOpenImage={onOpenImage} />;
     }
-    const firstImgId = imageIds.find(id => Boolean(imageMap[id])) || imageIds[0];
+    const firstImgId = imageIds[0];
     return (
-      <div className="xhs-note-real-image-frame" style={getImageFrameStyle(note.imageWidth, note.imageHeight)}>
-        <img src={imageMap[firstImgId]} alt="" className="xhs-note-real-image" />
+      <div className="xhs-note-real-image-frame" style={getImageFrameStyle(note.imageWidth, note.imageHeight)}
+        role={isDetail ? "button" : undefined} tabIndex={isDetail ? 0 : undefined}
+        onClick={isDetail ? () => onOpenImage?.(0) : undefined}
+        onKeyDown={isDetail ? event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpenImage?.(0); } } : undefined}>
+        <XhsLazyImage assetId={firstImgId} fallbackSrc={imageMap[firstImgId]} alt="" className="xhs-note-real-image" />
         {!isDetail && imageIds.length > 1 ? (
           <div className="xhs-waterfall-multi-badge">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -736,6 +757,12 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
   const [profileOpen, setProfileOpen] = useState(false);
   const [composeOpen, setComposeOpen] = useState(false);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const stagedXhsImages = useRef(new Set<string>());
+  const imageUploadInProgress = useRef(false);
+  const imageUploadEpoch = useRef(0);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [fullscreenImage, setFullscreenImage] = useState<{ noteId: string; index: number } | null>(null);
+  useEffect(() => { if (!visible) setFullscreenImage(null); }, [visible]);
   const [busy, setBusy] = useState<BusyState>("idle");
   const [error, setError] = useState("");
   const [debugErrorTitle, setDebugErrorTitle] = useState("暂时无法完成小红书操作。");
@@ -982,8 +1009,8 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
 
   function renderNotificationThumbnail(notice: XiaohongshuNotification) {
     const note = getNotificationNote(notice);
-    if (note?.imageAssetId && imageMap[note.imageAssetId]) {
-      return <img src={imageMap[note.imageAssetId]} alt="" />;
+    if (note?.imageAssetId) {
+      return <XhsLazyImage assetId={note.imageAssetId} fallbackSrc={imageMap[note.imageAssetId]} alt="" />;
     }
     return <span>{getXhsPlainText(notice.thumbnailText || note?.title || "笔记")}</span>;
   }
@@ -1354,10 +1381,8 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
   }, [selectedNote?.id, activeVideoCaption, videoCaptionExpanded]);
 
   useEffect(() => {
-    const assetIds = Array.from(new Set([
-      ...state.notes.flatMap(note => (note.imageAssetIds && note.imageAssetIds.length > 0 ? note.imageAssetIds : [note.imageAssetId])),
-      state.profile.coverImageAssetId,
-    ].filter(Boolean))) as string[];
+    // Note thumbnails are visibility-scoped in XhsLazyImage; do not decode all past posts.
+    const assetIds = [state.profile.coverImageAssetId].filter(Boolean) as string[];
     assetIds.forEach((assetId) => {
       if (imageMap[assetId]) return;
       getChatImageFromIndexedDB(assetId)
@@ -1366,7 +1391,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
         })
         .catch(() => undefined);
     });
-  }, [state.notes, state.profile.coverImageAssetId, imageMap]);
+  }, [state.profile.coverImageAssetId, imageMap]);
 
   function persist(next: XiaohongshuState) {
     const saved = saveXiaohongshuState(next);
@@ -1524,77 +1549,81 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
     setSettingsDraft(DEFAULT_XIAOHONGSHU_SETTINGS);
   }
 
-  async function processImageFile(file: File): Promise<XiaohongshuDraftImage | null> {
-    return new Promise((resolve) => {
-      const image = new Image();
-      const objectUrl = URL.createObjectURL(file);
-      image.onload = () => {
-        const canvas = document.createElement("canvas");
-        const maxSize = 960;
-        const sourceWidth = image.width;
-        let sourceHeight = image.height;
-        const sourceX = 0;
-        let sourceY = 0;
-        if (sourceHeight / sourceWidth > XHS_MAX_IMAGE_HEIGHT_RATIO) {
-          sourceHeight = Math.round(sourceWidth * XHS_MAX_IMAGE_HEIGHT_RATIO);
-          sourceY = Math.round((image.height - sourceHeight) / 2);
-        }
-        let width = sourceWidth;
-        let height = sourceHeight;
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = Math.round(height / width * maxSize);
-            width = maxSize;
-          } else {
-            width = Math.round(width / height * maxSize);
-            height = maxSize;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const context = canvas.getContext("2d");
-        if (!context) {
-          URL.revokeObjectURL(objectUrl);
-          resolve(null);
-          return;
-        }
-        context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
-        canvas.toBlob((blob) => {
-          URL.revokeObjectURL(objectUrl);
-          if (!blob) {
-            resolve(null);
-            return;
-          }
-          saveChatImageToIndexedDB(blob).then((assetId) => {
-            const preview = URL.createObjectURL(blob);
-            setImageMap(prev => ({ ...prev, [assetId]: preview }));
-            resolve({ assetId, dataUrl: preview, width: canvas.width, height: canvas.height });
-          }).catch(() => resolve(null));
-        }, "image/jpeg", 0.82);
-      };
-      image.onerror = () => {
-        URL.revokeObjectURL(objectUrl);
-        resolve(null);
-      };
-      image.src = objectUrl;
-    });
+  async function processImageFile(file: File): Promise<XiaohongshuDraftImage> {
+    const warning = xhsOriginalFileError(file);
+    if (warning) throw new Error(warning);
+    const preview = await makeXiaohongshuThumbnail(file);
+    const assetId = await saveXiaohongshuImagePair(file, preview.blob);
+    stagedXhsImages.current.add(assetId);
+    try {
+      const dataUrl = await getChatImageFromIndexedDB(assetId);
+      if (!dataUrl) throw new Error("图片缩略图保存后无法读取");
+      return { assetId, dataUrl, width: preview.width, height: preview.height };
+    } catch (error) {
+      discardStagedXhsImage({ assetId });
+      throw error;
+    }
   }
+
+  function discardStagedXhsImage(image?: XiaohongshuDraftImage) {
+    const id = image?.assetId;
+    if (!id || !stagedXhsImages.current.has(id)) return;
+    // Read persisted references: late cleanup must never remove a published photo.
+    if (loadXiaohongshuState().notes.some(note => getXiaohongshuNoteImageIds(note).includes(id))) {
+      stagedXhsImages.current.delete(id);
+      return;
+    }
+    stagedXhsImages.current.delete(id);
+    void deleteThemeAsset(id).catch(error => console.warn("[Xiaohongshu] Could not free unpublished draft image", error));
+  }
+
+  function clearDraftXhsImages() {
+    imageUploadEpoch.current += 1;
+    for (const assetId of [...stagedXhsImages.current]) discardStagedXhsImage({ assetId });
+    setDraft(prev => ({ ...prev, image: {}, images: undefined }));
+  }
+
+  useEffect(() => () => {
+    imageUploadEpoch.current += 1;
+    for (const assetId of [...stagedXhsImages.current]) discardStagedXhsImage({ assetId });
+  }, []);
 
   async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []);
     event.target.value = "";
-    if (files.length === 0) return;
-    const results = (await Promise.all(files.map(processImageFile))).filter((img): img is XiaohongshuDraftImage => Boolean(img));
-    if (results.length === 0) return;
-    setDraft((prev) => {
-      const existing = prev.images || (prev.image?.dataUrl ? [prev.image] : []);
-      const nextImages = [...existing, ...results];
-      return {
-        ...prev,
-        image: nextImages[0] || {},
-        images: nextImages,
-      };
-    });
+    if (!files.length) return;
+    if (imageUploadInProgress.current) { onNotice?.("图片正在上传，请完成后再添加"); return; }
+    const epoch = imageUploadEpoch.current;
+    imageUploadInProgress.current = true;
+    setImageUploading(true);
+    try {
+      const existingCount = draft.images?.length ?? (draft.image?.assetId ? 1 : 0);
+      const allowed = Math.max(0, 9 - existingCount);
+      if (!allowed) { onNotice?.("每篇笔记最多添加 9 张图片"); return; }
+      if (files.length > allowed) onNotice?.(`最多再添加 ${allowed} 张图片`);
+      const results: XiaohongshuDraftImage[] = [];
+      let failed = 0;
+      // Do not decode nine full-size photos concurrently on iOS WebKit.
+      for (const file of files.slice(0, allowed)) {
+        if (epoch !== imageUploadEpoch.current) break;
+        try {
+          const result = await processImageFile(file);
+          if (epoch !== imageUploadEpoch.current) discardStagedXhsImage(result);
+          else results.push(result);
+        } catch (error) {
+          failed += 1;
+          console.warn("[Xiaohongshu] Image upload failed", error);
+          onNotice?.(error instanceof Error ? error.message : "图片保存失败");
+        }
+      }
+      if (failed) onNotice?.(`${failed} 张图片未成功保存，请重试`);
+      if (!results.length || epoch !== imageUploadEpoch.current) return;
+      setDraft(prev => {
+        const existing = prev.images || (prev.image?.dataUrl ? [prev.image] : []);
+        const nextImages = [...existing, ...results].slice(0, 9);
+        return { ...prev, image: nextImages[0] || {}, images: nextImages };
+      });
+    } finally { imageUploadInProgress.current = false; setImageUploading(false); }
   }
 
   async function handleProfileCoverChange(event: ChangeEvent<HTMLInputElement>) {
@@ -1643,6 +1672,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
   }
 
   async function handlePublish() {
+    if (imageUploadInProgress.current) { onNotice?.("图片正在保存，请完成后再发布"); return; }
     if (busy !== "idle" || (!draft.title.trim() && !draft.body.trim())) return;
     setBusy("publish");
     clearErrorState();
@@ -1653,6 +1683,9 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
         notes: [userNote, ...state.notes],
       });
       setState(current);
+      // Only after persistence succeeds do these assets become published resources.
+      for (const id of getXiaohongshuNoteImageIds(userNote)) stagedXhsImages.current.delete(id);
+      imageUploadEpoch.current += 1;
       setComposeOpen(false);
       setDraft({ title: "", body: "", tags: [], image: {} });
       setTagInput("");
@@ -2332,8 +2365,8 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
       <div className={`cp-xhs-video-moving-layer${preview ? " cp-xhs-video-moving-layer--preview" : ""}`} style={style}>
         <main className="cp-xhs-video-stage">
           <div className={`cp-xhs-video-frame cp-xhs-cover--${note.tone}`}>
-            {note.imageAssetId && imageMap[note.imageAssetId] ? (
-              <img className="xhs-video-real-image" src={imageMap[note.imageAssetId]} alt="" />
+            {note.imageAssetId ? (
+              <XhsLazyImage assetId={note.imageAssetId} fallbackSrc={imageMap[note.imageAssetId]} className="xhs-video-real-image" alt="" />
             ) : note.videoDescription?.trim() || note.imageDescription?.trim() ? (
               <div className="cp-xhs-video-frame-text">
                 <CheckPhoneBilingualText
@@ -2781,6 +2814,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
                   imageMap={imageMap}
                   collapseBilingualTranslation={state.settings.collapseBilingualTranslation}
                   isDetail={true}
+                  onOpenImage={index => setFullscreenImage({ noteId: selectedNote.id, index })}
                 />
               </div>
               <div className="cp-xhs-note-detail-card">
@@ -3114,6 +3148,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
                             type="button"
                             className="xhs-publish-img-remove"
                             onClick={() => {
+                              discardStagedXhsImage(img);
                               setDraft((prev) => {
                                 const list = (prev.images || [prev.image!]).filter((_, i) => i !== idx);
                                 return {
@@ -3143,7 +3178,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
                     <button
                       type="button"
                       className="xhs-upload-change-btn"
-                      onClick={() => setDraft(prev => ({ ...prev, image: {}, images: undefined }))}
+                      onClick={clearDraftXhsImages}
                     >
                       清空所有图片
                     </button>
@@ -3203,7 +3238,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
                   />
                 </div>
                 <div className="xhs-publish-actions">
-                  <button type="button" className="xhs-publish-submit-btn" onClick={handlePublish} disabled={busy !== "idle" || (!draft.title.trim() && !draft.body.trim())}>
+                  <button type="button" className="xhs-publish-submit-btn" onClick={handlePublish} disabled={imageUploading || busy !== "idle" || (!draft.title.trim() && !draft.body.trim())}>
                     {busy === "publish" ? <Loader2 className="cp-spin" size={18} /> : <Send size={18} />}
                     发布笔记
                   </button>
@@ -3473,6 +3508,16 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
           </section>
         </div>
       ) : null}
+
+      {fullscreenImage && (() => {
+        const note = state.notes.find(item => item.id === fullscreenImage.noteId);
+        return note ? <XiaohongshuImageViewer
+          key={note.id}
+          imageIds={getXiaohongshuNoteImageIds(note)}
+          initialIndex={fullscreenImage.index}
+          onClose={() => setFullscreenImage(null)}
+        /> : null;
+      })()}
 
       {pendingFeedAction ? (
         <div className="xhs-modal-backdrop" onClick={() => setPendingFeedAction(null)}>

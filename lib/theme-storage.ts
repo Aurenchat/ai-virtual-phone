@@ -51,6 +51,8 @@ export type ThemeAssetRecord = {
   type: ThemeAssetType;
   mimeType: string;
   dataUrl: string;
+  /** Float native Xiaohongshu full-resolution original, stored as Blob for backup-safe media extraction. */
+  xiaohongshuOriginalBlob?: Blob;
   updatedAt: string;
 };
 
@@ -237,6 +239,34 @@ async function readAssetRecord(id: string): Promise<ThemeAssetRecord | null> {
   } finally {
     database.close();
   }
+}
+
+/** Add the original bytes atomically to the existing preview asset record.
+ * Keeping it in ai_phone_theme_db_v1/assets ensures existing backup/restore
+ * sources and Blob-aware serializers cover this content without a new DB. */
+export async function attachXiaohongshuOriginalBlob(id: string, original: Blob): Promise<void> {
+  const database = await openThemeDb();
+  if (!database) throw new Error("IndexedDB 不可用，未保存小红书高清原图");
+  try {
+    const transaction = database.transaction(THEME_ASSET_STORE, "readwrite");
+    let writeError: unknown;
+    const store = transaction.objectStore(THEME_ASSET_STORE);
+    const request = store.get(id);
+    request.onsuccess = () => {
+      const existing = request.result as ThemeAssetRecord | undefined;
+      if (!existing) { transaction.abort(); return; }
+      try { store.put({ ...existing, xiaohongshuOriginalBlob: original }); }
+      catch (error) { writeError = error; transaction.abort(); }
+    };
+    try { await runTransactionDone(transaction); }
+    catch (error) { throw writeError ?? error ?? new Error("小红书高清原图保存失败"); }
+  } finally { database.close(); }
+}
+
+export async function getXiaohongshuOriginalBlob(id: string): Promise<Blob | null> {
+  const record = await readAssetRecord(id);
+  const original = record?.xiaohongshuOriginalBlob;
+  return original instanceof Blob && original.size > 0 ? original : null;
 }
 
 export async function getThemeAssetDataUrl(id: string): Promise<string | null> {
