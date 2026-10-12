@@ -1218,8 +1218,13 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         return () => window.removeEventListener(CHAT_PLUGIN_TOAST_EVENT, handler);
     }, []);
 
-    const [bgImageResolved, setBgImageResolved] = useState<string | null>(null);
-    const [bgLoading, setBgLoading] = useState(!!session.backgroundImage);
+    const backgroundSource = session.backgroundImage || "";
+    const bgRequestRef = useRef<object | null>(null);
+    const [bgResource, setBgResource] = useState<{ source: string; url: string; request: object } | null>(null);
+    // Source and request identity prevent reuse of a released lease on A -> B -> A.
+    const bgReady = bgResource?.source === backgroundSource && bgResource?.request === bgRequestRef.current;
+    const bgImageResolved = bgReady ? bgResource?.url || null : null;
+    const bgLoading = !!backgroundSource && !bgReady;
 
     const wrapperRef = useRef<HTMLDivElement>(null);
     const imessagePresentation = useImessagePresentation(wrapperRef, liveCSS, session.id);
@@ -1280,26 +1285,40 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     }, [messages]);
 
     useEffect(() => {
-        if (!session.backgroundImage) {
-            setBgImageResolved(null);
-            setBgLoading(false);
-            return;
+        const source = session.backgroundImage || "";
+        const request = {};
+        bgRequestRef.current = request;
+        let cancelled = false;
+        let release = () => {};
+        const resolve = (url: string) => {
+            if (!cancelled) setBgResource({ source, url, request });
+        };
+        if (!source) {
+            resolve("");
+        } else if (source.startsWith("data:") || /^https?:\/\//i.test(source)) {
+            // Keep existing behavior for legacy inline URLs and remote wallpapers.
+            resolve(source);
+        } else {
+            void import("@/lib/chat-background-resource")
+                .then(({ acquireChatBackground }) => acquireChatBackground(source))
+                .then(lease => {
+                    if (cancelled) {
+                        lease?.release();
+                        return;
+                    }
+                    release = lease?.release ?? (() => {});
+                    resolve(lease?.url ?? "");
+                })
+                .catch(() => {
+                    // Missing/unreadable wallpaper must never block the chat room.
+                    resolve("");
+                });
         }
-        if (session.backgroundImage.startsWith("data:") || session.backgroundImage.startsWith("http")) {
-            setBgImageResolved(session.backgroundImage);
-            setBgLoading(false);
-            return;
-        }
-        // It's an ID — load from IndexedDB
-        setBgLoading(true);
-        import("@/lib/chat-asset-storage").then(({ getChatImageFromIndexedDB }) => {
-            getChatImageFromIndexedDB(session.backgroundImage!).then(dataUrl => {
-                if (dataUrl) {
-                    setBgImageResolved(dataUrl);
-                }
-                setBgLoading(false);
-            });
-        });
+        return () => {
+            cancelled = true;
+            bgRequestRef.current = null;
+            release();
+        };
     }, [session.backgroundImage]);
 
     // Message Actions state
