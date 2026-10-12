@@ -1,4 +1,10 @@
 import { getChatImageFromIndexedDB } from "./chat-asset-storage";
+import {
+  getXiaohongshuNoteImageIds,
+  makeXiaohongshuVisionMessage as makeVisionMessage,
+  resolveXiaohongshuVisionImages,
+  type XiaohongshuVisionBatch,
+} from "./xiaohongshu-vision";
 import { ChatEngineError, previewMessagesForApi, sendLLMRequest } from "./chat-engine";
 import { loadCharacters } from "./character-storage";
 import type { Character } from "./character-types";
@@ -805,19 +811,37 @@ function resolveGlobalApiConfig(): ApiConfig | null {
   return configs[0] ?? null;
 }
 
+// Session-only capability memory; never persisted to settings or user archives.
+const textOnlyNoteApis = new Map<string, string>();
+
+function noteVisionApiSignature(apiConfig: ApiConfig): string {
+  return JSON.stringify([apiConfig.provider, apiConfig.baseUrl ?? "", apiConfig.defaultModel]);
+}
+
+function canUseNoteVision(apiConfig: ApiConfig): boolean {
+  const signature = noteVisionApiSignature(apiConfig);
+  if (textOnlyNoteApis.get(apiConfig.id) !== signature) textOnlyNoteApis.delete(apiConfig.id);
+  return apiConfig.enableImageRecognition && !textOnlyNoteApis.has(apiConfig.id);
+}
+
 function hasVisionParts(messages: LLMMessage[]): boolean {
   return messages.some(message => Array.isArray(message.content) && message.content.some(part => part.type === "image_url"));
 }
 
 function stripVisionParts(messages: LLMMessage[]): LLMMessage[] {
   return messages.map((message) => {
-    if (!Array.isArray(message.content)) return message;
+    if (!Array.isArray(message.content) || !message.content.some(part => part.type === "image_url")) return message;
     const text = message.content
       .filter((part): part is Extract<LLMContentPart, { type: "text" }> => part.type === "text")
+      // Image-only labels/instructions must not masquerade as visual evidence on fallback.
       .map(part => part.text)
-      .filter(Boolean)
+      .filter(part => part && !/^\[笔记图片 \d+\/\d+\]$/.test(part) && !part.startsWith("[图片识别说明]") && !part.startsWith("[图片读取状态]"))
       .join("\n\n");
-    return { ...message, content: text || "[图片已省略：当前模型不支持多模态输入]" };
+    return {
+      ...message,
+      content: [text, "[图片读取状态]本轮视觉请求失败，真实图片已全部省略；不要猜测任何图片的具体内容。"]
+        .filter(Boolean).join("\n\n"),
+    };
   });
 }
 
@@ -888,30 +912,19 @@ async function sendWithOptionalVisionFallback(
     return await sendLLMRequest(apiConfig, preset, messages, regexes, meta, options);
   } catch (error) {
     if (!attemptedVision || !isVisionUnsupportedError(error)) throw error;
+    const reason = error instanceof Error ? error.message : String(error ?? "");
+    // Oversize/malformed images are request failures, not proof of a text-only model.
+    if (/only supports text|text[- ]only|(?:does(?:n't| not) support|not support)\s+(?:images?|image inputs?|vision|multimodal)(?:[.,;\s]|$)|(?:vision|multimodal)\s+(?:is )?(?:not supported|unsupported)|(?:不支持|无法支持)(?:图片|图像|视觉|多模态)(?:输入|识别)?(?:[。，；\s]|$)/i.test(reason)
+      && !/api error\s+(413|415)|request_too_large|image.{0,30}(?:format|size|media type)|图片.{0,10}(?:格式|大小|类型)/i.test(reason)) {
+      textOnlyNoteApis.set(apiConfig.id, noteVisionApiSignature(apiConfig));
+    }
     console.warn("[Xiaohongshu] Vision request failed, retrying without images:", error);
     return sendLLMRequest(apiConfig, preset, stripVisionParts(messages), regexes, meta, options);
   }
 }
 
-function makeVisionMessage(text: string, imageDataUrl?: string | null): LLMMessage {
-  if (!imageDataUrl) return { role: "user", content: text, _debugMeta: { marker: "xiaohongshu_context" } };
-  return {
-    role: "user",
-    content: [
-      { type: "text", text },
-      { type: "image_url", image_url: { url: imageDataUrl, detail: "low" } },
-    ],
-    _debugMeta: { marker: "xiaohongshu_context" },
-  };
-}
-
-async function resolveNoteImageDataUrl(note: XiaohongshuNote): Promise<string | null> {
-  if (!note.imageAssetId) return null;
-  try {
-    return await getChatImageFromIndexedDB(note.imageAssetId);
-  } catch {
-    return null;
-  }
+async function resolveNoteImageBatch(note: XiaohongshuNote): Promise<XiaohongshuVisionBatch> {
+  return resolveXiaohongshuVisionImages(note, getChatImageFromIndexedDB);
 }
 
 export function formatXiaohongshuFeedContext(notes: XiaohongshuNote[]): string {
@@ -1156,13 +1169,13 @@ export async function generateXiaohongshuNpcReactionForUserPost(
     "<user_xiaohongshu_post>",
     formatXiaohongshuUserPostContext(note),
     "</user_xiaohongshu_post>",
-    note.imageAssetId && !note.imageDescription ? "该笔记有真实图片；如果你无法看到图片，请只根据标题、正文、TAG 与已有评论生成互动。" : "",
+    getXiaohongshuNoteImageIds(note).length > 0 && !note.imageDescription ? "该笔记有真实图片；如果你无法看到图片，请只根据标题、正文、TAG 与已有评论生成互动。" : "",
   ].filter(Boolean).join("\n");
-  const imageDataUrl = apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
+  const imageBatch = canUseNoteVision(apiConfig) ? await resolveNoteImageBatch(note) : null;
   const raw = await sendWithOptionalVisionFallback(
     apiConfig,
     null,
-    [makeVisionMessage(context, imageDataUrl)],
+    [makeVisionMessage(context, imageBatch)],
     [],
     { characterName: "小红书NPC互动" },
     { appId: "xiaohongshu", appTags: ["xiaohongshu", "npc_user_post"], skipOutputRegex: true },
@@ -1212,9 +1225,9 @@ export async function generateXiaohongshuCharacterReactionToUserPost(
   }, settings);
   if (!resolved?.apiConfig) return null;
   const messages = assemblePromptPayload(resolved.input);
-  const imageDataUrl = resolved.apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
-  if (imageDataUrl) {
-    messages.push(makeVisionMessage("这是当前小红书笔记配图。请结合预设中的 {{xiaohongshuUserPostContext}} 判断如何评论。", imageDataUrl));
+  const imageBatch = canUseNoteVision(resolved.apiConfig) ? await resolveNoteImageBatch(note) : null;
+  if (imageBatch?.total) {
+    messages.push(makeVisionMessage("这是当前小红书笔记配图。请结合预设中的 {{xiaohongshuUserPostContext}} 判断如何评论。", imageBatch));
   }
   const raw = await sendWithOptionalVisionFallback(
     resolved.apiConfig,
@@ -1251,13 +1264,13 @@ export async function generateXiaohongshuNpcReplyToUserComment(
     "<xiaohongshu_comment_context>",
     commentContext,
     "</xiaohongshu_comment_context>",
-    note.imageAssetId && !note.imageDescription ? "该笔记有真实图片；如果你无法看到图片，请只根据标题、正文、TAG 与评论区上下文生成回复。" : "",
+    getXiaohongshuNoteImageIds(note).length > 0 && !note.imageDescription ? "该笔记有真实图片；如果你无法看到图片，请只根据标题、正文、TAG 与评论区上下文生成回复。" : "",
   ].filter(Boolean).join("\n");
-  const imageDataUrl = apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
+  const imageBatch = canUseNoteVision(apiConfig) ? await resolveNoteImageBatch(note) : null;
   const raw = await sendWithOptionalVisionFallback(
     apiConfig,
     null,
-    [makeVisionMessage(prompt, imageDataUrl)],
+    [makeVisionMessage(prompt, imageBatch)],
     [],
     { characterName: "小红书NPC评论回复" },
     { appId: "xiaohongshu", appTags: ["xiaohongshu", "npc_comment_reply"], skipOutputRegex: true },
@@ -1283,13 +1296,13 @@ export async function generateXiaohongshuNpcMoreComments(
     "<xiaohongshu_note_comment_context>",
     commentContext,
     "</xiaohongshu_note_comment_context>",
-    note.imageAssetId && !note.imageDescription ? "该笔记有真实图片；如果你无法看到图片，请只根据标题、正文、TAG 与评论区上下文生成更多评论。" : "",
+    getXiaohongshuNoteImageIds(note).length > 0 && !note.imageDescription ? "该笔记有真实图片；如果你无法看到图片，请只根据标题、正文、TAG 与评论区上下文生成更多评论。" : "",
   ].filter(Boolean).join("\n");
-  const imageDataUrl = apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
+  const imageBatch = canUseNoteVision(apiConfig) ? await resolveNoteImageBatch(note) : null;
   const raw = await sendWithOptionalVisionFallback(
     apiConfig,
     null,
-    [makeVisionMessage(prompt, imageDataUrl)],
+    [makeVisionMessage(prompt, imageBatch)],
     [],
     { characterName: "小红书NPC更多评论" },
     { appId: "xiaohongshu", appTags: ["xiaohongshu", "npc_more_comments"], skipOutputRegex: true },
@@ -1349,9 +1362,9 @@ export async function generateXiaohongshuCharacterReplyToUserComment(
   }, settings);
   if (!resolved?.apiConfig) return null;
   const messages = assemblePromptPayload(resolved.input);
-  const imageDataUrl = resolved.apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
-  if (imageDataUrl) {
-    messages.push(makeVisionMessage("这是当前小红书笔记的配图。请结合预设中的 {{xiaohongshuCommentContext}} 回复用户评论。", imageDataUrl));
+  const imageBatch = canUseNoteVision(resolved.apiConfig) ? await resolveNoteImageBatch(note) : null;
+  if (imageBatch?.total) {
+    messages.push(makeVisionMessage("这是当前小红书笔记的配图。请结合预设中的 {{xiaohongshuCommentContext}} 回复用户评论。", imageBatch));
   }
   const raw = await sendWithOptionalVisionFallback(
     resolved.apiConfig,
@@ -1387,9 +1400,9 @@ export async function generateXiaohongshuCharacterMentionReply(
   }, settings);
   if (!resolved?.apiConfig) return null;
   const messages = assemblePromptPayload(resolved.input);
-  const imageDataUrl = resolved.apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(note) : null;
-  if (imageDataUrl) {
-    messages.push(makeVisionMessage("这是当前小红书笔记的配图。请结合预设中的 {{xiaohongshuMentionContext}} 回复 @ 评论。", imageDataUrl));
+  const imageBatch = canUseNoteVision(resolved.apiConfig) ? await resolveNoteImageBatch(note) : null;
+  if (imageBatch?.total) {
+    messages.push(makeVisionMessage("这是当前小红书笔记的配图。请结合预设中的 {{xiaohongshuMentionContext}} 回复 @ 评论。", imageBatch));
   }
   const raw = await sendWithOptionalVisionFallback(
     resolved.apiConfig,
@@ -1449,9 +1462,9 @@ export async function previewXiaohongshuPromptPayload(
   if (!resolved?.apiConfig) throw new ChatEngineError("未配置小红书 API。");
   const messages = assemblePromptPayload(resolved.input);
   if (firstNote && mode !== "activity") {
-    const imageDataUrl = resolved.apiConfig.enableImageRecognition ? await resolveNoteImageDataUrl(firstNote) : null;
-    if (imageDataUrl) {
-      messages.push(makeVisionMessage("这是当前小红书笔记配图。请结合预设中的小红书上下文判断如何回应。", imageDataUrl));
+    const imageBatch = canUseNoteVision(resolved.apiConfig) ? await resolveNoteImageBatch(firstNote) : null;
+    if (imageBatch?.total) {
+      messages.push(makeVisionMessage("这是当前小红书笔记配图。请结合预设中的小红书上下文判断如何回应。", imageBatch));
     }
   }
   return {
