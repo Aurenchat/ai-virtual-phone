@@ -89,6 +89,12 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
         return el;
     }, []);
 
+    // Pagination already restores its own anchor: row-level Safari compensation
+    // must stand down until the pagination image watcher finishes.
+    const isRestoringLoadMoreAnchor = useCallback(
+        () => loadMoreAnchorRef.current !== null, [],
+    );
+
     const stopLoadMoreAnchorTracking = useCallback(() => {
         loadMoreResizeObserverRef.current?.disconnect();
         loadMoreResizeObserverRef.current = null;
@@ -563,6 +569,8 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
                             heightCache={momentHeightCacheRef.current}
                             estimatedHeight={estimatePostHeight(post)}
                             initiallyMount={index < MOMENTS_INITIAL_POST_COUNT}
+                            hasMedia={Boolean(post.photoUrl)}
+                            isExternalAnchorActive={isRestoringLoadMoreAnchor}
                         >
                             <MomentPostCard
                                 post={post}
