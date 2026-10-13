@@ -99,6 +99,18 @@
   padding-bottom: 18px;
   scroll-padding-bottom: calc(var(--chat-bottom-reserve, 120px) + 18px);
 }
+/* Pre-commit iMessage scroll geometry: the presentation opt-in is resolved in
+   useLayoutEffect before the first visible paint. Don't wait for Bridge's
+   im-header-ready flag to change padding-top a frame after entry. */
+.chat-app .chat-room-wrapper.chat-mode-online[data-im-presentation] > .page-body.chat-room-main-pane {
+  padding-top: calc(var(--page-header-safe-top,48px) + var(--im-nav-height,100px) + 16px + var(--chat-plugin-header-height,0px));
+}
+.chat-app .chat-room-wrapper.chat-mode-online[data-im-presentation] > .page-header.chat-room-main-pane .page-header-content {
+  min-height: var(--im-nav-height,100px);
+}
+.chat-app .chat-room-wrapper.chat-mode-online[data-im-presentation] > .chat-plugin-header {
+  top: calc(var(--page-header-safe-top,48px) + var(--im-nav-height,100px) + 12px);
+}
 
 .chat-app .chat-room-wrapper > .page-body::after {
   content: "";

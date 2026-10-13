@@ -5532,7 +5532,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     } : undefined;
 
     return (
-        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper chat-mode-${offlineMode ? "offline" : "online"} page-shell inset-0 flex flex-col z-20`} style={chatRoomBackgroundStyle} {...(bgLoading ? { "data-loading": "" } : {})} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})}>
+        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper chat-mode-${offlineMode ? "offline" : "online"} page-shell inset-0 flex flex-col z-20`} style={chatRoomBackgroundStyle} {...(bgLoading ? { "data-loading": "" } : {})} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})} {...(!offlineMode && imessagePresentation ? { "data-im-presentation": "" } : {})}>
             {/* Custom CSS Injection for this session — scoped to prevent leaking */}
             {liveCSS && (
                 <SessionCustomCSS css={liveCSS} scope={`.session-${session.id}`} />
@@ -6147,7 +6147,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                             {/* Message Actions Popup */}
                                             {activeMessageId === msg.id && renderBubbleContextMenu(msg)}
 
-                                            <ImessagePresentation.Provider key={`${session.id}:${msg.id}`} value={{ enabled: imessagePresentation && !renderMsg.mediaType && !renderMsg.mediaData?.readingQuote, voiceTranscript: false }}>
+                                            <ImessagePresentation.Provider key={`${session.id}:${msg.id}`} value={{ enabled: imessagePresentation && (!renderMsg.mediaType || renderMsg.mediaType === "quote") && !renderMsg.mediaData?.readingQuote, voiceTranscript: false }}>
                                             <MessageBubble
                                                 msg={renderMsg}
                                                 displayContent={msg.displayProjected ? undefined : bubbleDisplayContent}
