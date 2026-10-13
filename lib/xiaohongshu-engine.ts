@@ -1183,6 +1183,66 @@ export async function generateXiaohongshuNpcReactionForUserPost(
   return parseWithDebug(raw, output => parseXiaohongshuNpcReaction(output, note.id), "无法解析小红书互动内容");
 }
 
+/** Dedicated, mandatory one-post-per-character generation. */
+export async function generateXiaohongshuCharacterPost(
+  characterId: string,
+  notes: XiaohongshuNote[],
+  settings?: XiaohongshuSettings,
+): Promise<ParsedXiaohongshuCharacterActivity> {
+  const userNames = getUserXiaohongshuNamesFromNotes(notes);
+  const context = userNames.length > 0
+    ? prependXiaohongshuUserIdentityHint(
+        formatXiaohongshuFeedContext(notes.slice(0, 8)),
+        buildXiaohongshuUserIdentityHint({ characterId, xiaohongshuNames: userNames }),
+      )
+    : formatXiaohongshuFeedContext(notes.slice(0, 8));
+  // Reuse the native XHS character activity preset / binding / memory / worldbooks.
+  // The explicit final user task constrains this call to ONLY publishing a post.
+  const resolved = await resolveCharacterAssemblerInput(characterId, ["xiaohongshu", "activity"], {
+    feedContext: context,
+  }, settings);
+  if (!resolved) throw new ChatEngineError(`无法加载角色：${characterId}`);
+  if (!resolved.apiConfig) throw new ChatEngineError(`角色「${resolved.character.name}」未绑定可用的小红书 API`);
+  const messages = assemblePromptPayload(resolved.input);
+  messages.push({ role: "user", content: [
+    "[本轮专用任务：仅生成本人一篇新小红书帖子]",
+    "请根据本人角色设定、世界观、生活状态和时间线，独立写一篇真实自然的小红书帖子。必须发帖，恰好一篇。",
+    "本次不是浏览互动任务。不要给已有笔记评论、点赞或收藏，不要生成独立 #评论 区块。",
+    "帖子内容要有具体事件与个人表达，不重复已有标题，不必强行围绕用户。",
+    "可以为新帖附带少量自然的 NPC 评论及楼中楼，但绝对不能冒充用户发表评论。",
+    "如果是图文请提供[图片描述]，如果是视频请提供[视频描述]，这是文字内容描述而非真实上传素材。",
+    "严格按以下字段输出，只有一段 #发帖，不要说明、代码块或第二篇帖子：",
+    "#发帖",
+    "[类型]图文或视频",
+    "[标题]帖子标题",
+    "[正文]完整自然的帖子正文",
+    "[图片描述]真实具体的画面描述（视频可换成[视频描述]）",
+    "[图标]✦",
+    "[标签]标签1、标签2",
+    "[点赞]数字",
+    "[收藏]数字",
+    "[评论数]数字",
+    "[评论1作者]路人昵称",
+    "[评论1内容]路人评论（可省略）",
+  ].join("\n") });
+  const raw = await sendLLMRequest(
+    resolved.apiConfig,
+    resolved.preset,
+    messages,
+    resolved.regexes,
+    { characterName: `小红书:${resolved.character.name}`, userName: resolved.input.userIdentity?.name },
+    { appId: "xiaohongshu", appTags: ["xiaohongshu", "activity", "post"] },
+  );
+  return parseWithDebug(raw, output => {
+    const postBlocks = parseBlocks(output).filter(block => /发帖|笔记|视频/.test(block.title) && !/评论/.test(block.title));
+    const parsed = parseXiaohongshuCharacterActivity(output, []);
+    if (postBlocks.length !== 1 || !parsed.post?.body.trim()) {
+      throw new Error("角色未按要求返回恰好一篇新帖子");
+    }
+    return { comments: [], post: parsed.post };
+  }, "无法解析角色的独立发帖内容");
+}
+
 export async function generateXiaohongshuCharacterActivity(
   characterId: string,
   notes: XiaohongshuNote[],
@@ -1198,8 +1258,15 @@ export async function generateXiaohongshuCharacterActivity(
   const resolved = await resolveCharacterAssemblerInput(characterId, ["xiaohongshu", "activity"], {
     feedContext: context,
   }, settings);
-  if (!resolved?.apiConfig) return null;
+  if (!resolved) throw new ChatEngineError(`无法加载角色：${characterId}`);
+  if (!resolved.apiConfig) throw new ChatEngineError(`角色「${resolved.character.name}」未绑定可用的小红书 API`);
   const messages = assemblePromptPayload(resolved.input);
+  messages.push({ role: "user", content: [
+    "[本轮专用任务：只浏览已有笔记并互动，不发表新帖]",
+    "你可以选择最多三篇已有笔记发表评论（含点赞、收藏及楼中楼），也可以不评论。",
+    "不要输出 #发帖、#笔记、#视频 等新帖区块；本轮不会保存新帖子。",
+    "若评论请严格使用上方已有笔记的真实[笔记ID]。",
+  ].join("\n") });
   const raw = await sendLLMRequest(
     resolved.apiConfig,
     resolved.preset,
@@ -1208,7 +1275,10 @@ export async function generateXiaohongshuCharacterActivity(
     { characterName: `小红书:${resolved.character.name}`, userName: resolved.input.userIdentity?.name },
     { appId: "xiaohongshu", appTags: ["xiaohongshu", "activity"] },
   );
-  return parseWithDebug(raw, output => parseXiaohongshuCharacterActivity(output, notes.map(note => note.id)), "无法解析小红书角色互动内容");
+  return parseWithDebug(raw, output => {
+    const parsed = parseXiaohongshuCharacterActivity(output, notes.map(note => note.id));
+    return { comments: parsed.comments }; // Defensive: never post in browse-only mode.
+  }, "无法解析小红书角色互动内容");
 }
 
 export async function generateXiaohongshuCharacterReactionToUserPost(

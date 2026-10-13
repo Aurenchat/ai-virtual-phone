@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const ts = require('typescript');
+const root = path.resolve(__dirname, '..');
+const source = fs.readFileSync(path.join(root,'lib/xiaohongshu-generation-plan.ts'),'utf8');
+const js = ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+const output={exports:{}};vm.runInNewContext(js,{module:output,exports:output.exports,Set,Array});
+const select=output.exports.resolveXiaohongshuGenerationCharacterIds;
+const chars=[{id:'a'},{id:'b'},{id:'c'}];const participants=['a','a','z'];
+assert.deepEqual(Array.from(select('npc',participants,chars,['b'])),[]);
+assert.deepEqual(Array.from(select('all-posts',participants,chars,['b'])),['a']);
+assert.deepEqual(Array.from(select('activity',participants,chars,['b'])),['a']);
+assert.deepEqual(Array.from(select('selected-posts',participants,chars,['c','b','c','missing'])),['c','b']);
+assert.deepEqual(Array.from(select('selected-posts',[],chars,[])),[]);
+assert.deepEqual(Array.from(select('all-posts',[],chars,['b'])),[]);
+assert.deepEqual(participants,['a','a','z']);
+console.log('PASS generation target selection: all uses saved participants; specified uses all library characters; dedupe and no mutation');

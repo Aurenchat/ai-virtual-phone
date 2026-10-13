@@ -32,7 +32,9 @@ import { getXiaohongshuNoteImageIds } from "@/lib/xiaohongshu-vision";
 import { XhsLazyImage } from "@/components/xiaohongshu/xhs-lazy-image";
 import { XiaohongshuImageViewer } from "@/components/xiaohongshu/xhs-image-viewer";
 import { loadCharacters } from "@/lib/character-storage";
+import { kvUpdateAtomic } from "@/lib/kv-db";
 import type { Character } from "@/lib/character-types";
+import { resolveXiaohongshuGenerationCharacterIds, type XiaohongshuGenerationMode } from "@/lib/xiaohongshu-generation-plan";
 import { incrementEventCounter } from "@/lib/memory-storage";
 import { maybeRunSummarization } from "@/lib/memory-summarizer";
 import { resolveUserIdentity } from "@/lib/settings-storage";
@@ -49,6 +51,7 @@ import {
   applyNpcMoreComments,
   applyNpcReaction,
   generateXiaohongshuCharacterActivity,
+  generateXiaohongshuCharacterPost,
   generateXiaohongshuCharacterMentionReply,
   generateXiaohongshuCharacterReplyToUserComment,
   generateXiaohongshuCharacterReactionToUserPost,
@@ -108,7 +111,7 @@ type XiaohongshuAppProps = {
   onBusyChange?: (isBusy: boolean) => void;
 };
 
-type BusyState = "idle" | "npc-feed" | "character-activity" | "publish" | "npc-reaction" | "character-reaction" | "comment-reply" | "mention-reply" | "more-comments" | "dm-reply" | "regenerate-comment";
+type BusyState = "idle" | "npc-feed" | "character-post" | "character-activity" | "publish" | "npc-reaction" | "character-reaction" | "comment-reply" | "mention-reply" | "more-comments" | "dm-reply" | "regenerate-comment";
 type XiaohongshuProfileTab = "notes" | "comments" | "saved" | "liked";
 type XiaohongshuMessagePanel = "engagement" | "follow" | "comment";
 type XiaohongshuHomeFeedTab = "follow" | "discover" | "video";
@@ -819,6 +822,10 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
   const [commentMentionOpen, setCommentMentionOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<PendingDeleteTarget | null>(null);
   const [pendingFeedAction, setPendingFeedAction] = useState<PendingFeedAction | null>(null);
+  const [feedGenerationMode, setFeedGenerationMode] = useState<XiaohongshuGenerationMode>("npc");
+  const [selectedPostCharacterIds, setSelectedPostCharacterIds] = useState<string[]>([]);
+  const [postCharacterSearch, setPostCharacterSearch] = useState("");
+  const feedGenerationInFlightRef = useRef(false);
   const [profileDraft, setProfileDraft] = useState(state.profile);
   const [settingsDraft, setSettingsDraft] = useState(state.settings);
   const [expandedPrompts, setExpandedPrompts] = useState<Set<string>>(new Set());
@@ -1430,6 +1437,18 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
     return saved;
   }
 
+  /** Only generation writes use this path; merge into fresh storage before UI/memory. */
+  async function commitGeneratedState(update: (latest: XiaohongshuState) => XiaohongshuState): Promise<XiaohongshuState> {
+    await kvUpdateAtomic("ai_phone_xiaohongshu_state_v1", raw => {
+      const latest = raw ? JSON.parse(raw) as XiaohongshuState : loadXiaohongshuState();
+      if (!Array.isArray(latest.notes) || (latest.notifications !== undefined && !Array.isArray(latest.notifications))) throw new Error("小红书存档无法读取，未保存生成内容");
+      const next = { ...update({ ...latest, notifications: latest.notifications ?? [] }), updatedAt: new Date().toISOString() };
+      return { value: JSON.stringify(next), result: null };
+    });
+    // Use the existing reader for legacy defaults in UI, without rewriting old notes.
+    return loadXiaohongshuState();
+  }
+
   async function generateNpcFeedState(baseState: XiaohongshuState, activeSettings: XiaohongshuState["settings"]): Promise<{ state: XiaohongshuState; generated: XiaohongshuNote[] }> {
     const generated = await generateXiaohongshuNpcFeed(
       activeSettings,
@@ -1440,23 +1459,63 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
     if (generated.length === 0) throw new Error("没有解析到小红书笔记。");
     return {
       generated,
-      state: saveXiaohongshuState({
-        ...baseState,
+      state: await commitGeneratedState(latest => ({
+        ...latest,
         notes: [
           ...generated,
-          ...baseState.notes,
+          ...latest.notes,
         ],
-      }),
+      })),
     };
   }
 
-  async function generateCharacterActivityState(baseState: XiaohongshuState, activeSettings: XiaohongshuState["settings"]): Promise<XiaohongshuState> {
-    const ids = activeSettings.participantCharacterIds;
+  /** Only selected/participating character posts; one mandatory post per character. */
+  async function generateCharacterPostsState(
+    baseState: XiaohongshuState,
+    activeSettings: XiaohongshuState["settings"],
+    ids: string[],
+  ): Promise<{ state: XiaohongshuState; created: number; failed: number }> {
     let current = baseState;
-    if (ids.length === 0) return current;
+    let created = 0;
+    let failed = 0;
+    let firstError: unknown = null;
+    for (const characterId of ids) {
+      const character = loadCharacters().find(item => item.id === characterId);
+      if (!character) { failed += 1; continue; }
+      try {
+        const activity = await generateXiaohongshuCharacterPost(character.id, current.notes.slice(0, 8), activeSettings);
+        const post = createCharacterPost(character, activity);
+        if (!post) throw new Error(`角色「${character.name}」没有返回可发布的笔记`);
+        // Persist first; do not create a memory projection for a failed save.
+        current = await commitGeneratedState(latest => {
+          if (!loadCharacters().some(item => item.id === character.id)) throw new Error("发帖角色已删除，未发布笔记");
+          return { ...latest, notes: [post, ...latest.notes] };
+        });
+        setState(current);
+        created += 1;
+        try {
+          recordXiaohongshuPostEvent({ characterId: character.id, characterName: character.name, note: post });
+          recordCharacterThreadCommentEvents(character, post, post, post.comments);
+          touchCharacterMemory(character);
+        } catch (memoryError) {
+          // Publishing has already succeeded; a projection failure is not an API/post failure.
+          console.warn("[Xiaohongshu] Native post memory write failed:", character.name, memoryError);
+        }
+      } catch (err) {
+        firstError ??= err;
+        failed += 1;
+        console.warn("[Xiaohongshu] Dedicated character post failed:", character.name, err);
+      }
+    }
+    if (!created) throw firstError instanceof Error ? firstError : new Error(firstError ? String(firstError) : "没有成功生成任何角色帖子");
+    return { state: current, created, failed };
+  }
 
+  /** Existing role browse/comment flow, without its old optional post side-effect. */
+  async function generateCharacterActivityState(baseState: XiaohongshuState, activeSettings: XiaohongshuState["settings"], ids: string[]): Promise<XiaohongshuState> {
+    let current = baseState;
     const participants = ids
-      .map(characterId => characters.find(item => item.id === characterId))
+      .map(characterId => loadCharacters().find(item => item.id === characterId))
       .filter((character): character is Character => Boolean(character));
     let successCount = 0;
     let firstError: unknown = null;
@@ -1471,82 +1530,78 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
         continue;
       }
       if (!activity) continue;
-      successCount += 1;
-
-      const collectedNotifications: XiaohongshuState["notifications"] = [];
-      const updatedNotes = current.notes.map((note) => {
-        const related = activity.comments.filter(comment => comment.noteId === note.id);
-        if (related.length === 0) return note;
-        let nextNote = note;
-        for (const parsed of related) {
-          if (!parsed.text.trim()) continue;
-          const result = applyCharacterActivityComment({
-            note: nextNote,
-            character,
-            text: parsed.text,
-            liked: parsed.liked,
-            saved: parsed.saved,
-            thread: parsed.thread,
-          });
-          nextNote = result.note;
-          collectedNotifications.push(...result.notifications);
-          recordXiaohongshuCommentEvent({
-            characterId: character.id,
-            characterName: character.name,
-            note,
-            comment: result.mainComment,
-            liked: parsed.liked,
-            saved: parsed.saved,
-          });
-          recordCharacterThreadCommentEvents(character, note, result.note, result.threadComments);
-          touchCharacterMemory(character);
-        }
-        return nextNote;
-      });
-      const characterPost = createCharacterPost(character, activity);
-      if (characterPost) {
-        recordXiaohongshuPostEvent({
-          characterId: character.id,
-          characterName: character.name,
-          note: characterPost,
+      if (!activity.comments.length) { successCount += 1; continue; }
+      const comments = activity.comments;
+      const committedEvents: Array<{ note: XiaohongshuNote; result: ReturnType<typeof applyCharacterActivityComment>; liked: boolean; saved: boolean }> = [];
+      current = await commitGeneratedState(latest => {
+        if (!loadCharacters().some(item => item.id === character.id)) throw new Error("互动角色已删除，未保存评论");
+        const collectedNotifications: XiaohongshuState["notifications"] = [];
+        const updatedNotes = latest.notes.map((note) => {
+          const related = comments.filter(comment => comment.noteId === note.id);
+          if (related.length === 0) return note;
+          let nextNote = note;
+          for (const parsed of related) {
+            if (!parsed.text.trim()) continue;
+            const result = applyCharacterActivityComment({
+              note: nextNote, character, text: parsed.text, liked: parsed.liked, saved: parsed.saved, thread: parsed.thread,
+            });
+            nextNote = result.note;
+            collectedNotifications.push(...result.notifications);
+            committedEvents.push({ note, result, liked: parsed.liked, saved: parsed.saved });
+          }
+          return nextNote;
         });
-        recordCharacterThreadCommentEvents(character, characterPost, characterPost, characterPost.comments);
-        touchCharacterMemory(character);
-      }
-      current = saveXiaohongshuState({
-        ...current,
-        notes: characterPost ? [characterPost, ...updatedNotes] : updatedNotes,
-        notifications: collectedNotifications.length > 0
-          ? [...collectedNotifications, ...current.notifications]
-          : current.notifications,
+        return {
+          ...latest,
+          notes: updatedNotes,
+          notifications: collectedNotifications.length > 0
+            ? [...collectedNotifications, ...latest.notifications]
+            : latest.notifications,
+        };
       });
       setState(current);
+      successCount += 1;
+      for (const event of committedEvents) {
+        recordXiaohongshuCommentEvent({ characterId: character.id, characterName: character.name,
+          note: event.note, comment: event.result.mainComment, liked: event.liked, saved: event.saved });
+        recordCharacterThreadCommentEvents(character, event.note, event.result.note, event.result.threadComments);
+        touchCharacterMemory(character);
+      }
     }
-
-    if (successCount === 0 && firstError) {
-      throw firstError instanceof Error ? firstError : new Error(String(firstError));
-    }
+    if (successCount === 0 && firstError) throw firstError instanceof Error ? firstError : new Error(String(firstError));
+    onNotice?.(`已完成 ${successCount} 位参与角色的浏览互动${participants.length > successCount ? `，${participants.length - successCount} 位角色失败（详情见日志）` : ""}`);
     return current;
   }
 
-  async function handleGenerateHomeContent() {
-    if (busy !== "idle") return;
+  async function handleGenerateFeedMode(mode: XiaohongshuGenerationMode, selectedIds: string[]) {
+    if (busy !== "idle" || feedGenerationInFlightRef.current) return;
+    feedGenerationInFlightRef.current = true;
     clearErrorState();
     try {
-      const activeSettings = state.settings;
-      setBusy("npc-feed");
-      const { state: withNpc } = await generateNpcFeedState(state, activeSettings);
-      setState(withNpc);
-
-      if (activeSettings.participantCharacterIds.length > 0) {
-        setBusy("character-activity");
-        const withCharacters = await generateCharacterActivityState(withNpc, activeSettings);
-        setState(withCharacters);
+      const baseState = loadXiaohongshuState();
+      const activeSettings = baseState.settings;
+      const ids = resolveXiaohongshuGenerationCharacterIds(mode, activeSettings.participantCharacterIds, loadCharacters(), selectedIds);
+      if (mode !== "npc" && ids.length === 0) {
+        throw new Error(mode === "selected-posts" ? "请从全部角色中至少选择一位发帖角色。" : "没有可用的小红书参与角色，请先到小红书设置中勾选角色。");
       }
-      onNotice?.("小红书内容已生成");
+      if (mode === "npc") {
+        setBusy("npc-feed");
+        const { state: next, generated } = await generateNpcFeedState(baseState, activeSettings);
+        setState(next);
+        onNotice?.(`已生成 ${generated.length} 篇路人帖子`);
+      } else if (mode === "activity") {
+        setBusy("character-activity");
+        const next = await generateCharacterActivityState(baseState, activeSettings, ids);
+        setState(next);
+      } else {
+        setBusy("character-post");
+        const { created, failed } = await generateCharacterPostsState(baseState, activeSettings, ids);
+        onNotice?.(`已生成 ${created} 篇角色帖子${failed ? `，${failed} 位角色失败（详情见日志）` : ""}`);
+      }
     } catch (err) {
-      handleGenerationError(err, "暂时无法刷新小红书内容。");
+      handleGenerationError(err, "暂时无法生成小红书内容。");
     } finally {
+      feedGenerationInFlightRef.current = false;
       setBusy("idle");
     }
   }
@@ -2148,7 +2203,14 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
   }
 
   function requestFeedAction(action: PendingFeedAction) {
-    if (busy !== "idle") return;
+    if (busy !== "idle" || feedGenerationInFlightRef.current) return;
+    if (action === "refresh") {
+      // Explicit picker always sees current Float character library, not XHS settings participants.
+      setCharacters(loadCharacters());
+      setFeedGenerationMode("npc");
+      setSelectedPostCharacterIds([]);
+      setPostCharacterSearch("");
+    }
     setPendingFeedAction(action);
   }
 
@@ -2187,7 +2249,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
     const action = pendingFeedAction;
     setPendingFeedAction(null);
     if (action === "refresh") {
-      await handleGenerateHomeContent();
+      await handleGenerateFeedMode(feedGenerationMode, selectedPostCharacterIds);
     } else {
       handleClearAllContent();
     }
@@ -2534,15 +2596,15 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
       return (
         <div className="cp-xhs-status cp-empty-copy">
           <p>暂无小红书内容</p>
-          <span>生成首页、附近、视频和角色互动</span>
+          <span>生成路人帖子、角色帖子或角色互动</span>
           {options.showGenerateButton ? (
             <button
               type="button"
               className="xhs-empty-generate-btn"
-              onClick={handleGenerateHomeContent}
+              onClick={() => requestFeedAction("refresh")}
               disabled={busy !== "idle"}
             >
-              {busy === "npc-feed" || busy === "character-activity" ? "正在生成" : "生成小红书内容"}
+              {busy !== "idle" ? "正在生成" : "生成小红书内容"}
             </button>
           ) : null}
         </div>
@@ -2644,7 +2706,7 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
       {busy !== "idle" ? (
         <div className="cp-refresh-indicator cp-refresh-indicator--floating" aria-live="polite">
           <span className="cp-refresh-indicator-text">
-            {busy === "npc-feed" ? "正在生成帖子内容" : busy === "character-activity" ? "正在生成角色互动内容" : busy === "publish" ? "正在发布笔记" : busy === "comment-reply" || busy === "mention-reply" ? "正在生成回复内容" : busy === "dm-reply" ? "正在生成私信回复" : "正在生成互动内容"}
+            {busy === "npc-feed" ? "正在生成路人帖子" : busy === "character-post" ? "正在生成角色帖子" : busy === "character-activity" ? "正在生成角色互动内容" : busy === "publish" ? "正在发布笔记" : busy === "comment-reply" || busy === "mention-reply" ? "正在生成回复内容" : busy === "dm-reply" ? "正在生成私信回复" : "正在生成互动内容"}
           </span>
           <span className="cp-refresh-indicator-dots" aria-hidden="true">
             <i></i><i></i><i></i>
@@ -3598,27 +3660,74 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
         /> : null;
       })()}
 
-      {pendingFeedAction ? (
+      {pendingFeedAction === "refresh" ? (
         <div className="xhs-modal-backdrop" onClick={() => setPendingFeedAction(null)}>
-          <section className="xhs-confirm-sheet" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={pendingFeedAction === "refresh" ? "确认刷新" : "确认清空内容流"}>
+          <section className="xhs-confirm-sheet" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="选择小红书生成方式" style={{ maxHeight: "min(82dvh, 700px)", overflowY: "auto" }}>
             <header>
-              <strong>{pendingFeedAction === "refresh" ? "新增一批小红书内容？" : "清空首页、附近和视频内容？"}</strong>
+              <strong>新增小红书内容</strong>
               <button type="button" className="xhs-sheet-close-btn" onClick={() => setPendingFeedAction(null)} aria-label="关闭">×</button>
             </header>
-            <p>
-              {pendingFeedAction === "refresh"
-                ? "将生成一批新的首页与视频内容，已有内容会保留，旧内容不会回传给本次生成链路。"
-                : "将清空首页推荐、附近和视频页当前可见内容；消息、私信、用户主页和互动记录会保留。"}
-            </p>
+            <div role="radiogroup" aria-label="内容生成方式" style={{ display: "grid", gap: 9, margin: "12px 0" }}>
+              {([
+                { mode: "npc", title: "生成一批路人帖子", hint: "只生成 NPC 首页、附近、视频内容" },
+                { mode: "all-posts", title: "全部参与角色发帖", hint: "按照小红书设置中勾选的角色，每人一篇" },
+                { mode: "selected-posts", title: "指定角色发帖", hint: "从 Float 全部角色中多选，不修改参与设置" },
+                { mode: "activity", title: "生成角色浏览互动", hint: "参与角色浏览现有笔记并评论，不再顺便发帖" },
+              ] as Array<{ mode: XiaohongshuGenerationMode; title: string; hint: string }>).map(option => (
+                <button key={option.mode} type="button" role="radio" aria-checked={feedGenerationMode === option.mode}
+                  onClick={() => setFeedGenerationMode(option.mode)}
+                  style={{ textAlign: "left", border: feedGenerationMode === option.mode ? "1.5px solid #ff385f" : "1px solid #e9e9ec", borderRadius: 12, padding: "11px 13px", background: feedGenerationMode === option.mode ? "#fff4f6" : "#fff", color: "#242424" }}>
+                  <strong style={{ display: "block", fontSize: 14 }}>{feedGenerationMode === option.mode ? "● " : "○ "}{option.title}</strong>
+                  <span style={{ display: "block", color: "#777", fontSize: 12, paddingTop: 3 }}>{option.hint}</span>
+                </button>
+              ))}
+            </div>
+            {feedGenerationMode === "selected-posts" ? (
+              <div style={{ marginBottom: 12 }}>
+                <label htmlFor="xhs-generation-character-search" style={{ display: "block", fontSize: 13, marginBottom: 6 }}>
+                  从全部角色选择（已选 {selectedPostCharacterIds.length} 位）
+                </label>
+                <input id="xhs-generation-character-search" value={postCharacterSearch}
+                  onChange={event => setPostCharacterSearch(event.target.value)} placeholder="搜索角色姓名" autoComplete="off"
+                  style={{ width: "100%", boxSizing: "border-box", borderRadius: 10, border: "1px solid #ddd", padding: "10px 12px", fontSize: 14, color: "#242424", background: "#fff" }} />
+                <div role="group" aria-label="发帖角色多选" style={{ maxHeight: 220, overflowY: "auto", display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 6, marginTop: 8 }}>
+                  {characters.filter(character => character.name.toLocaleLowerCase().includes(postCharacterSearch.trim().toLocaleLowerCase())).slice(0, 80).map(character => {
+                    const chosen = selectedPostCharacterIds.includes(character.id);
+                    return <button type="button" key={character.id} aria-pressed={chosen}
+                      onClick={() => setSelectedPostCharacterIds(previous => chosen ? previous.filter(id => id !== character.id) : [...previous, character.id])}
+                      style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "left", border: chosen ? "1px solid #ff385f" : "1px solid #e5e5e7", background: chosen ? "#fff4f6" : "#f7f7f8", color: "#333", borderRadius: 9, padding: "9px 10px", fontSize: 13 }}>
+                      {chosen ? "✓ " : "○ "}{character.name}
+                    </button>;
+                  })}
+                </div>
+                {characters.filter(character => character.name.toLocaleLowerCase().includes(postCharacterSearch.trim().toLocaleLowerCase())).length > 80 ? (
+                  <p style={{ fontSize: 12, color: "#777" }}>结果较多，仅显示前 80 位；输入名字可继续查找。已选角色不会因为搜索而丢失。</p>
+                ) : null}
+                {selectedPostCharacterIds.length > 0 ? <p style={{ fontSize: 12, color: "#777" }}>已选：{selectedPostCharacterIds.map(id => characters.find(item => item.id === id)?.name || "已删除角色").join("、")}</p> : null}
+              </div>
+            ) : null}
+            {(feedGenerationMode === "all-posts" || feedGenerationMode === "activity") && !resolveXiaohongshuGenerationCharacterIds(feedGenerationMode, state.settings.participantCharacterIds, characters).length ? (
+              <p style={{ color: "#b04b54", fontSize: 12 }}>当前没有有效的参与角色。请先到小红书设置中勾选角色。</p>
+            ) : null}
             <div className="xhs-confirm-actions">
               <button type="button" onClick={() => setPendingFeedAction(null)}>取消</button>
-              <button
-                type="button"
-                className={pendingFeedAction === "clear" ? "xhs-confirm-delete-btn" : "xhs-confirm-primary-btn"}
-                onClick={() => void handleConfirmFeedAction()}
-              >
-                {pendingFeedAction === "refresh" ? "确认新增" : "确认清空"}
-              </button>
+              <button type="button" className="xhs-confirm-primary-btn" disabled={feedGenerationMode !== "npc" && !resolveXiaohongshuGenerationCharacterIds(feedGenerationMode, state.settings.participantCharacterIds, characters, selectedPostCharacterIds).length}
+                onClick={() => void handleConfirmFeedAction()}>开始生成</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {pendingFeedAction === "clear" ? (
+        <div className="xhs-modal-backdrop" onClick={() => setPendingFeedAction(null)}>
+          <section className="xhs-confirm-sheet" onClick={event => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="确认清空内容流">
+            <header>
+              <strong>清空首页、附近和视频内容？</strong>
+              <button type="button" className="xhs-sheet-close-btn" onClick={() => setPendingFeedAction(null)} aria-label="关闭">×</button>
+            </header>
+            <p>将清空首页推荐、附近和视频页当前可见内容；消息、私信、用户主页和互动记录会保留。</p>
+            <div className="xhs-confirm-actions">
+              <button type="button" onClick={() => setPendingFeedAction(null)}>取消</button>
+              <button type="button" className="xhs-confirm-delete-btn" onClick={() => void handleConfirmFeedAction()}>确认清空</button>
             </div>
           </section>
         </div>
