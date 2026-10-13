@@ -5,7 +5,7 @@ import { PaymentFxLine, usePaymentFx } from "./payment-fx-preview";
 import { formatPaymentAmount, normalizeCurrency, PAYMENT_CURRENCIES } from "@/lib/payment-currency";
 import { paymentDisplayState, paymentReceiveSuffix, paymentStatusGlyph } from "@/lib/payment-display";
 
-import { useState, useEffect, useCallback, useRef, useMemo, useContext, useId, memo } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, useContext, useId, memo } from "react";
 import { ImessagePresentation, TranslationBody } from "./imessage-presentation";
 import { MusicShareBubble } from "./music-share-bubble";
 import { filterVoiceDisplayText } from "@/lib/voice-display-text";
@@ -631,7 +631,10 @@ export const BilingualTextBlock = memo(function BilingualTextBlock({
     useEffect(() => {
         if (!presentation.enabled) setExpanded(defaultExpanded);
     }, [text, defaultExpanded, presentation.enabled]);
-    useEffect(() => { if (presentation.enabled) setExpanded(false); }, [presentation.enabled]);
+    // An iMessage opt-in can arrive in a parent's layout effect. Collapse before
+    // that commit paints; passive useEffect allowed one visible expanded frame.
+    // Run ONLY when enabled changes, never on a user-triggered translation toggle.
+    useLayoutEffect(() => { if (presentation.enabled) setExpanded(false); }, [presentation.enabled]);
     const display = (value: string) => presentation.enabled && presentation.voiceTranscript ? filterVoiceDisplayText(value) : value;
     const renderContent = (content: string, extraClass?: string) => {
         if (mode === "plain") return <PlainTextContent content={content} className={extraClass} />;

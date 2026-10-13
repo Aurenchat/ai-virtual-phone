@@ -2147,6 +2147,21 @@
   .chat-music-share-cover > img { transition: none; }
 }
 
+/* iMessage Bridge music: the *surface* keeps its measured tail outline.
+   The rectangular album cover only needs its upper rounded corners. Reusing
+   the full dynamic path() on both moving layers may trigger extra WebKit
+   repainting when a neighboring bilingual message expands/collapses. The host
+   override deliberately also covers existing per-session saved iMessage CSS. */
+.chat-room-wrapper:is(.im-single, .im-group) .im-bubble.chat-bubble-music-share.im-geometry-ready .chat-music-share-cover {
+  border-radius: 24px 24px 0 0;
+  clip-path: none;
+}
+/* Disable an avoidable opacity compositor transition on this one cover only.
+   Does not alter image src/load state, the player, or non-iMessage cards. */
+.chat-room-wrapper:is(.im-single, .im-group) .im-bubble.chat-bubble-music-share .chat-music-share-cover > img {
+  transition: none;
+}
+
 .chat-music-share-info {
   position: relative;
   z-index: 1;

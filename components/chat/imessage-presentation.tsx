@@ -1,19 +1,17 @@
 "use client";
 
-import { createContext, useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
 export const ImessagePresentation = createContext({ enabled: false, voiceTranscript: false });
 
-// Read the theme's opt-in after SessionCustomCSS has injected scoped styles.
-// Old themes do not opt in. No global setting or persistent data is modified.
+// Resolve scoped CSS opt-in during the commit's layout phase, before paint.
+// Waiting for rAF exposed an expanded non-iMessage translation for one frame.
+// Old themes remain opt-out; this only reads computed CSS, never stores settings.
 export function useImessagePresentation(ref: RefObject<HTMLElement | null>, css: string, sessionId: string) {
     const [enabled, setEnabled] = useState(false);
-    useEffect(() => {
-        const frame = requestAnimationFrame(() => {
-            const s = ref.current && getComputedStyle(ref.current);
-            setEnabled(s?.getPropertyValue("--im-theme").trim() === "1" && s.getPropertyValue("--im-presentation").trim() === "1");
-        });
-        return () => cancelAnimationFrame(frame);
+    useLayoutEffect(() => {
+        const s = ref.current && getComputedStyle(ref.current);
+        setEnabled(s?.getPropertyValue("--im-theme").trim() === "1" && s.getPropertyValue("--im-presentation").trim() === "1");
     }, [ref, css, sessionId]);
     return enabled;
 }
