@@ -22,6 +22,7 @@ import { sendBrowserNotification } from "@/lib/browser-notification";
 import { dispatchChatMessageNotice } from "@/lib/chat-notification-events";
 import { shouldSendChatInputOnEnter } from "@/lib/chat-input-keyboard";
 import { useChatBottomReserve } from "./use-chat-bottom-reserve";
+import { createChatScrollStability } from "@/lib/chat-scroll-stability";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
@@ -1383,10 +1384,13 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     useEffect(() => () => { mountedRef.current = false; }, []);
     useEffect(() => { visibleMessagesRef.current = messages; }, [messages]);
     useEffect(() => { hasMoreRef.current = hasMore; }, [hasMore]);
+    // Session-local geometry tracking. It never reads stored message content.
+    const scrollStability = useMemo(() => createChatScrollStability(), [session.id]);
     useChatBottomReserve(
         wrapperRef,
         scrollRef,
         `${session.id}:${offlineMode}:${isMultiSelectMode}:${showEmojiPanel}:${showStickerPanel}:${showPlusMenu}:${theaterMode}:${!!quotingMessage}`,
+        scrollStability.isPinned,
     );
 
     const selectStoredMessageWindow = useCallback((allMsgs: ChatMessage[]) => {
@@ -1618,6 +1622,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
     // Flat array of group characters for components that need it
     const groupCharacters = useMemo(() => [...groupCharMap.values()], [groupCharMap]);
+    const callReplacesRoom = !!session.isGroup && groupCharacters.length > 0 && (showVoiceCall || showVideoCall);
+    useLayoutEffect(() => scrollStability.attach(scrollRef.current), [scrollStability, callReplacesRoom]);
     const groupCharacterNames = useMemo(() => groupCharacters.map(item => item.name).filter(Boolean).join("、"), [groupCharacters]);
 
     const activeRegexes = useMemo<RegexConfig[]>(() => {
@@ -1964,6 +1970,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
     const loadMore = useCallback(() => {
         if (!hasMore || loadingMoreRef.current) return;
+        scrollStability.suspend(); // Preserving a history anchor outranks bottom follow.
         stopLoadMoreAnchorTracking();
         loadingMoreRef.current = true;
         initialScrollVersionRef.current += 1;
@@ -1993,7 +2000,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         hasMoreRef.current = nextHasMore;
         setHasMore(nextHasMore);
         setMessages(nextMessages);
-    }, [captureScrollAnchor, hasMore, messages, session.id, stopLoadMoreAnchorTracking]);
+    }, [captureScrollAnchor, hasMore, messages, session.id, scrollStability, stopLoadMoreAnchorTracking]);
     // useLayoutEffect: runs synchronously after DOM mutation, before browser paint
     // Prevents flash of wrong scroll position, works reliably under transform: scale()
     const displayMessages = useMemo(() => {
@@ -2006,11 +2013,20 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             .map(item => item.msg);
     }, [messages, transientMessages]);
 
+    const previousDisplayedIdsRef = useRef(new Set<string>());
+    const previousTailIdRef = useRef<string | null>(null);
     useLayoutEffect(() => {
         const el = scrollRef.current;
         const anchor = loadMoreAnchorRef.current;
         const loadMoreRestore = loadMoreScrollRestoreRef.current;
+        const tailId = displayMessages[displayMessages.length - 1]?.id ?? null;
+        const tailChanged = tailId !== previousTailIdRef.current;
+        const ownSend = displayMessages.some(msg => msg.role === "user"
+            && !isTransientMessage(msg) && !previousDisplayedIdsRef.current.has(msg.id));
+        previousDisplayedIdsRef.current = new Set(displayMessages.map(msg => msg.id));
+        previousTailIdRef.current = tailId;
         if (loadMoreRestore) {
+            scrollStability.suspend();
             if (el && !restoreScrollAnchor(anchor)) {
                 el.scrollTop = loadMoreRestore.scrollTop + (el.scrollHeight - loadMoreRestore.scrollHeight);
             }
@@ -2023,6 +2039,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
         const pendingJump = pendingSearchJumpRef.current;
         if (pendingJump && el) {
+            scrollStability.suspend();
             const jumpIds = pendingJump.fallbackMessageId && pendingJump.fallbackMessageId !== pendingJump.messageId
                 ? [pendingJump.messageId, pendingJump.fallbackMessageId]
                 : [pendingJump.messageId];
@@ -2031,6 +2048,13 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             if (targetId && target) {
                 pendingSearchJumpRef.current = null;
                 scrollElementWithinContainer(el, target, { behavior: "smooth", block: "center" });
+                scrollStability.stabilizeTarget(() => {
+                    if (!target.isConnected || !el.contains(target)) return;
+                    const targetRect = target.getBoundingClientRect();
+                    const containerRect = el.getBoundingClientRect();
+                    const distance = targetRect.top + targetRect.height / 2 - containerRect.top - el.clientHeight / 2;
+                    if (Math.abs(distance) > 1) scrollElementWithinContainer(el, target, { behavior: "auto", block: "center" });
+                });
                 flashMessageHighlight(targetId);
             } else {
                 pendingSearchJumpRef.current = null;
@@ -2042,67 +2066,32 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         if (needsInitialScrollRef.current && displayMessages.length > 0 && el) {
             needsInitialScrollRef.current = false;
             prevMsgCountRef.current = displayMessages.length;
-            const scrollVersion = ++initialScrollVersionRef.current;
-
-            // Wait for all images inside the scroll container to finish loading, then scroll once
-            const imgs = Array.from(el.querySelectorAll("img"));
-            const pending = imgs.filter(img => !img.complete);
-            console.log(`[SCROLL] imgs total=${imgs.length}, pending=${pending.length}`);
-
-            if (pending.length === 0) {
-                el.scrollTop = el.scrollHeight;
-                console.log(`[SCROLL] done (no pending), sH=${el.scrollHeight}`);
-            } else {
-                let loaded = 0;
-                const onDone = () => {
-                    loaded++;
-                    if (loaded >= pending.length) {
-                        if (initialScrollVersionRef.current !== scrollVersion || loadingMoreRef.current) return;
-                        el.scrollTop = el.scrollHeight;
-                        console.log(`[SCROLL] done (all loaded), sH=${el.scrollHeight}`);
-                    }
-                };
-                for (const img of pending) {
-                    img.addEventListener("load", onDone, { once: true });
-                    img.addEventListener("error", onDone, { once: true });
-                }
-            }
-        } else if (displayMessages.length > prevMsgCountRef.current && el) {
-            el.scrollTop = el.scrollHeight;
+            ++initialScrollVersionRef.current;
+            // Do not wait for image load. Correct again if media/iMessage later resize.
+            scrollStability.initial();
+        } else if ((displayMessages.length > prevMsgCountRef.current || tailChanged) && el) {
+            // Own sends jump to the newest message; incoming messages only follow
+            // while the user is pinned, never while reading older history.
+            scrollStability.appended(ownSend);
         }
         prevMsgCountRef.current = displayMessages.length;
-    }, [displayMessages, flashMessageHighlight, restoreScrollAnchor, watchLoadMoreAnchorImages]);
+    }, [displayMessages, flashMessageHighlight, restoreScrollAnchor, scrollStability, watchLoadMoreAnchorImages]);
 
+    const offlineScrollStateRef = useRef({ sessionId: "", active: false, input: "" });
     useLayoutEffect(() => {
+        const previous = offlineScrollStateRef.current;
+        offlineScrollStateRef.current = { sessionId: session.id, active: offlineMode, input: pendingOfflineUserText };
         if (!offlineMode) return;
-        const el = scrollRef.current;
-        if (el) el.scrollTop = el.scrollHeight;
-    }, [offlineMode, offlineTurns.length, isOfflineGenerating, pendingOfflineUserText]);
+        if (offlineLoadMoreRestoreRef.current) { scrollStability.suspend(); return; }
+        if (!previous.active || previous.sessionId !== session.id) scrollStability.initial();
+        else scrollStability.appended(!!pendingOfflineUserText && pendingOfflineUserText !== previous.input);
+    }, [offlineMode, offlineTurns.length, isOfflineGenerating, pendingOfflineUserText, scrollStability, session.id]);
 
-    // 流式预览增量更新时跟随滚动到底：仅在用户本来就停在底部附近时跟随，
-    // 用户上翻历史/查看旧消息时绝不拽回底部（否则长回复生成中根本无法阅读）。
-    const isNearBottomRef = useRef(true);
-    useEffect(() => {
-        const el = scrollRef.current;
-        if (!el) return;
-        const onScroll = () => {
-            // 距底部 < 120px 视为"在底部附近"；用户上翻即停用自动跟随
-            isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-        };
-        el.addEventListener("scroll", onScroll, { passive: true });
-        return () => el.removeEventListener("scroll", onScroll);
-    }, []);
-    // 只在接近底部时才跟随，且用 rAF 合并到下一帧，避免每帧 setState 后 layout 抖动
-    const streamFollowRef = useRef(0);
+    // The controller coalesces stream/layout requests in one cancellable frame.
     const followStreamScroll = useCallback(() => {
-        if (streamFollowRef.current) return;
-        streamFollowRef.current = window.requestAnimationFrame(() => {
-            streamFollowRef.current = 0;
-            if (!isNearBottomRef.current) return;
-            const el = scrollRef.current;
-            if (el) el.scrollTop = el.scrollHeight;
-        });
-    }, []);
+        scrollStability.followIfPinned();
+    }, [scrollStability]);
+
     useLayoutEffect(() => {
         if (!streamPreview && !offlineStreamPreview) return;
         followStreamScroll();
@@ -2113,10 +2102,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         return () => {
             if (streamParseFrameRef.current) cancelAnimationFrame(streamParseFrameRef.current);
             if (offlineStreamFrameRef.current) cancelAnimationFrame(offlineStreamFrameRef.current);
-            if (streamFollowRef.current) cancelAnimationFrame(streamFollowRef.current);
             streamParseFrameRef.current = 0;
             offlineStreamFrameRef.current = 0;
-            streamFollowRef.current = 0;
         };
     }, []);
 
@@ -4126,6 +4113,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
     const loadMoreOfflineTurns = useCallback(() => {
         if (!hasMoreOfflineTurns) return;
+        scrollStability.suspend();
         const el = scrollRef.current;
         if (el) {
             offlineLoadMoreRestoreRef.current = {
@@ -4134,7 +4122,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             };
         }
         setOfflineVisibleCount(count => Math.min(count + OFFLINE_LOAD_MORE_COUNT, offlineTurns.length));
-    }, [hasMoreOfflineTurns, offlineTurns.length]);
+    }, [hasMoreOfflineTurns, offlineTurns.length, scrollStability]);
 
     useLayoutEffect(() => {
         const restore = offlineLoadMoreRestoreRef.current;
@@ -5411,6 +5399,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     /* Settings panel is rendered as an overlay (not early return) to preserve chat scroll position */
 
     const jumpToStoredMessage = useCallback((messageId: string) => {
+        scrollStability.suspend();
         const allMsgs = loadChatMessages(session.id);
         const targetIndex = allMsgs.findIndex(msg => msg.id === messageId);
         if (targetIndex < 0) return;
@@ -5456,7 +5445,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         hasMoreRef.current = nextHasMore;
         setHasMore(nextHasMore);
         setMessages(nextMessages);
-    }, [session.id, stopLoadMoreAnchorTracking]);
+    }, [session.id, scrollStability, stopLoadMoreAnchorTracking]);
 
     // Shared handler: reload messages + re-trigger scroll-to-bottom after call ends
     const returnFromCall = (hide: () => void) => {

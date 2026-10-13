@@ -18,27 +18,35 @@ export function useChatBottomReserve<TWrapper extends HTMLElement, TScroll exten
     wrapperRef: RefObject<TWrapper | null>,
     scrollRef: RefObject<TScroll | null>,
     refreshKey: string,
+    shouldAutoStick?: () => boolean,
 ) {
     useLayoutEffect(() => {
         if (typeof window === "undefined") return;
         const wrapper = wrapperRef.current;
         if (!wrapper) return;
 
+        let disposed = false;
         let frame = 0;
         let bottomScrollFrame = 0;
         let observer: ResizeObserver | null = null;
 
         const scheduleStickToBottom = () => {
+            if (disposed) return;
             if (bottomScrollFrame) window.cancelAnimationFrame(bottomScrollFrame);
             bottomScrollFrame = window.requestAnimationFrame(() => {
                 bottomScrollFrame = 0;
+                if (disposed) return;
                 const el = scrollRef.current;
-                if (el) el.scrollTop = el.scrollHeight;
+                if (el && (shouldAutoStick?.() ?? true)) {
+                    const target = Math.max(0, el.scrollHeight - el.clientHeight);
+                    if (Math.abs(el.scrollTop - target) > 1) el.scrollTop = target;
+                }
             });
         };
 
         const measure = () => {
             frame = 0;
+            if (disposed) return;
             const overlay = findBottomOverlay(wrapper);
             if (!overlay) {
                 wrapper.style.removeProperty(CHAT_BOTTOM_RESERVE_CSS_VAR);
@@ -57,10 +65,11 @@ export function useChatBottomReserve<TWrapper extends HTMLElement, TScroll exten
                 wrapper.style.removeProperty(CHAT_BOTTOM_RESERVE_CSS_VAR);
             }
 
-            if (wasNearBottom) scheduleStickToBottom();
+            if (wasNearBottom && (shouldAutoStick?.() ?? true)) scheduleStickToBottom();
         };
 
         const requestMeasure = () => {
+            if (disposed) return;
             if (frame) window.cancelAnimationFrame(frame);
             frame = window.requestAnimationFrame(measure);
         };
@@ -77,6 +86,7 @@ export function useChatBottomReserve<TWrapper extends HTMLElement, TScroll exten
         window.visualViewport?.addEventListener("scroll", requestMeasure);
 
         return () => {
+            disposed = true;
             if (frame) window.cancelAnimationFrame(frame);
             if (bottomScrollFrame) window.cancelAnimationFrame(bottomScrollFrame);
             observer?.disconnect();
@@ -84,5 +94,5 @@ export function useChatBottomReserve<TWrapper extends HTMLElement, TScroll exten
             window.visualViewport?.removeEventListener("resize", requestMeasure);
             window.visualViewport?.removeEventListener("scroll", requestMeasure);
         };
-    }, [wrapperRef, scrollRef, refreshKey]);
+    }, [wrapperRef, scrollRef, refreshKey, shouldAutoStick]);
 }

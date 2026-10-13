@@ -1,0 +1,26 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const room = fs.readFileSync(path.join(__dirname,'../components/chat/chat-room.tsx'),'utf8');
+assert.match(room, /createChatScrollStability/);
+assert.match(room, /scrollStability\.initial\(\)/);
+assert.match(room, /scrollStability\.appended\(/);
+assert.match(room, /scrollStability\.suspend\(\)/);
+assert.match(room, /scrollStability\.followIfPinned\(\)/);
+assert.doesNotMatch(room, /Wait for all images inside the scroll container to finish loading/);
+assert.doesNotMatch(room, /pending\.filter\(img => !img\.complete\)/);
+// History anchoring & search jumps must remain intact.
+assert.match(room, /restoreScrollAnchor\(anchor\)/);
+assert.match(room, /pendingSearchJumpRef\.current/);
+assert.match(room, /useChatBottomReserve\(/);
+assert.doesNotMatch(room, /streamFollowRef/, 'stream correction must share the controller frame');
+assert.match(room, /offlineLoadMoreRestoreRef\.current\) \{ scrollStability\.suspend\(\)/);
+assert.match(room, /scrollStability\.appended\(!!pendingOfflineUserText/);
+assert.match(room, /hasMoreOfflineTurns, offlineTurns\.length, scrollStability/);
+assert.match(room, /scrollStability\.attach\(scrollRef\.current\).*callReplacesRoom/);
+assert.match(room, /callReplacesRoom = .*session\.isGroup.*showVoiceCall.*showVideoCall/);
+assert.match(room, /previousDisplayedIdsRef\.current\.has\(msg\.id\)/, 'own sends detected even when the 50-message window keeps its size');
+assert.match(room, /prevMsgCountRef\.current \|\| tailChanged/, 'fixed-size windows still notify the controller');
+assert.match(room, /scrollStability\.stabilizeTarget\(/, 'search geometry settles without bottom following');
+console.log('PASS ChatRoom integration guards: initial, append, stream, scroll-jump escape, history-anchor preserved');
