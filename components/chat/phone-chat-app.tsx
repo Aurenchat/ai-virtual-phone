@@ -166,7 +166,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
                     },
                 });
             } else {
-                const content = formatXiaohongshuShareForPrompt({
+                const content = sharePayload.noteId ? `[小红书帖子引用]${sharePayload.title}（${sharePayload.authorName}，笔记ID:${sharePayload.noteId}）` : formatXiaohongshuShareForPrompt({
                     author: sharePayload.authorName,
                     title: sharePayload.title,
                     body: sharePayload.body,
@@ -178,6 +178,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
                     content,
                     mediaType: "xiaohongshu_note_share",
                     mediaData: {
+                        xiaohongshuNoteId: sharePayload.noteId,
                         xiaohongshuAuthor: sharePayload.authorName,
                         xiaohongshuTitle: sharePayload.title,
                         xiaohongshuBody: sharePayload.body,

@@ -1,6 +1,12 @@
 // lib/chat-engine.ts
 
 import { createSseJsonParser } from "./sse-json";
+import {
+    newestXhsShareMessage, buildXhsSharePromptForChat,
+    parseXhsSocialActions, createXhsStreamSanitizer,
+    canUseXhsShareVision, retryXhsShareWithoutVision,
+    type XhsPendingSocialAction,
+} from "./xiaohongshu-chat-share";
 import { maybeAppendShortcutCapability } from "./offline-shortcut-capability";
 import { loadCharacters } from "./character-storage";
 import { buildScreenEffectPromptHint } from "./chat-screen-effects";
@@ -373,6 +379,8 @@ export type DebugPromptRequestOptions = {
 };
 
 type ChatPromptBuildOptions = {
+    /** Only direct online chat publishers opt in to the native share bridge. */
+    xhsShareEnabled?: boolean;
     diagnosticRunId?: string;
     followUpCount?: number;
     followUpDelay?: number;
@@ -1494,6 +1502,8 @@ export type ChatCompletionPart = {
 
 export type ChatCompletionResult = {
     parts: ChatCompletionPart[];
+    /** Proposed by the model, never committed inside the engine. */
+    xiaohongshuAction?: XhsPendingSocialAction;
 };
 
 /** Extract combined clean text from a ChatCompletionResult (for callers that need a plain string). */
@@ -1820,6 +1830,7 @@ export async function buildChatPromptMessages(
     regexes: RegexConfig[];
     userIdentity: ReturnType<typeof resolveUserIdentity>;
     toolsEnabled: boolean;
+    xhsShareTargets?: string[];
 }> {
     markGenerationDiagnostic(options?.diagnosticRunId, "CONTEXT_PREP_BEGIN");
     const chars = loadCharacters();
@@ -2018,10 +2029,24 @@ export async function buildChatPromptMessages(
             content: "本次自定义 APP AI 任务只输出严格 JSON。不要输出 Markdown 代码块、解释文字或聊天富媒体指令。",
         });
     }
+    // Only the currently received reference is expanded. Historic shares
+    // remain compact and never re-read nine images in every subsequent turn.
+    let xhsShareTargets: string[] | undefined;
+    if (options?.xhsShareEnabled && resolvedAppId === "chat" && !session.isGroup) {
+        const share = newestXhsShareMessage(historyForPrompt, session.id);
+        if (share) {
+            try {
+                llmMessages.push(...await buildXhsSharePromptForChat(share, canUseXhsShareVision(config), ids => { xhsShareTargets = ids; }));
+            } catch (err) {
+                console.warn("[XHS share] Could not expand note reference:", err);
+                llmMessages.push({ role: "user", content: "[小红书原帖读取失败]只根据分享卡片提供的文字回答，不要猜测图片或评论内容。" });
+            }
+        }
+    }
     appendEmptyGenerateGuardMessage(llmMessages, config, historyForPrompt);
 
     markGenerationDiagnostic(options?.diagnosticRunId, "PROMPT_ASSEMBLED", { llmMessageCount: llmMessages.length });
-    return { llmMessages, character, config, preset, regexes, userIdentity, toolsEnabled };
+    return { llmMessages, character, config, preset, regexes, userIdentity, toolsEnabled, xhsShareTargets };
 }
 
 export type ChatCompletionCallbacks = {
@@ -2180,9 +2205,10 @@ async function generateNativeChatCompletion(
         options?: ChatPromptBuildOptions & { signal?: AbortSignal };
         callbacks?: ChatCompletionCallbacks;
         bailoutRef: ReplyBailoutRef;
+        sanitizeShareOutput?: (text: string) => string;
     },
 ): Promise<ChatCompletionResult> {
-    const { session, llmMessages, character, config, preset, regexes, userIdentity, options, callbacks, bailoutRef } = params;
+    const { session, llmMessages, character, config, preset, regexes, userIdentity, options, callbacks, bailoutRef, sanitizeShareOutput } = params;
     const enabledTools = getEnabledTools(options?.appId ?? "chat");
     const requestAppTags = mergeAppTags(options?.appTags, options?.promptProfile?.appTags, options?.appId ?? "chat");
     const persistedSession = loadChatSessions().find(item => item.id === session.id);
@@ -2251,6 +2277,7 @@ async function generateNativeChatCompletion(
                 );
             }
         } catch (err) {
+            if (sanitizeShareOutput && retryXhsShareWithoutVision(config, requestMessages, err)) { round -= 1; continue; }
             const errMsg = `⚠️ 回复生成失败: ${err instanceof Error ? err.message : String(err)}`;
             if (parts.length > 0) {
                 throwIfAborted(options?.signal);
@@ -2271,6 +2298,7 @@ async function generateNativeChatCompletion(
         }
         // 剔除预设配置的文本片段（<思考结束> 等残留标签）
         displayContent = stripPresetTexts(displayContent, preset);
+        displayContent = sanitizeShareOutput?.(displayContent) ?? displayContent;
 
         const { cleanText: afterActionStrip, actions } = parseActionTags(displayContent);
         if (actions.length > 0) {
@@ -2589,12 +2617,43 @@ async function generateChatCompletionCore(
     callbacks: ChatCompletionCallbacks | undefined,
     bailoutRef: ReplyBailoutRef,
 ): Promise<ChatCompletionResult> {
-    const { llmMessages, character, config, preset, regexes, userIdentity, toolsEnabled } = await buildChatPromptMessages(session, history, options);
+    const { llmMessages, character, config, preset, regexes, userIdentity, toolsEnabled, xhsShareTargets } = await buildChatPromptMessages(session, history, options);
     const requestAppTags = mergeAppTags(options?.appTags, options?.promptProfile?.appTags, options?.appId ?? "chat");
+    const xhsShare = options?.xhsShareEnabled && (options?.appId ?? "chat") === "chat" && !session.isGroup
+        ? newestXhsShareMessage(history, session.id) : null;
+    let pendingXhsAction: XhsPendingSocialAction | undefined;
+    let onVisibleReply: ((value: string) => string) | undefined;
+    if (xhsShare?.mediaData?.xiaohongshuNoteId) {
+        const baseCallbacks = callbacks;
+        const sanitizeStream = createXhsStreamSanitizer(baseCallbacks?.onStreamDelta);
+        const turnId = options?.diagnosticRunId || `xhs-${Date.now()}-${Math.random()}`;
+        onVisibleReply = (value: string) => {
+            const parsed = parseXhsSocialActions(value);
+            if (parsed.actions && xhsShareTargets !== undefined) pendingXhsAction = {
+                shareMessageId: xhsShare.id,
+                noteId: xhsShare.mediaData!.xiaohongshuNoteId!,
+                action: parsed.actions,
+                turnId, allowedReplyIds: xhsShareTargets,
+            };
+            return parsed.visibleText;
+        };
+        callbacks = {
+            ...baseCallbacks,
+            onStreamDelta: sanitizeStream,
+            onTextPart: async (text, sender, meta) => {
+                sanitizeStream.flush();
+                await baseCallbacks?.onTextPart?.(text, sender, meta);
+            },
+            onNativeToolAssistantTurn: async (turn) => {
+                sanitizeStream.flush();
+                await baseCallbacks?.onNativeToolAssistantTurn?.(turn);
+            },
+        };
+    }
 
     // 追问有自己的排期时兜底（followup:key），这里只为普通回复生成挂单。
     // 不 await：挂单失败或慢都不拖累本地生成；生成先结束则通过 closed 标记补撤销。
-    if (!session.isGroup && (options?.appId ?? "chat") === "chat" && !(requestAppTags ?? []).includes("followup")) {
+    if (!xhsShare && !session.isGroup && (options?.appId ?? "chat") === "chat" && !(requestAppTags ?? []).includes("followup")) {
         // 云端兜底可能在另一台机器上生成并经真实微信发送。把本轮最后一条
         // 用户输入/系统指令作为因果锚点带过去，避免回复拉回本地后因手机与
         // 云服务器存在亚秒级时钟偏差，被按 createdAt 重排到触发消息前面。
@@ -2637,7 +2696,7 @@ async function generateChatCompletionCore(
     }
 
     if (toolsEnabled && nativeToolProtocolForConfig(config) && getEnabledTools(options?.appId ?? "chat").length > 0) {
-        return generateNativeChatCompletion({
+        const nativeResult = await generateNativeChatCompletion({
             session,
             llmMessages,
             character,
@@ -2648,7 +2707,12 @@ async function generateChatCompletionCore(
             options,
             callbacks,
             bailoutRef,
+            sanitizeShareOutput: onVisibleReply,
         });
+        return { ...nativeResult,
+            parts: xhsShare ? nativeResult.parts.map(part => ({ ...part, text: parseXhsSocialActions(part.text).visibleText })) : nativeResult.parts,
+            xiaohongshuAction: nativeResult.parts.some(part => part.toolNotice?.startsWith("⚠️")) ? undefined : pendingXhsAction,
+        };
     }
 
     // ── Tool calling loop with real-time callbacks ──
@@ -2696,6 +2760,7 @@ async function generateChatCompletionCore(
                 });
             }
         } catch (err) {
+            if (xhsShare && retryXhsShareWithoutVision(config, llmMessages, err)) { round -= 1; continue; }
             const errMsg = `⚠️ 回复生成失败: ${err instanceof Error ? err.message : String(err)}`;
             if (parts.length > 0) {
                 throwIfAborted(options?.signal);
@@ -2718,6 +2783,7 @@ async function generateChatCompletionCore(
         }
         // 剔除预设配置的文本片段（<思考结束> 等残留标签），不进入消息/提示词
         filteredOutput = stripPresetTexts(filteredOutput, preset);
+        filteredOutput = onVisibleReply?.(filteredOutput) ?? filteredOutput;
 
         // Parse actions (朋友圈 etc) — strip from display text but keep tool tags
         const { cleanText: afterActionStrip, actions } = parseActionTags(filteredOutput);
@@ -2933,6 +2999,7 @@ async function generateChatCompletionCore(
                     }
                     // 剔除预设配置的文本片段（<思考结束> 等残留标签）
                     finalOutput = stripPresetTexts(finalOutput, preset);
+                    finalOutput = onVisibleReply?.(finalOutput) ?? finalOutput;
                     await callbacks?.onTextPart?.(finalOutput);
                     parts.push({ text: finalOutput });
                     if (bailoutRef.shortcutHandles.length > 0) bailoutRef.shortcutCompleted = true;
@@ -2957,7 +3024,8 @@ async function generateChatCompletionCore(
         }
     })();
 
-    return { parts };
+    return { parts: xhsShare ? parts.map(part => ({ ...part, text: parseXhsSocialActions(part.text).visibleText })) : parts,
+        xiaohongshuAction: parts.some(part => part.toolNotice?.startsWith("⚠️")) ? undefined : pendingXhsAction };
 }
 
 /**

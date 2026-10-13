@@ -786,6 +786,8 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
   const [fullscreenImage, setFullscreenImage] = useState<{ noteId: string; index: number } | null>(null);
   useEffect(() => { if (!visible) setFullscreenImage(null); }, [visible]);
   const [busy, setBusy] = useState<BusyState>("idle");
+  const nativeWriterBusy = useRef(false);
+  nativeWriterBusy.current = busy !== "idle";
   const [regeneratingCommentId, setRegeneratingCommentId] = useState<string | null>(null);
   const commentRegenerationInFlightRef = useRef(false);
   const [error, setError] = useState("");
@@ -1308,12 +1310,17 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
   }, []);
 
   useEffect(() => {
-    const handleExternalUpdate = () => {
+    const beforeShareCommit = (event: Event) => { if (nativeWriterBusy.current) event.preventDefault(); };
+    window.addEventListener("xiaohongshu-before-share-commit", beforeShareCommit);
+    const handleExternalUpdate = (event: Event) => {
       setState(loadXiaohongshuState());
-      setImageMap({});
+      if (!(event as CustomEvent).detail?.socialOnly) setImageMap({});
     };
     window.addEventListener("xiaohongshu-updated", handleExternalUpdate);
-    return () => window.removeEventListener("xiaohongshu-updated", handleExternalUpdate);
+    return () => {
+      window.removeEventListener("xiaohongshu-updated", handleExternalUpdate);
+      window.removeEventListener("xiaohongshu-before-share-commit", beforeShareCommit);
+    };
   }, []);
 
   useEffect(() => {
@@ -2303,10 +2310,11 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
       : note.imageDescription) || "";
     const share = {
       type: "xiaohongshu_note",
+      noteId: note.id,
       authorName: note.authorName,
       title: getXhsPlainText(note.title),
-      body: getXhsPlainText(note.body),
-      description: getXhsPlainText(description),
+      body: getXhsPlainText(note.body).slice(0, 180),
+      description: getXhsPlainText(description).slice(0, 120),
       noteType: note.type,
       tags: note.tags,
       imageAssetId: note.imageAssetId,

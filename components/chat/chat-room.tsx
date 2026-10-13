@@ -47,6 +47,8 @@ import { TransferTargetModal } from "./transfer-target-modal";
 import { GiftPickerModal } from "./gift-picker-modal";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { deleteWeixinCloudMessagesFromCloud, emitWeixinSyncToast, syncAllWeixinBotRuntimesToCloud } from "@/lib/weixin-cloud-sync";
+import { commitXhsShareActions } from "@/lib/xiaohongshu-chat-share-commit";
+import { isXhsSavedChatReply, newestXhsShareMessage } from "@/lib/xiaohongshu-chat-share";
 import { loadBindingConfig, loadPresets, loadRegexes, resolveBinding, resolveUserIdentity } from "@/lib/settings-storage";
 import { generateGroupChatCompletion, generateGroupOfflineChatCompletion, parseGroupChatResponse, buildEditableGroupRoundText } from "@/lib/group-chat-engine";
 import { appendChatOfflineTurn, deleteChatOfflineTurn, deleteChatOfflineTurnsFrom, extractThinkingTag, loadChatOfflineTurns, parseOfflineResponse, saveChatOfflineTurns, updateChatOfflineTurn, type ChatOfflineTurn } from "@/lib/chat-offline-storage";
@@ -315,6 +317,7 @@ type GenerationRunGuard = {
     diagnosticRunId?: string;
     signal?: AbortSignal;
     isActive?: () => boolean;
+    onMessagePublished?: (message: ChatMessage, committed: Promise<boolean>) => void;
 };
 
 type AssistantMessageDraft = Omit<ChatMessage, "id" | "createdAt" | "status"> & { status?: ChatMessage["status"] };
@@ -3012,7 +3015,10 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             const tracePublish = itemIndex < 2;
             const publishValues = { publishItemIndex: itemIndex + 1 };
             if (tracePublish) markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISH_ITEM_BEGIN", publishValues);
-            const msg = pushChatMessage(entry.draft);
+            let committed: Promise<boolean> | undefined;
+            const msg = pushChatMessage(entry.draft, options?.onMessagePublished
+                ? { onMessageCommit: value => { committed = value; } } : undefined);
+            if (committed) options?.onMessagePublished?.(msg, committed);
             if (tracePublish) markGenerationDiagnostic(options?.diagnosticRunId, "PUSH_MESSAGE_RETURNED", publishValues);
             markGenerationDiagnostic(options?.diagnosticRunId, "PUBLISHING", {}, 0, 1);
             setMessages(prev => [...prev, msg]);
@@ -3248,6 +3254,26 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         return null;
     };
 
+    const commitSharedNoteActionAfterSave = async (
+        pending: import("@/lib/xiaohongshu-chat-share").XhsPendingSocialAction | undefined,
+        replies: Array<{ message: ChatMessage; committed: Promise<boolean> }>,
+        guard: GenerationRunGuard,
+    ) => {
+        if (!pending) return;
+        const confirmations = await Promise.all(replies.map(reply => reply.committed));
+        if (guard.signal?.aborted || guard.isActive?.() === false) return;
+        if (confirmations.some(confirmed => !confirmed)) { showChatToast("聊天保存未全部确认，小红书操作未执行"); return; }
+        const savedAssistant = replies.find((reply, index) => confirmations[index]
+            && isXhsSavedChatReply(reply.message))?.message;
+        if (!savedAssistant) return;
+        const outcome = await commitXhsShareActions({ sessionId: session.id, characterId: session.contactId,
+            responseMessageId: savedAssistant.id, pending, isActive: () => !guard.signal?.aborted && guard.isActive?.() !== false });
+        if (!outcome.applied && !outcome.duplicate && guard.isActive?.() !== false) {
+            const notice = pushChatMessage({ sessionId: session.id, role: "system", content: `小红书操作未执行：${outcome.reason || "提交失败"}。聊天回复已保留。` });
+            setMessages(prev => [...prev, notice]);
+        }
+    };
+
     const runManagedGeneration = async ({
         history,
         errorPrefix = "发送失败",
@@ -3264,7 +3290,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         const generationRun = createGenerationRun(session.id, Boolean(session.isGroup));
         const generationRunId = generationRun.runId;
         const isCurrentGeneration = () => isGenerationRunActive(session.id, generationRunId);
+        const xhsSavedReplies: Array<{ message: ChatMessage; committed: Promise<boolean> }> = [];
         const generationGuard: GenerationRunGuard = { signal: generationRun.controller.signal, isActive: isCurrentGeneration, diagnosticRunId: generationRunId };
+        if (newestXhsShareMessage(history, session.id)) generationGuard.onMessagePublished = (message, committed) => { xhsSavedReplies.push({ message, committed }); };
         let shouldRunDeclineReply = false;
 
         isGeneratingRef.current = true;
@@ -3325,6 +3353,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     session,
                     history,
                     {
+                        xhsShareEnabled: true,
                         appTags: theaterMode ? ["chat"] : ["chat", "text"],
                         signal: generationRun.controller.signal,
                         diagnosticRunId: generationRunId,
@@ -3357,6 +3386,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 if (!isCurrentGeneration()) return;
                 const result = await splitAndSaveAIMessages(flattenCompletionResult(cr), { ...generationGuard, reasoningText: capturedReasoning, instantReveal: isSessionStreamingEnabled(session, true) });
                 if (!isCurrentGeneration()) return;
+                if (cr.xiaohongshuAction) await commitSharedNoteActionAfterSave(cr.xiaohongshuAction, xhsSavedReplies, generationGuard);
                 scheduleFollowUp(session.id, 0, result.stateValues);
                 handleCallTrigger(result.triggerCall);
                 shouldRunDeclineReply = Boolean(result.hasDecline);
@@ -3594,6 +3624,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         const generationRun = createGenerationRun(session.id, Boolean(session.isGroup));
         const generationRunId = generationRun.runId;
         const isCurrentGeneration = () => isGenerationRunActive(session.id, generationRunId);
+        const xhsSavedReplies: Array<{ message: ChatMessage; committed: Promise<boolean> }> = [];
         const generationGuard: GenerationRunGuard = { signal: generationRun.controller.signal, isActive: isCurrentGeneration, diagnosticRunId: generationRunId };
         let shouldRunDeclineReply = false;
         isGeneratingRef.current = true;
@@ -3605,6 +3636,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         try {
             markGenerationDiagnostic(generationRunId, "HISTORY_LOAD_BEGIN");
             const latestMessages = loadChatMessages(session.id);
+            if (newestXhsShareMessage(latestMessages, session.id)) generationGuard.onMessagePublished = (message, committed) => { xhsSavedReplies.push({ message, committed }); };
             markGenerationDiagnostic(generationRunId, "HISTORY_LOADED", { historyCount: latestMessages.length });
             if (session.isGroup) {
                 const streamedImageReplacementTasks: Promise<unknown>[] = [];
@@ -3794,6 +3826,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 let pendingReasoning: string | undefined;
 
                 const result = await generateChatCompletion(session, latestMessages, {
+                    xhsShareEnabled: true,
                     appTags: theaterMode ? ["chat"] : ["chat", "text"],
                     signal: generationRun.controller.signal,
                     diagnosticRunId: generationRunId,
@@ -3883,6 +3916,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     },
                 });
                 if (!isCurrentGeneration()) return;
+                if (result.xiaohongshuAction) await commitSharedNoteActionAfterSave(result.xiaohongshuAction, xhsSavedReplies, generationGuard);
 
                 if (lastSendResult) {
                     scheduleFollowUp(session.id, 0, lastSendResult.stateValues);

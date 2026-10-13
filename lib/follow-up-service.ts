@@ -19,6 +19,9 @@ import {
 } from "./chat-storage";
 import type { ChatMessage, StateValue } from "./chat-storage";
 import { generateChatCompletion, flattenCompletionResult } from "./chat-engine";
+import { commitXhsShareActions } from "./xiaohongshu-chat-share-commit";
+import type { XhsPendingSocialAction } from "./xiaohongshu-chat-share";
+import { isXhsSavedChatReply } from "./xiaohongshu-chat-share";
 import { startGenerationDiagnostic, markGenerationDiagnostic } from "./chat-generation-diagnostics";
 
 function startBackgroundDiagnostic(sessionId: string, isGroup: boolean): string {
@@ -295,6 +298,7 @@ type BackgroundCompletionRound = {
     responseBatchId?: string;
     rawResponseText?: string;
     reasoningText?: string;
+    xiaohongshuAction?: XhsPendingSocialAction;
 };
 
 async function generateBackgroundCompletionRounds(
@@ -305,7 +309,7 @@ async function generateBackgroundCompletionRounds(
     const rounds: BackgroundCompletionRound[] = [];
     // 每轮 LLM 调用的思维链：onReasoning 先于该轮 onTextPart 触发，挂到该轮文本上
     let pendingReasoning: string | undefined;
-    const result = await generateChatCompletion(session, messages, options, {
+    const result = await generateChatCompletion(session, messages, { ...options, xhsShareEnabled: true }, {
         onReasoning: (t) => { pendingReasoning = t; },
         onTextPart: (text, _senderInfo, meta) => {
             markGenerationDiagnostic(options?.diagnosticRunId, "RESPONSE_RECEIVED", { rawLength: text.length });
@@ -327,6 +331,7 @@ async function generateBackgroundCompletionRounds(
             rounds.push({ text: fallback, rawResponseText: fallback, reasoningText: pendingReasoning });
         }
     }
+    if (result.xiaohongshuAction && rounds.length) rounds[rounds.length - 1].xiaohongshuAction = result.xiaohongshuAction;
     return rounds;
 }
 
@@ -341,6 +346,8 @@ async function saveBackgroundCompletionRounds(
     let hasVisible = false;
     let newCount = currentCount;
     let stateValues: StateValue[] = [];
+    const savedReplyIds: string[] = [];
+    const pending = rounds.find(round => round.xiaohongshuAction)?.xiaohongshuAction;
     for (const round of rounds) {
         const result = await parseAndSaveResponse(
             round.text,
@@ -353,6 +360,7 @@ async function saveBackgroundCompletionRounds(
                 responseBatchId: round.responseBatchId,
                 rawResponseText: round.rawResponseText,
                 reasoningText: round.reasoningText,
+                onMessagePublished: pending ? message => { if (isXhsSavedChatReply(message)) savedReplyIds.push(message.id); } : undefined,
             },
         );
         if (result.hasVisible) {
@@ -363,6 +371,17 @@ async function saveBackgroundCompletionRounds(
         }
         if (result.stateValues.length > 0) {
             stateValues = result.stateValues;
+        }
+    }
+    if (pending && hasVisible && savedReplyIds.length && !isBackgroundGenerationCancelled(sessionId)) {
+        const contactId = loadChatSessions().find(session => session.id === sessionId)?.contactId;
+        if (contactId) {
+            const outcome = await commitXhsShareActions({ sessionId, characterId: contactId,
+                responseMessageId: savedReplyIds[0], pending, isActive: () => !isBackgroundGenerationCancelled(sessionId) });
+            if (!outcome.applied && !outcome.duplicate && !isBackgroundGenerationCancelled(sessionId)) {
+                const message = pushChatMessage({ sessionId, role: "system", content: `小红书操作未执行：${outcome.reason || "提交失败"}。聊天回复已保留。` });
+                window.dispatchEvent(new CustomEvent("followup-message-saved", { detail: { sessionId, message } }));
+            }
         }
     }
     return { hasVisible, newCount, stateValues };
@@ -928,6 +947,7 @@ export async function parseAndSaveResponse(
     contextMessages: ChatMessage[],
     options?: {
         diagnosticRunId?: string;
+        onMessagePublished?: (message: ChatMessage) => void;
         senderCharacterId?: string;
         senderName?: string;
         silent?: boolean;
@@ -949,8 +969,11 @@ export async function parseAndSaveResponse(
     // Background publishing keeps synchronous message IDs and UI semantics.
     // Dispatch is held until all message write TRANSACTIONS have committed.
     const messageCommits: Promise<boolean>[] = [];
-    const pushBackgroundCommittedMessage = (message: Parameters<typeof pushChatMessage>[0]): ChatMessage =>
-        pushChatMessage(message, { onMessageCommit: committed => { messageCommits.push(committed); } });
+    const pushBackgroundCommittedMessage = (message: Parameters<typeof pushChatMessage>[0]): ChatMessage => {
+        const saved = pushChatMessage(message, { onMessageCommit: committed => { messageCommits.push(committed); } });
+        options?.onMessagePublished?.(saved);
+        return saved;
+    };
     const awaitMessageCommits = async (): Promise<void> => {
         if ((await Promise.all(messageCommits)).some(committed => !committed)) {
             throw new Error("Background message IndexedDB commit not confirmed");

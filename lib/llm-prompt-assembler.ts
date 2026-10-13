@@ -1214,6 +1214,11 @@ export function formatRichMediaForHistory(msg: ChatMessage, userName: string, ch
             return `[音乐分享:${mTitle}]`;
         }
         case "xiaohongshu_note_share":
+            if (d?.xiaohongshuNoteId) {
+                // New messages are lightweight references; original note is
+                // expanded only on receipt. Historical turns stay compact.
+                return `[小红书帖子引用]${d.xiaohongshuTitle || "帖子"}（${d.xiaohongshuAuthor || "未知作者"}，笔记ID:${d.xiaohongshuNoteId}）`;
+            }
             return formatXiaohongshuShareForPrompt({
                 author: d?.xiaohongshuAuthor,
                 title: d?.xiaohongshuTitle,

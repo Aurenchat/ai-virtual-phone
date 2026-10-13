@@ -8,6 +8,8 @@ export type MusicChatSharePayload = {
 
 export type XiaohongshuNoteChatSharePayload = {
     type: "xiaohongshu_note";
+    /** Lightweight reference, never a serialized copy of all comments/images. */
+    noteId?: string;
     authorName: string;
     title: string;
     body: string;
