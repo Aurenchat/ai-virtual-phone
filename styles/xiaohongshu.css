@@ -84,7 +84,7 @@
   position: relative;
   width: 100%;
   overflow: hidden;
-  background: #000;
+  background: #eee;
 }
 
 .xhs-note-slider-track {
@@ -114,8 +114,8 @@
 .xhs-note-slider-item img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
-  background: #000;
+  object-fit: cover;
+  background: #eee;
 }
 
 .xhs-note-slider-indicator {
