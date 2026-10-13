@@ -3056,9 +3056,6 @@
 .chat-room-wrapper[data-settings-open] {
   background: transparent !important;
 }
-.chat-room-wrapper[data-loading] {
-  opacity: 0;
-}
 /* ── Voice message bubble ── */
 .voice-msg-bubble {
   display: flex;

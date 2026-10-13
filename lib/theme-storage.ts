@@ -214,6 +214,7 @@ async function saveAssetRecord(record: ThemeAssetRecord): Promise<void> {
     return;
   }
 
+  await invalidateWallpaperDerivativeIfNeeded(record.id);
   try {
     const transaction = database.transaction(THEME_ASSET_STORE, "readwrite");
     const store = transaction.objectStore(THEME_ASSET_STORE);
@@ -221,6 +222,18 @@ async function saveAssetRecord(record: ThemeAssetRecord): Promise<void> {
     await runTransactionDone(transaction);
   } finally {
     database.close();
+  }
+  await invalidateWallpaperDerivativeIfNeeded(record.id);
+}
+
+async function invalidateWallpaperDerivativeIfNeeded(assetId: string): Promise<void> {
+  if (!assetId.startsWith("chat_bg_")) return;
+  try {
+    const { invalidateChatWallpaperPreview } = await import("./chat-wallpaper-preview");
+    await invalidateChatWallpaperPreview(assetId);
+  } catch {
+    // Preview cache is disposable. An unavailable cache must never block a
+    // source asset write, including backup restores.
   }
 }
 
@@ -313,6 +326,7 @@ export async function deleteThemeAsset(id: string): Promise<void> {
   if (!database) {
     return;
   }
+  await invalidateWallpaperDerivativeIfNeeded(id);
   try {
     const transaction = database.transaction(THEME_ASSET_STORE, "readwrite");
     transaction.objectStore(THEME_ASSET_STORE).delete(id);
@@ -320,6 +334,7 @@ export async function deleteThemeAsset(id: string): Promise<void> {
   } finally {
     database.close();
   }
+  await invalidateWallpaperDerivativeIfNeeded(id);
 }
 
 export async function saveThemeAssetFromBlob(

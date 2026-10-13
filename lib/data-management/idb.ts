@@ -641,6 +641,15 @@ export async function importSource(
             await runRequest(store.put(value));
           }
           await done;
+          if (payload.dbName === "ai_phone_theme_db_v1" && storePayload.name === "assets") {
+            const assetId = (value as { id?: unknown })?.id;
+            if (typeof assetId === "string" && assetId.startsWith("chat_bg_")) {
+              try {
+                const { invalidateChatWallpaperPreview } = await import("../chat-wallpaper-preview");
+                await invalidateChatWallpaperPreview(assetId);
+              } catch { /* Disposable cache failure must not fail original restore. */ }
+            }
+          }
           if (existing !== undefined) result.overwritten += 1;
           else result.added += 1;
         } catch (error) {

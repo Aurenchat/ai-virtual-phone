@@ -689,6 +689,17 @@ export function ChatSettingsPanel({
         try {
             const { saveChatImageToIndexedDB } = await import("@/lib/chat-asset-storage");
             const id = await saveChatImageToIndexedDB(file);
+            if (key === "backgroundImage") {
+                // Prepare the disposable small preview BEFORE this wallpaper is
+                // selected, so first entry does not decode full-size artwork.
+                // Failures must not prevent the authoritative image being used.
+                try {
+                    const { getOrCreateChatWallpaperPreview } = await import("@/lib/chat-wallpaper-preview");
+                    await getOrCreateChatWallpaperPreview(id);
+                } catch (error) {
+                    console.warn("[ChatWallpaper] preview preparation unavailable", error);
+                }
+            }
             setter(id);
             updateSession({ [key]: id });
         } catch (error) {

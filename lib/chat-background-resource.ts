@@ -10,6 +10,7 @@
  * most ONE idle entry; active entries are always held until their owners leave.
  */
 import { getChatImageFromIndexedDB } from "@/lib/chat-asset-storage";
+import { getOrCreateChatWallpaperPreview, getChatWallpaperRevision, onChatWallpaperInvalidated } from "@/lib/chat-wallpaper-preview";
 
 export type ChatBackgroundLease = {
     url: string;
@@ -18,6 +19,7 @@ export type ChatBackgroundLease = {
 
 type CachedResource = {
     assetId: string;
+    revision: string;
     url: string;
     objectUrl?: boolean;
     users: number;
@@ -28,6 +30,7 @@ const IDLE_REUSE_MS = 8_000;
 const BASE64_CHUNK = 64 * 1024; // Must be a multiple of four.
 const resources = new Map<string, CachedResource>();
 const inFlight = new Map<string, Promise<CachedResource | null>>();
+const inFlightRevisions = new Map<string, string>();
 
 /** Decode bounded pieces; do not allocate a second giant decoded binary string. */
 async function base64ImageToBlob(dataUrl: string): Promise<Blob | null> {
@@ -52,11 +55,17 @@ async function base64ImageToBlob(dataUrl: string): Promise<Blob | null> {
     return new Blob(chunks, { type: mime });
 }
 
+function revokeResource(resource: CachedResource): void {
+    if (!resource.objectUrl) return;
+    resource.objectUrl = false;
+    URL.revokeObjectURL(resource.url);
+}
+
 function retire(resource: CachedResource): void {
     if (resource.users !== 0 || resources.get(resource.assetId) !== resource) return;
     if (resource.idleTimer !== null) clearTimeout(resource.idleTimer);
     resources.delete(resource.assetId);
-    URL.revokeObjectURL(resource.url);
+    revokeResource(resource);
 }
 
 function trimIdle(): void {
@@ -81,6 +90,12 @@ function lease(resource: CachedResource): ChatBackgroundLease {
             released = true;
             resource.users--;
             if (resource.users !== 0) return;
+            // If the authoritative source was replaced while in use, the old
+            // lease must retire, not republish itself under the same asset ID.
+            if (resources.get(resource.assetId) !== resource) {
+                revokeResource(resource);
+                return;
+            }
             // Map order tracks the most recently released wallpaper.
             resources.delete(resource.assetId);
             resources.set(resource.assetId, resource);
@@ -90,46 +105,92 @@ function lease(resource: CachedResource): ChatBackgroundLease {
     };
 }
 
+/** Forget a hot resource if its authoritative theme asset was replaced. */
+export function invalidateChatBackgroundResource(assetId: string): void {
+    inFlight.delete(assetId);
+    inFlightRevisions.delete(assetId);
+    const resource = resources.get(assetId);
+    if (!resource) return;
+    resources.delete(assetId);
+    if (resource.idleTimer !== null) clearTimeout(resource.idleTimer);
+    if (resource.users === 0) revokeResource(resource);
+    // Live consumers keep their old URL until releasing their leases.
+}
+
+onChatWallpaperInvalidated(invalidateChatBackgroundResource);
+
 /**
  * For old data URLs and remote backgrounds preserve the existing path.
  * For theme asset IDs, issue only one IDB read/conversion per concurrent load.
- * On decode failure, fall back to the original data URL (same rendering as before).
+ * A failed preview leaves chat visible; unexpected service failures retain the
+ * perf.1 fallback for compatibility without changing authoritative artwork.
  */
-export async function acquireChatBackground(source: string): Promise<ChatBackgroundLease | null> {
+export async function acquireChatBackground(source: string, retryOnInvalidation = true): Promise<ChatBackgroundLease | null> {
     if (!source) return null;
     if (source.startsWith("data:") || /^https?:\/\//i.test(source)) {
         return { url: source, release: () => {} };
     }
 
+    const revision = getChatWallpaperRevision(source);
     const cached = resources.get(source);
-    if (cached) return lease(cached);
+    if (cached?.revision === revision) return lease(cached);
+    if (cached) invalidateChatBackgroundResource(source);
 
     let pending = inFlight.get(source);
+    if (inFlightRevisions.get(source) !== revision) pending = undefined;
     if (!pending) {
         pending = (async (): Promise<CachedResource | null> => {
+            // Persistent derivative first: no full-size IDB source read/decode on
+            // subsequent room visits, including after WebContent restarts.
+            try {
+                const visual = await getOrCreateChatWallpaperPreview(source);
+                if (visual?.kind === "url") {
+                    return { assetId: source, revision, url: visual.url, users: 0, idleTimer: null };
+                }
+                if (visual?.kind === "blob" && typeof URL.createObjectURL === "function") {
+                    return {
+                        assetId: source,
+                        revision,
+                        url: URL.createObjectURL(visual.blob),
+                        objectUrl: true,
+                        users: 0,
+                        idleTimer: null,
+                    };
+                }
+                if (!visual) return null;
+            } catch { /* Preserve perf.1 behavior when preview service fails. */ }
+
+            // Last-resort perf.1 fallback, preserving all legacy artwork.
             const dataUrl = await getChatImageFromIndexedDB(source);
             if (!dataUrl) return null;
             try {
                 const blob = await base64ImageToBlob(dataUrl);
                 if (blob && typeof URL.createObjectURL === "function") {
-                    const resource: CachedResource = {
+                    return {
                         assetId: source,
+                        revision,
                         url: URL.createObjectURL(blob),
                         objectUrl: true,
                         users: 0,
                         idleTimer: null,
                     };
-                    return resource;
                 }
-            } catch { /* Preserve old, non-blob rendering as fallback. */ }
-            return { assetId: source, url: dataUrl, users: 0, idleTimer: null };
+            } catch { /* Display the original URL as a safe fallback. */ }
+            return { assetId: source, revision, url: dataUrl, users: 0, idleTimer: null };
         })();
         inFlight.set(source, pending);
-        const clearPending = () => { if (inFlight.get(source) === pending) inFlight.delete(source); };
+        inFlightRevisions.set(source, revision);
+        const clearPending = () => {
+            if (inFlight.get(source) === pending) { inFlight.delete(source); inFlightRevisions.delete(source); }
+        };
         void pending.then(clearPending, clearPending);
     }
 
     const resource = await pending;
+    if (getChatWallpaperRevision(source) !== revision || (resource && resource.revision !== revision)) {
+        if (resource?.users === 0) revokeResource(resource);
+        return retryOnInvalidation ? acquireChatBackground(source, false) : null;
+    }
     if (!resource) return null;
     // Publish only when the first consumer is ready to hold a reference.
     // Otherwise another asset could trim a zero-user, still-pending resource.

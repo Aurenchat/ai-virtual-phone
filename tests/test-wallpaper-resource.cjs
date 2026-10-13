@@ -29,6 +29,11 @@ function buildHost(options = {}) {
     const sandbox = {
         exports,
         require(name) {
+            // Keep perf.1 fallback behavior under test; preview behavior has
+            // its own focused test suite.
+            if (name === '@/lib/chat-wallpaper-preview') {
+                return { getChatWallpaperRevision:()=>"test",onChatWallpaperInvalidated:()=>()=>{},getOrCreateChatWallpaperPreview: async () => { throw new Error('Mock: no preview'); } };
+            }
             assert.equal(name, '@/lib/chat-asset-storage');
             return { getChatImageFromIndexedDB: async id => {
                 reads.set(id, (reads.get(id) ?? 0) + 1);
@@ -115,6 +120,7 @@ process.on('unhandledRejection', error => unhandled.push(error));
     // Cancellation consumers still receive and immediately release their late lease.
     const deferred = buildHost({deferReads: true}); deferred.contentById.set('late', jpegUrl);
     const requests = [deferred.acquire('late'), deferred.acquire('late')];
+    for (let i = 0; i < 10 && deferred.pendingReads.length === 0; i++) await Promise.resolve();
     assert.equal(deferred.pendingReads.length, 1);
     deferred.pendingReads.shift()(); const late = await Promise.all(requests);
     late.forEach(lease => lease.release()); deferred.advance(8000);
