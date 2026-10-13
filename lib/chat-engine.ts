@@ -2,10 +2,10 @@
 
 import { createSseJsonParser } from "./sse-json";
 import {
-    newestXhsShareMessage, buildXhsSharePromptForChat,
+    getXhsShareTurnAnchor, buildXhsSharePromptForChat,
     parseXhsSocialActions, createXhsStreamSanitizer,
     canUseXhsShareVision, retryXhsShareWithoutVision,
-    type XhsPendingSocialAction,
+    type XhsPendingSocialAction, type XhsShareTurnAnchor,
 } from "./xiaohongshu-chat-share";
 import { maybeAppendShortcutCapability } from "./offline-shortcut-capability";
 import { loadCharacters } from "./character-storage";
@@ -1831,6 +1831,7 @@ export async function buildChatPromptMessages(
     userIdentity: ReturnType<typeof resolveUserIdentity>;
     toolsEnabled: boolean;
     xhsShareTargets?: string[];
+    xhsShareAnchor?: XhsShareTurnAnchor;
 }> {
     markGenerationDiagnostic(options?.diagnosticRunId, "CONTEXT_PREP_BEGIN");
     const chars = loadCharacters();
@@ -1838,6 +1839,9 @@ export async function buildChatPromptMessages(
     if (!character) throw new ChatEngineError(`Character not found: ${session.contactId}`);
 
     const resolvedAppId = options?.appId ?? "chat";
+    const xhsShareAnchor = options?.xhsShareEnabled && resolvedAppId === "chat" && !session.isGroup
+        ? getXhsShareTurnAnchor(history, session.id) : undefined;
+    const xhsShareMessage = xhsShareAnchor ? history.find(message => message.id === xhsShareAnchor.shareMessageId) : undefined;
     const bindings = loadBindingConfig();
     const activeSlot = resolveBinding(bindings, character.id, resolvedAppId);
 
@@ -2033,7 +2037,7 @@ export async function buildChatPromptMessages(
     // remain compact and never re-read nine images in every subsequent turn.
     let xhsShareTargets: string[] | undefined;
     if (options?.xhsShareEnabled && resolvedAppId === "chat" && !session.isGroup) {
-        const share = newestXhsShareMessage(historyForPrompt, session.id);
+        const share = xhsShareMessage;
         if (share) {
             try {
                 llmMessages.push(...await buildXhsSharePromptForChat(share, canUseXhsShareVision(config), ids => { xhsShareTargets = ids; }));
@@ -2046,7 +2050,7 @@ export async function buildChatPromptMessages(
     appendEmptyGenerateGuardMessage(llmMessages, config, historyForPrompt);
 
     markGenerationDiagnostic(options?.diagnosticRunId, "PROMPT_ASSEMBLED", { llmMessageCount: llmMessages.length });
-    return { llmMessages, character, config, preset, regexes, userIdentity, toolsEnabled, xhsShareTargets };
+    return { llmMessages, character, config, preset, regexes, userIdentity, toolsEnabled, xhsShareTargets, xhsShareAnchor };
 }
 
 export type ChatCompletionCallbacks = {
@@ -2617,23 +2621,23 @@ async function generateChatCompletionCore(
     callbacks: ChatCompletionCallbacks | undefined,
     bailoutRef: ReplyBailoutRef,
 ): Promise<ChatCompletionResult> {
-    const { llmMessages, character, config, preset, regexes, userIdentity, toolsEnabled, xhsShareTargets } = await buildChatPromptMessages(session, history, options);
+    const { llmMessages, character, config, preset, regexes, userIdentity, toolsEnabled, xhsShareTargets, xhsShareAnchor } = await buildChatPromptMessages(session, history, options);
     const requestAppTags = mergeAppTags(options?.appTags, options?.promptProfile?.appTags, options?.appId ?? "chat");
-    const xhsShare = options?.xhsShareEnabled && (options?.appId ?? "chat") === "chat" && !session.isGroup
-        ? newestXhsShareMessage(history, session.id) : null;
+    const xhsShare = xhsShareAnchor;
     let pendingXhsAction: XhsPendingSocialAction | undefined;
     let onVisibleReply: ((value: string) => string) | undefined;
-    if (xhsShare?.mediaData?.xiaohongshuNoteId) {
+    if (xhsShare?.noteId) {
         const baseCallbacks = callbacks;
         const sanitizeStream = createXhsStreamSanitizer(baseCallbacks?.onStreamDelta);
         const turnId = options?.diagnosticRunId || `xhs-${Date.now()}-${Math.random()}`;
         onVisibleReply = (value: string) => {
             const parsed = parseXhsSocialActions(value);
             if (parsed.actions && xhsShareTargets !== undefined) pendingXhsAction = {
-                shareMessageId: xhsShare.id,
-                noteId: xhsShare.mediaData!.xiaohongshuNoteId!,
+                shareMessageId: xhsShare.shareMessageId,
+                noteId: xhsShare.noteId,
                 action: parsed.actions,
                 turnId, allowedReplyIds: xhsShareTargets,
+                anchor: xhsShare,
             };
             return parsed.visibleText;
         };

@@ -1,6 +1,6 @@
 /** Deferred native XHS actions. No chat undo ledger and no viewed/reacted lock. */
 import type { XiaohongshuComment, XiaohongshuState } from "./xiaohongshu-types";
-import { isXhsSavedChatReply, parseXhsSocialActions, type XhsPendingSocialAction } from "./xiaohongshu-chat-share";
+import { isXhsSavedChatReply, newestXhsShareMessage, parseXhsSocialActions, type XhsPendingSocialAction } from "./xiaohongshu-chat-share";
 import { makeXiaohongshuComment, makeXiaohongshuNotification } from "./xiaohongshu-storage";
 import { kvUpdateAtomic } from "./kv-db";
 import { applyCharacterReaction } from "./xiaohongshu-engine";
@@ -28,24 +28,28 @@ export async function commitXhsShareActions(input: {
   }
   inFlight.add(turnKey);
   const active = () => input.isActive?.() !== false;
+  const anchor = pending.anchor || { sessionId, shareMessageId: pending.shareMessageId, noteId: pending.noteId, lastUserMessageId: pending.shareMessageId };
   const cachedSourceLive = () => {
     const messages = loadChatMessages(sessionId);
+    const responseIndex = messages.findIndex(msg => msg.id === responseMessageId && isXhsSavedChatReply(msg));
+    if (responseIndex < 0 || anchor.sessionId !== sessionId || anchor.shareMessageId !== pending.shareMessageId || anchor.noteId !== pending.noteId) return false;
+    const source = newestXhsShareMessage(messages.slice(0, responseIndex), sessionId);
     let latestUser: (typeof messages)[number] | undefined;
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.role === "user" && !msg.isRetracted && msg.mediaType !== "tool_result") { latestUser = msg; break; }
     }
-    return latestUser?.id === pending.shareMessageId
-      && latestUser.mediaType === "xiaohongshu_note_share" && latestUser.mediaData?.xiaohongshuNoteId === pending.noteId
-      && messages.some(msg => msg.id === responseMessageId && msg.role === "assistant" && !msg.isRetracted);
+    return latestUser?.id === anchor.lastUserMessageId && source?.id === anchor.shareMessageId
+      && source.mediaData?.xiaohongshuNoteId === anchor.noteId;
   };
   try {
     if (!active() || !cachedSourceLive()) return { applied: false, reason: "本轮已取消或分享/回复已删除" };
-    const [share, response] = await chatDb.messages.bulkGet([pending.shareMessageId, responseMessageId]);
+    const [share, response, lastUser] = await chatDb.messages.bulkGet([pending.shareMessageId, responseMessageId, anchor.lastUserMessageId]);
     const session = await chatDb.sessions.get(sessionId);
     if (!active() || !cachedSourceLive() || !session || session.isGroup || session.contactId !== characterId
       || !share || share.sessionId !== sessionId || share.role !== "user" || share.isRetracted
       || share.mediaType !== "xiaohongshu_note_share" || share.mediaData?.xiaohongshuNoteId !== pending.noteId
+      || !lastUser || lastUser.sessionId !== sessionId || lastUser.role !== "user" || lastUser.isRetracted
       || !response || response.sessionId !== sessionId || !isXhsSavedChatReply(response)
       || (response.senderCharacterId && response.senderCharacterId !== characterId)
       ) {

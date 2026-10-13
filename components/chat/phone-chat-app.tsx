@@ -13,7 +13,8 @@ import { notifyMascotPageContext } from "@/lib/mascot-events";
 import { loadCharacters } from "@/lib/character-storage";
 import { SessionCustomCSS } from "@/components/ui/session-custom-css";
 import { kvGet } from "@/lib/kv-db";
-import { formatXiaohongshuShareForPrompt, type ChatSharePayload } from "@/lib/chat-share";
+import { formatXiaohongshuShareForPrompt, formatXiaohongshuShareSummary, type ChatSharePayload } from "@/lib/chat-share";
+import { scheduleXhsShareReply } from "@/lib/xiaohongshu-share-reply";
 import { CHAT_OPEN_SESSION_EVENT, CHAT_OPEN_ADD_CONTACT_EVENT } from "@/lib/chat-notification-events";
 import { CHAT_SESSIONS_MERGED_EVENT, type ChatSessionsMergedDetail } from "@/lib/chat-session-merge";
 import { getMascotSettingsSnapshot } from "@/lib/mascot-settings";
@@ -38,6 +39,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
     );
     const [dbReady, setDbReady] = useState(false);
     const [hideTabBar, setHideTabBar] = useState(false);
+    const consumedShareRef = useRef<ChatSharePayload | null>(null);
 
     // Hydrate IndexedDB → in-memory caches on mount
     useEffect(() => {
@@ -69,6 +71,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
     // When sharePayload is set, switch to contacts tab (and close any open chat room)
     useEffect(() => {
         if (sharePayload) {
+            consumedShareRef.current = null;
             setActiveSession(null);
             setActiveMascot(false);
             setActiveTab("contacts");
@@ -151,6 +154,10 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
 
     const handleSelectContact = (sess: ChatSession | null) => {
         if (sharePayload && sess) {
+            if (sharePayload.type === "xiaohongshu_note") {
+                if (consumedShareRef.current === sharePayload) return;
+                consumedShareRef.current = sharePayload;
+            }
             if (sharePayload.type === "music") {
                 pushChatMessage({
                     sessionId: sess.id,
@@ -166,13 +173,15 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
                     },
                 });
             } else {
-                const content = sharePayload.noteId ? `[小红书帖子引用]${sharePayload.title}（${sharePayload.authorName}，笔记ID:${sharePayload.noteId}）` : formatXiaohongshuShareForPrompt({
+                const format = sharePayload.noteId ? formatXiaohongshuShareSummary : formatXiaohongshuShareForPrompt;
+                const content = format({
                     author: sharePayload.authorName,
                     title: sharePayload.title,
                     body: sharePayload.body,
                     description: sharePayload.description,
                 });
-                pushChatMessage({
+                let committed: Promise<boolean> = Promise.resolve(false);
+                const sharedMessage = pushChatMessage({
                     sessionId: sess.id,
                     role: "user",
                     content,
@@ -189,7 +198,8 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
                         xiaohongshuCoverIcon: sharePayload.coverIcon,
                         xiaohongshuTone: sharePayload.tone,
                     },
-                });
+                }, { onMessageCommit: value => { committed = value; } });
+                if (!sess.isGroup) scheduleXhsShareReply(sharedMessage, committed);
             }
             window.dispatchEvent(new CustomEvent("chat-messages-updated", { detail: { sessionId: sess.id } }));
             onShareDone?.();

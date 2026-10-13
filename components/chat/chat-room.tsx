@@ -49,6 +49,7 @@ import { ConfirmDialog } from "@/components/ui/modal";
 import { deleteWeixinCloudMessagesFromCloud, emitWeixinSyncToast, syncAllWeixinBotRuntimesToCloud } from "@/lib/weixin-cloud-sync";
 import { commitXhsShareActions } from "@/lib/xiaohongshu-chat-share-commit";
 import { isXhsSavedChatReply, newestXhsShareMessage } from "@/lib/xiaohongshu-chat-share";
+import { getXiaohongshuShareReadableContent } from "@/lib/chat-share";
 import { loadBindingConfig, loadPresets, loadRegexes, resolveBinding, resolveUserIdentity } from "@/lib/settings-storage";
 import { generateGroupChatCompletion, generateGroupOfflineChatCompletion, parseGroupChatResponse, buildEditableGroupRoundText } from "@/lib/group-chat-engine";
 import { appendChatOfflineTurn, deleteChatOfflineTurn, deleteChatOfflineTurnsFrom, extractThinkingTag, loadChatOfflineTurns, parseOfflineResponse, saveChatOfflineTurns, updateChatOfflineTurn, type ChatOfflineTurn } from "@/lib/chat-offline-storage";
@@ -3614,6 +3615,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     };
 
     const triggerAIResponse = async () => {
+        if (newestXhsShareMessage(loadChatMessages(session.id), session.id)
+            && (isBackgroundReplyGenerating(session.id) || activeGenerationRuns.has(session.id))) return;
         if (isGeneratingRef.current) {
             if (activeGenerationRuns.has(session.id)) return;
             // 上一轮被外部取消/顶替后收尾提前返回过，标记已是陈旧状态：复位后继续本次请求
@@ -3984,6 +3987,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 characterId?: string;
                 handled?: boolean;
                 busy?: boolean;
+                source?: string;
+                shareMessageId?: string;
             }>).detail;
             const requestSessionId = typeof detail?.sessionId === "string" ? detail.sessionId : "";
             const requestCharacterId = typeof detail?.characterId === "string" ? detail.characterId : "";
@@ -3991,11 +3996,14 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 ? requestSessionId === session.id
                 : Boolean(requestCharacterId && !session.isGroup && requestCharacterId === session.contactId);
             if (!matches) return;
+            if (detail?.source === "native_xhs_share" && (detail.handled
+                || newestXhsShareMessage(loadChatMessages(session.id), session.id)?.id !== detail.shareMessageId)) return;
 
             if (detail) detail.handled = true;
             syncMessagesFromStorage();
             // 真在生成中：如实告知调用方（避免记成「已生成回应」），本轮结束后 pendingGenerate 兜底
-            if (isGeneratingRef.current && activeGenerationRuns.has(session.id)) {
+            if ((isGeneratingRef.current && activeGenerationRuns.has(session.id))
+                || (detail?.source === "native_xhs_share" && isBackgroundReplyGenerating(session.id))) {
                 if (detail) detail.busy = true;
                 return;
             }
@@ -4491,7 +4499,8 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         setEditingResponseContent("");
         setEditingMessageId(msg.id);
         // 语音条的文字存在 mediaData.label 里，content 是空的
-        setEditingContent(msg.mediaType === "audio" ? (msg.mediaData?.label || msg.content) : msg.content);
+        setEditingContent(msg.mediaType === "audio" ? (msg.mediaData?.label || msg.content)
+            : msg.mediaType === "xiaohongshu_note_share" ? getXiaohongshuShareReadableContent(msg) : msg.content);
         setActiveMessageId(null);
     };
 

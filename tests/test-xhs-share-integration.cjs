@@ -57,7 +57,7 @@ const env={
  ...bridge,buildChatPromptMessages:async(_session,history,opts)=>{
   let ids;const selected=opts?.xhsShareEnabled?bridge.newestXhsShareMessage(history,session.id):null;
   const llmMessages=selected?await bridge.buildXhsSharePromptForChat(selected,bridge.canUseXhsShareVision(api),x=>ids=x):[{role:'user',content:'plain'}];
-  return {llmMessages,character:role,config:api,preset:null,regexes:[],userIdentity:{name:'User'},toolsEnabled:tools,xhsShareTargets:ids};
+  return {llmMessages,character:role,config:api,preset:null,regexes:[],userIdentity:{name:'User'},toolsEnabled:tools,xhsShareTargets:ids,xhsShareAnchor:opts?.xhsShareEnabled?bridge.getXhsShareTurnAnchor(history,session.id):undefined};
  },
  mergeAppTags:x=>x,loadChatSessions:()=>[session],getEnabledTools:()=>tools?[{name:'fixture'}]:[],nativeToolProtocolForConfig:()=>nativeMode,
  isSessionStreamingEnabled:()=>streaming,getMaxToolRounds:()=>3,

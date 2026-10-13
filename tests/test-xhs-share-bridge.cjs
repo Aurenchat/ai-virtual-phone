@@ -37,7 +37,7 @@ assert(c.includes('[笔记ID]note-original')&&c.includes('[TAG]Morocco'));
 assert(c.includes('回复 路人1')&&c.includes('回复 路人2'));
 assert(c.includes('[评论ID]reply'));
 assert.strictEqual(read.newestXhsShareMessage([{...savedShare,sessionId:'session1'}],'session1').id,'share1');
-assert.strictEqual(read.newestXhsShareMessage([{...savedShare,sessionId:'session1'},{id:'other',sessionId:'session1',role:'user'}],'session1'),null);
+assert.strictEqual(read.newestXhsShareMessage([{...savedShare,sessionId:'session1'},{id:'other',sessionId:'session1',role:'user'}],'session1').id,'share1');
 assert.strictEqual(read.newestXhsShareMessage([{...savedShare,sessionId:'session1',isRetracted:true}],'session1'),null);
 const parsed = read.parseXhsSocialActions('好的< x > <xhs_social_actions>{"like":true,"save":true,"replies":[{"targetCommentId":"root","text":"回复"}]}</xhs_social_actions>');
 assert.strictEqual(parsed.actions.like, true); assert.strictEqual(parsed.actions.replies[0].targetCommentId,'root');

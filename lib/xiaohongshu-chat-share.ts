@@ -19,23 +19,38 @@ export type XhsSuggestedActions = {
   comment?: string;
   replies: Array<{ targetCommentId: string; text: string }>;
 };
-export type XhsPendingSocialAction = { shareMessageId: string; noteId: string; action: XhsSuggestedActions; turnId?: string; allowedReplyIds?: string[] };
+export type XhsShareTurnAnchor = { sessionId: string; shareMessageId: string; noteId: string; lastUserMessageId: string };
+export type XhsPendingSocialAction = { shareMessageId: string; noteId: string; action: XhsSuggestedActions; turnId?: string; allowedReplyIds?: string[]; anchor?: XhsShareTurnAnchor };
 
 export function isXhsSavedChatReply(message: ChatMessage): boolean {
   return message.role === "assistant" && !message.isRetracted
-    && (!!message.content.trim() || (!!message.mediaType && !["tool_call", "tool_result", "tool_notice"].includes(message.mediaType)));
+    && !["tool_call", "tool_result", "tool_notice"].includes(message.mediaType || "")
+    && (!!message.content?.trim() || !!message.mediaType);
 }
 
 export function newestXhsShareMessage(history: ChatMessage[], sessionId: string): ChatMessage | null {
-  // Only a CURRENT newly received share triggers auto-read; old cards in earlier
-  // history do not silently reactivate on every follow-up or unrelated message.
-  let last: ChatMessage | undefined;
+  // The latest card in the unanswered user turn wins. Ordinary user text may
+  // follow it; only a real, non-retracted assistant reply closes that turn.
   for (let i = history.length - 1; i >= 0; i--) {
     const item = history[i];
-    if (item.sessionId === sessionId && (item.role === "user" || item.role === "assistant")) { last = item; break; }
+    if (item.sessionId !== sessionId || item.isRetracted) continue;
+    if (isXhsSavedChatReply(item)) return null;
+    if (item.role === "user" && item.mediaType === "xiaohongshu_note_share") {
+      return item.mediaData?.xiaohongshuNoteId ? item : null;
+    }
   }
-  return last?.role === "user" && !last.isRetracted && last.mediaType === "xiaohongshu_note_share"
-    && !!last.mediaData?.xiaohongshuNoteId ? last : null;
+  return null;
+}
+
+export function getXhsShareTurnAnchor(history: ChatMessage[], sessionId: string): XhsShareTurnAnchor | undefined {
+  const share = newestXhsShareMessage(history, sessionId);
+  if (!share) return undefined;
+  let lastUser: ChatMessage | undefined;
+  for (let i = history.length - 1; i >= 0; i--) {
+    const item = history[i];
+    if (item.sessionId === sessionId && item.role === "user" && !item.isRetracted && item.mediaType !== "tool_result") { lastUser = item; break; }
+  }
+  return { sessionId, shareMessageId: share.id, noteId: share.mediaData!.xiaohongshuNoteId!, lastUserMessageId: lastUser!.id };
 }
 
 function truncate(value: unknown, limit: number): string {

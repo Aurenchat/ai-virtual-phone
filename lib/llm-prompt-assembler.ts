@@ -13,7 +13,7 @@ import { readDwellingLayoutCache } from "./dwelling-storage";
 import { formatDwellingContext } from "./dwelling-engine";
 import { matchesActiveTags } from "./content-tag-utils";
 import { formatReadingQuoteContent } from "./reading-quote";
-import { formatXiaohongshuShareForPrompt } from "./chat-share";
+import { formatXiaohongshuShareForPrompt, getXiaohongshuShareReadableContent } from "./chat-share";
 import { stripStateAndInnerForPrompt } from "./prompt-sanitizer";
 import { formatPromptTimestamp, getPromptTimestampOptionsForTimeContext, resolvePromptTimeAware, type PromptTimestampOptions } from "./prompt-time";
 import { formatCharacterRelationsForPrompt } from "./character-world-storage";
@@ -1217,7 +1217,7 @@ export function formatRichMediaForHistory(msg: ChatMessage, userName: string, ch
             if (d?.xiaohongshuNoteId) {
                 // New messages are lightweight references; original note is
                 // expanded only on receipt. Historical turns stay compact.
-                return `[小红书帖子引用]${d.xiaohongshuTitle || "帖子"}（${d.xiaohongshuAuthor || "未知作者"}，笔记ID:${d.xiaohongshuNoteId}）`;
+                return getXiaohongshuShareReadableContent(msg);
             }
             return formatXiaohongshuShareForPrompt({
                 author: d?.xiaohongshuAuthor,
