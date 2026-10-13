@@ -1443,6 +1443,15 @@
   font-weight: 500;
 }
 
+.xhs-comment-text-actions { flex-wrap: wrap; row-gap: 6px; }
+.xhs-comment-text-actions .xhs-comment-reroll {
+  color: #717883;
+}
+.xhs-comment-text-actions .xhs-comment-reroll:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
 .xhs-comment-vote-btn {
   display: inline-flex;
   align-items: center;

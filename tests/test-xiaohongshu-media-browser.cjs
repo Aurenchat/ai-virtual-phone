@@ -122,7 +122,8 @@ w.test={
   const server=http.createServer(async(req,res)=>{
     try {
       const pathname=new URL(req.url,'http://localhost').pathname;
-      if(pathname==='/fixture.js'){res.setHeader('Content-Type','text/javascript');res.end(await fs.readFile(path.join(temp,'fixture.js')));}
+      // Latest main lazily imports the wallpaper derivative helper; serve emitted chunks too.
+      if(/^\/[\w.-]+\.js$/.test(pathname)){res.setHeader('Content-Type','text/javascript');res.end(await fs.readFile(path.join(temp,path.basename(pathname))));}
       else if(pathname==='/style.css'){res.setHeader('Content-Type','text/css');res.end(css);}
       else if(/^\/rescue\/[\w-]+\.js$/.test(pathname)){res.setHeader('Content-Type','text/javascript');res.end(await fs.readFile(path.join(repo,'public/float-rescue',path.basename(pathname))));}
       else {res.setHeader('Content-Type','text/html');res.end(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/style.css"><div id="app"></div><script>

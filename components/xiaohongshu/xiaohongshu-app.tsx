@@ -57,8 +57,16 @@ import {
   generateXiaohongshuNpcMoreComments,
   generateXiaohongshuNpcReplyToUserComment,
   generateXiaohongshuNpcReactionForUserPost,
+  generateXiaohongshuRegeneratedCommentText,
   XiaohongshuGenerationError,
 } from "@/lib/xiaohongshu-engine";
+import {
+  applyXiaohongshuCommentRegeneration,
+  commitXiaohongshuCommentRegeneration,
+  contextForXiaohongshuCommentRegeneration,
+  planXiaohongshuCommentRegeneration,
+  readXiaohongshuCommentRegenerationState,
+} from "@/lib/xiaohongshu-comment-regeneration";
 import {
   createUserXiaohongshuNote,
   loadXiaohongshuState,
@@ -100,7 +108,7 @@ type XiaohongshuAppProps = {
   onBusyChange?: (isBusy: boolean) => void;
 };
 
-type BusyState = "idle" | "npc-feed" | "character-activity" | "publish" | "npc-reaction" | "character-reaction" | "comment-reply" | "mention-reply" | "more-comments" | "dm-reply";
+type BusyState = "idle" | "npc-feed" | "character-activity" | "publish" | "npc-reaction" | "character-reaction" | "comment-reply" | "mention-reply" | "more-comments" | "dm-reply" | "regenerate-comment";
 type XiaohongshuProfileTab = "notes" | "comments" | "saved" | "liked";
 type XiaohongshuMessagePanel = "engagement" | "follow" | "comment";
 type XiaohongshuHomeFeedTab = "follow" | "discover" | "video";
@@ -678,6 +686,9 @@ function CommentList({
   onReply,
   onDeleteComment,
   onVoteComment,
+  onRegenerateComment,
+  regeneratingCommentId,
+  regenerationDisabled,
   collapseBilingualTranslation,
 }: {
   comments: XiaohongshuComment[];
@@ -685,6 +696,9 @@ function CommentList({
   onReply: (comment: XiaohongshuComment) => void;
   onDeleteComment: (comment: XiaohongshuComment) => void;
   onVoteComment: (comment: XiaohongshuComment, vote: "like" | "dislike") => void;
+  onRegenerateComment: (comment: XiaohongshuComment) => void;
+  regeneratingCommentId: string | null;
+  regenerationDisabled: boolean;
   collapseBilingualTranslation: boolean;
 }) {
   if (comments.length === 0) return <div className="cp-xhs-mini-empty">还没有评论</div>;
@@ -718,6 +732,14 @@ function CommentList({
                   <time className="xhs-comment-time" dateTime={comment.createdAt}>{formatTime(comment.createdAt)}</time>
                   <button type="button" onClick={() => onReply(comment)}>回复</button>
                   <button type="button" onClick={() => onDeleteComment(comment)}>删除</button>
+                  {comment.authorType === "npc" || comment.authorType === "character" ? (
+                    <button type="button" className="xhs-comment-reroll"
+                      disabled={regenerationDisabled}
+                      aria-label={`重新生成${comment.authorName}的评论`}
+                      onClick={() => onRegenerateComment(comment)}>
+                      {regeneratingCommentId === comment.id ? "生成中…" : "重新生成"}
+                    </button>
+                  ) : null}
                 </div>
                 <div className="xhs-comment-vote-actions">
                   <button
@@ -764,6 +786,8 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
   const [fullscreenImage, setFullscreenImage] = useState<{ noteId: string; index: number } | null>(null);
   useEffect(() => { if (!visible) setFullscreenImage(null); }, [visible]);
   const [busy, setBusy] = useState<BusyState>("idle");
+  const [regeneratingCommentId, setRegeneratingCommentId] = useState<string | null>(null);
+  const commentRegenerationInFlightRef = useRef(false);
   const [error, setError] = useState("");
   const [debugErrorTitle, setDebugErrorTitle] = useState("暂时无法完成小红书操作。");
   const [debugRawOutput, setDebugRawOutput] = useState("");
@@ -1984,6 +2008,47 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
     void submitUserComment();
   }
 
+  async function handleRegenerateComment(comment: XiaohongshuComment) {
+    if (busy !== "idle" || commentRegenerationInFlightRef.current) return;
+    commentRegenerationInFlightRef.current = true;
+    setBusy("regenerate-comment");
+    setRegeneratingCommentId(comment.id);
+    clearErrorState();
+    try {
+      const snapshot = await readXiaohongshuCommentRegenerationState();
+      const originalNote = snapshot.notes.find(note => note.id === comment.noteId);
+      if (!originalNote) throw new Error("笔记已不存在，未进行重生成");
+      const plan = planXiaohongshuCommentRegeneration(originalNote, comment.id);
+      // Prepare replacements without writing any intermediate drafts to the actual note.
+      const pending = new Set(plan.comments.map(item => item.id));
+      const replacements = new Map<string, string>();
+      let workingNote = originalNote;
+      for (const [index, item] of plan.comments.entries()) {
+        const contextNote = contextForXiaohongshuCommentRegeneration(workingNote, pending);
+        // Only the first call sends actual vision images to avoid resending nine pictures
+        // for each NPC response. Descendant NPCs receive fresh parent/thread context.
+        const text = await generateXiaohongshuRegeneratedCommentText(
+          contextNote, item, snapshot.settings, index === 0,
+        );
+        if (!text.trim() || (index === 0 && text.trim() === item.text.trim())) {
+          throw new Error("重生成未返回新的有效评论，原评论已保留");
+        }
+        replacements.set(item.id, text);
+        pending.delete(item.id);
+        workingNote = applyXiaohongshuCommentRegeneration(workingNote, new Map([[item.id, text]]));
+      }
+      const saved = await commitXiaohongshuCommentRegeneration(originalNote, plan, replacements);
+      setState(saved);
+      onNotice?.(`已重生成 1 条评论及 ${plan.comments.length - 1} 条关联 NPC 回复`);
+    } catch (err) {
+      handleGenerationError(err, "重新生成评论失败，已保留原评论与楼中楼。");
+    } finally {
+      commentRegenerationInFlightRef.current = false;
+      setRegeneratingCommentId(null);
+      setBusy("idle");
+    }
+  }
+
   async function handleLoadMoreComments(note: XiaohongshuNote) {
     if (busy !== "idle") return;
     const latestNote = state.notes.find(item => item.id === note.id) ?? note;
@@ -2743,6 +2808,9 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
                       onReply={comment => setReplyTarget(comment)}
                       onDeleteComment={requestDeleteComment}
                       onVoteComment={handleVoteComment}
+                      onRegenerateComment={comment => void handleRegenerateComment(comment)}
+                      regeneratingCommentId={regeneratingCommentId}
+                      regenerationDisabled={busy !== "idle"}
                       collapseBilingualTranslation={state.settings.collapseBilingualTranslation}
                     />
                     <button
@@ -2859,6 +2927,9 @@ export function XiaohongshuApp({ onClose, onNotice, visible = true, onIdle, onBu
                     onReply={comment => setReplyTarget(comment)}
                     onDeleteComment={requestDeleteComment}
                     onVoteComment={handleVoteComment}
+                    onRegenerateComment={comment => void handleRegenerateComment(comment)}
+                    regeneratingCommentId={regeneratingCommentId}
+                    regenerationDisabled={busy !== "idle"}
                     collapseBilingualTranslation={state.settings.collapseBilingualTranslation}
                   />
                   <button

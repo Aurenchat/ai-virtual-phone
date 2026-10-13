@@ -221,6 +221,38 @@ export function deleteXiaohongshuProjectionEventForComment(commentId: string): v
   }
 }
 
+/**
+ * Refresh only already-existing per-character XHS projection snippets for revised
+ * comments; never append history or rewrite long-term summaries.
+ */
+export function reviseXiaohongshuRegeneratedCommentProjectionEntries(
+  events: XiaohongshuProjectionEntry[],
+  key: string,
+  revisions: ReadonlyMap<string, { before: XiaohongshuComment; afterText: string }>,
+): XiaohongshuProjectionEntry[] {
+    let changed = false;
+    const next = events.map(entry => {
+      const revision = entry?.commentId ? revisions.get(entry.commentId) : undefined;
+      if (!revision || revision.before.authorType !== "character"
+        || entry.noteId !== revision.before.noteId
+        || key !== storageKey(revision.before.authorId)) return entry;
+      const original = cleanEventText(revision.before.text, 360);
+      const replacement = cleanEventText(revision.afterText, 360);
+      let content = entry.content;
+      // Replace only the author's own snippet, never a quoted parent with the same text.
+      if (entry.id === `xiaohongshu_comment_${revision.before.id}`) {
+        content = content.replace(`，评论：“${original}”。点赞：`, `，评论：“${replacement}”。点赞：`);
+      } else if (entry.id === `xiaohongshu_reply_${revision.before.id}`) {
+        const suffix = `，回复：“${original}”。`;
+        if (content.endsWith(suffix)) content = content.slice(0, -suffix.length) + `，回复：“${replacement}”。`;
+      }
+      if (content === entry.content) return entry;
+      changed = true;
+      return { ...entry, content };
+    });
+    return changed ? next : events; // no compaction, new events, timestamps or writes
+}
+
 export function clearXiaohongshuProjectionEvents(): void {
   if (typeof window === "undefined") return;
   for (const key of kvKeysWithPrefix(XIAOHONGSHU_EVENT_PREFIX)) {

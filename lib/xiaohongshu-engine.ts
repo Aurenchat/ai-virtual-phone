@@ -1240,6 +1240,97 @@ export async function generateXiaohongshuCharacterReactionToUserPost(
   return parseWithDebug(raw, parseXiaohongshuCharacterReaction, "无法解析小红书角色互动内容");
 }
 
+/**
+ * Rewrite one existing AI-authored comment without creating new authors, ids,
+ * notifications, reactions or memory events. The caller commits the whole thread.
+ */
+export async function generateXiaohongshuRegeneratedCommentText(
+  note: XiaohongshuNote,
+  comment: XiaohongshuComment,
+  settings: XiaohongshuSettings,
+  includeVision = true,
+): Promise<string> {
+  if (comment.authorType === "user" || comment.noteId !== note.id) {
+    throw new Error("只能重生成当前笔记的 AI 评论");
+  }
+  const parent = comment.replyToCommentId
+    ? note.comments.find(item => item.id === comment.replyToCommentId)
+    : undefined;
+  const ancestry: XiaohongshuComment[] = [];
+  const seen = new Set([comment.id]);
+  let ancestor = parent;
+  while (ancestor && !seen.has(ancestor.id)) {
+    seen.add(ancestor.id); ancestry.unshift(ancestor);
+    ancestor = ancestor.replyToCommentId ? note.comments.find(item => item.id === ancestor!.replyToCommentId) : undefined;
+  }
+  const body = [
+    "<xiaohongshu_single_comment_regeneration>",
+    "当前任务是重写已经发表的一条评论的正文，不是新增评论、回复或互动。",
+    "只生成这一条评论的全新内容，保持作者的身份、口吻及原始回复对象不变。",
+    "输出仅允许包含 #单条评论 和 [内容] 一项。不要额外生成作者、评论、回复、点赞、关注或私信。",
+    "如果是回复，请接住被回复评论的具体内容；如果是主评论，请结合笔记正文及现有讨论自然发言。",
+    "评论应自然、口语化，有真实网友感；禁止说教、强行升华、复制原评论，禁止冒用用户身份。",
+    "[固定评论作者]" + comment.authorName,
+    "[评论作者类型]" + comment.authorType,
+    "[固定评论ID]" + comment.id,
+    "[现有评论正文，仅供避免重复]" + comment.text,
+    parent ? "[回复目标作者]" + parent.authorName : comment.replyTo || comment.replyToCommentId
+      ? "[评论类型]历史回复；无法确定父评论正文，不要猜测关联" : "[评论类型]主评论",
+    parent ? "[回复目标正文]" + parent.text : "",
+    ancestry.length ? "[真实 ID 依赖链，按上级到下级]\n" + ancestry.map(item => `[${item.id}] ${item.authorName}：${item.text}`).join("\n") : "",
+    "</xiaohongshu_single_comment_regeneration>",
+    "",
+    "<xiaohongshu_note_and_discussion>",
+    formatXiaohongshuNoteCommentContext(note),
+    "</xiaohongshu_note_and_discussion>",
+    "",
+    "#单条评论",
+    "[内容]新评论正文",
+  ].filter(Boolean).join("\n");
+
+  const parseResult = (raw: string): string => parseWithDebug(raw, output => {
+    const blocks = parseBlocks(output);
+    const block = blocks.find(item => item.title === "单条评论")
+      ?? (blocks.length === 1 && blocks[0].title === "全局" ? blocks[0] : undefined);
+    const text = cleanMultiline(block?.fields["内容"] ?? block?.fields["评论内容"], 600);
+    if (!text || text === "新评论正文") throw new Error("没有解析到有效的单条评论");
+    return text;
+  }, "无法解析重生成的单条评论");
+
+  if (comment.authorType === "character") {
+    const resolved = await resolveCharacterAssemblerInput(
+      comment.authorId,
+      ["xiaohongshu", "comment"],
+      { commentContext: formatXiaohongshuNoteCommentContext(note) },
+      settings,
+    );
+    if (!resolved?.apiConfig) throw new ChatEngineError("该角色没有可用的小红书 API 配置。");
+    const messages = assemblePromptPayload(resolved.input);
+    const images = includeVision && canUseNoteVision(resolved.apiConfig) ? await resolveNoteImageBatch(note) : null;
+    messages.push(makeVisionMessage(body, images));
+    const raw = await sendWithOptionalVisionFallback(
+      resolved.apiConfig, resolved.preset, messages, resolved.regexes,
+      { characterName: `小红书:${resolved.character.name}`, userName: resolved.input.userIdentity?.name },
+      { appId: "xiaohongshu", appTags: ["xiaohongshu", "comment"] },
+    );
+    return parseResult(raw);
+  }
+
+  const apiConfig = resolveGlobalApiConfig();
+  if (!apiConfig) throw new ChatEngineError("未配置全局默认 API。");
+  const names = getUserXiaohongshuNamesFromNote(note);
+  const prompt = buildXiaohongshuNpcPrompt(settings, body, {
+    userXiaohongshuName: names[0], extraReservedNames: names,
+  });
+  const images = includeVision && canUseNoteVision(apiConfig) ? await resolveNoteImageBatch(note) : null;
+  const raw = await sendWithOptionalVisionFallback(
+    apiConfig, null, [makeVisionMessage(prompt, images)], [],
+    { characterName: `小红书NPC评论重生成:${comment.authorName}` },
+    { appId: "xiaohongshu", appTags: ["xiaohongshu", "npc_comment_reply"], skipOutputRegex: true },
+  );
+  return parseResult(raw);
+}
+
 export async function generateXiaohongshuNpcReplyToUserComment(
   note: XiaohongshuNote,
   userComment: XiaohongshuComment,
