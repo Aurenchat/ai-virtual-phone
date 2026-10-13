@@ -4,7 +4,7 @@
 // AI 的 [状态栏] 壳内原文通过 window.STATUS_RAW（JS 取用）与 {{RAW}}（模板直插，已转义）注入。
 // 高度自适应桥与剧场画布同款；allow-scripts 无 same-origin，碰不到宿主页面与数据。
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { StateValue } from "@/lib/chat-storage";
 
 const FRAME_MIN_HEIGHT = 36;
@@ -33,8 +33,13 @@ function buildSrcDoc(html: string, raw: string, frameId: string, stateValues?: S
 
 export function CustomStatusFrame({ html, raw, stateValues }: { html: string; raw: string; stateValues?: StateValue[] }) {
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
-    const [frameId] = useState(() => `csf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+    // A new document must not accept queued measurements from the old one.
+    // Use serialized values so equivalent props do not reload the iframe.
+    const stateValuesKey = serializeInlineScriptValue(stateValues ?? []);
+    const frameId = useMemo(() => `csf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`, [html, raw, stateValuesKey]);
     const [height, setHeight] = useState(FRAME_MIN_HEIGHT);
+    const [measuredFrameId, setMeasuredFrameId] = useState<string | null>(null);
+    const measured = measuredFrameId === frameId;
 
     const srcDoc = useMemo(() => {
         const doc = buildSrcDoc(html, raw, frameId, stateValues);
@@ -50,15 +55,18 @@ export function CustomStatusFrame({ html, raw, stateValues }: { html: string; ra
   setTimeout(send,60);setTimeout(send,400);
 })();</` + `script>`;
         return /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, `${bridge}</body>`) : doc + bridge;
-    }, [html, raw, frameId, stateValues]);
+    }, [html, raw, frameId, stateValuesKey]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const handleMessage = (event: MessageEvent) => {
-            if (iframeRef.current && event.source !== iframeRef.current.contentWindow) return;
+            if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
             const data = event.data as Record<string, unknown> | null;
             if (!data || data.source !== "chat-status-frame" || data.type !== "resize" || data.id !== frameId) return;
             const next = Number(data.height);
-            if (Number.isFinite(next)) setHeight(Math.min(Math.max(next, FRAME_MIN_HEIGHT), 1200));
+            if (Number.isFinite(next)) {
+                setHeight(Math.min(Math.max(next, FRAME_MIN_HEIGHT), 1200));
+                setMeasuredFrameId(frameId);
+            }
         };
         window.addEventListener("message", handleMessage);
         return () => window.removeEventListener("message", handleMessage);
@@ -71,7 +79,7 @@ export function CustomStatusFrame({ html, raw, stateValues }: { html: string; ra
             sandbox="allow-scripts"
             scrolling="no"
             srcDoc={srcDoc}
-            style={{ width: "100%", height, border: 0, display: "block", background: "transparent" }}
+            style={{ width: "100%", height, border: 0, display: "block", background: "transparent", visibility: measured ? "visible" : "hidden" }}
         />
     );
 }

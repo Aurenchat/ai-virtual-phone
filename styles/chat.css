@@ -2671,6 +2671,12 @@
   animation: thoughtCardIn 0.3s ease-out;
 }
 
+/* Avoid an extra moving ancestor while the sandboxed renderer first measures.
+   Ordinary native status and monologue cards retain their existing animation. */
+.chat-status-bare:has(> iframe[title="自定义状态栏"]) {
+  animation: none;
+}
+
 /* 纯文字状态栏（没被正则/HTML 接管时）沿用折叠区原来的小字号，颜色跟随主题 */
 .chat-status-bare .chat-markdown {
   font-size: calc(11.7px*var(--app-text-scale,1));

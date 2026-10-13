@@ -1,0 +1,11 @@
+const fs=require('node:fs'),assert=require('node:assert/strict');
+const source=fs.readFileSync('components/chat/custom-status-frame.tsx','utf8'),css=fs.readFileSync('styles/chat.css','utf8');
+assert.match(source,/sandbox="allow-scripts"/);assert.doesNotMatch(source,/allow-same-origin/);
+assert.match(source,/!iframeRef.current \|\| event.source !== iframeRef.current.contentWindow/);
+assert.match(source,/data.id !== frameId/);assert.match(source,/Number.isFinite\(next\)/);assert.match(source,/Math.min\(Math.max\(next, FRAME_MIN_HEIGHT\), 1200\)/);
+assert.match(source,/measuredFrameId === frameId/);assert.match(source,/visibility: measured \? "visible" : "hidden"/);
+assert.match(source,/\[html, raw, stateValuesKey\]/);assert.match(source,/useLayoutEffect\(\(\) =>/);
+for(const key of ['window.STATUS_RAW','window.STATUS_VALUES'])assert(source.includes(key));
+assert.match(css,/\.chat-status-bare:has\(> iframe\[title="自定义状态栏"\]\)\s*\{\s*animation: none;/);
+assert.match(css,/\.chat-status-bare\s*\{[^}]*animation: thoughtCardIn/);
+console.log('PASS per-document visibility, source/ID/finite guards, stable value identity, sandbox and native animation');
