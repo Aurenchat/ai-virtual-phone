@@ -1364,6 +1364,18 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         }
     };
     const [voiceTextIds, setVoiceTextIds] = useState<Set<string>>(new Set());
+    // The voice context menu lives in a portal, outside the scrolling pane.
+    // Finish the transcript height change after React commits but before paint.
+    const finishVoiceTranscriptLayoutRef = useRef<(() => void) | null>(null);
+    useLayoutEffect(() => {
+        const finish = finishVoiceTranscriptLayoutRef.current;
+        finishVoiceTranscriptLayoutRef.current = null;
+        finish?.();
+    }, [voiceTextIds]);
+    useEffect(() => () => {
+        finishVoiceTranscriptLayoutRef.current?.();
+        finishVoiceTranscriptLayoutRef.current = null;
+    }, [session.id]);
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
     const [editingContent, setEditingContent] = useState("");
     const [editingResponseBatchId, setEditingResponseBatchId] = useState<string | null>(null);
@@ -1394,6 +1406,15 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     const beforeTranslationToggle = useCallback((target: HTMLElement) =>
         beginChatUserLayoutChange(scrollRef.current, target, scrollStability.suspend),
     [scrollStability]);
+    const beforeVoiceTranscriptToggle = useCallback((messageId: string) => {
+        const scroller = scrollRef.current;
+        if (!scroller) return;
+        // The popup is portaled to wrapperRef, not inside scrollRef: resolving
+        // from the clicked menu button would silently disable the layout guard.
+        const bubble = Array.from(scroller.querySelectorAll<HTMLElement>("[data-msg-id]"))
+            .find(element => element.dataset.msgId === messageId);
+        return bubble ? beginChatUserLayoutChange(scroller, bubble, scrollStability.suspend) : undefined;
+    }, [scrollStability]);
     useChatBottomReserve(
         wrapperRef,
         scrollRef,
@@ -5049,7 +5070,20 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                         {m.role === "assistant" && (m.rawResponseText || m.editableResponseText) ? "编辑回复" : "编辑"}
                     </button>
                     {m.mediaType === "audio" && m.mediaData?.label && (
-                        <button onClick={() => { setVoiceTextIds(prev => { const next = new Set(prev); const key = voiceTextKey(m.id); if (next.has(key)) next.delete(key); else next.add(key); return next; }); setActiveMessageId(null); }} className="ctx-menu-btn">{imessagePresentation && voiceTextIds.has(voiceTextKey(m.id)) ? "收起转写" : "转文字"}</button>
+                        <button onClick={() => {
+                            if (imessagePresentation) {
+                                finishVoiceTranscriptLayoutRef.current?.();
+                                finishVoiceTranscriptLayoutRef.current = beforeVoiceTranscriptToggle(m.id) ?? null;
+                            }
+                            setVoiceTextIds(prev => {
+                                const next = new Set(prev);
+                                const key = voiceTextKey(m.id);
+                                if (next.has(key)) next.delete(key);
+                                else next.add(key);
+                                return next;
+                            });
+                            setActiveMessageId(null);
+                        }} className="ctx-menu-btn">{imessagePresentation && voiceTextIds.has(voiceTextKey(m.id)) ? "收起转写" : "转文字"}</button>
                     )}
                     {m.role === "user" && (
                         <button onClick={() => handleRetractMessage(storedMessageId)} className="ctx-menu-btn">撤回消息</button>
@@ -6197,7 +6231,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                             />
                                             </ImessagePresentation.Provider>
                                             {imessagePresentation && renderMsg.mediaType === "audio" && voiceTextIds.has(voiceTextKey(msg.id)) && renderMsg.mediaData?.label && (
-                                                <ImessagePresentation.Provider key={`transcript:${session.id}:${msg.id}`} value={{ enabled: true, voiceTranscript: true }}>
+                                                <ImessagePresentation.Provider key={`transcript:${session.id}:${msg.id}`} value={{ enabled: true, voiceTranscript: true, beforeTranslationToggle }}>
                                                     <div className="im-voice-transcript">
                                                         <BilingualTextBlock text={msg.displayProjected ? renderMsg.mediaData.label : renderDisplayText(renderMsg.mediaData.label, msg.role === "user" ? 1 : 2, false)} mode="markdown" />
                                                     </div>
