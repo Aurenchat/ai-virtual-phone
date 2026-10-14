@@ -628,6 +628,7 @@ export const BilingualTextBlock = memo(function BilingualTextBlock({
     const presentation = useContext(ImessagePresentation);
     const translationId = useId();
     const [expanded, setExpanded] = useState(presentation.enabled ? false : defaultExpanded);
+    const finishUserLayoutRef = useRef<(() => void) | null>(null);
     useEffect(() => {
         if (!presentation.enabled) setExpanded(defaultExpanded);
     }, [text, defaultExpanded, presentation.enabled]);
@@ -635,6 +636,14 @@ export const BilingualTextBlock = memo(function BilingualTextBlock({
     // that commit paints; passive useEffect allowed one visible expanded frame.
     // Run ONLY when enabled changes, never on a user-triggered translation toggle.
     useLayoutEffect(() => { if (presentation.enabled) setExpanded(false); }, [presentation.enabled]);
+    // Finish the tapped-bubble anchor synchronously after the translation DOM
+    // changes, before the first WebKit paint of the expanded/collapsed state.
+    useLayoutEffect(() => {
+        const finish = finishUserLayoutRef.current;
+        finishUserLayoutRef.current = null;
+        finish?.();
+    }, [expanded]);
+    useEffect(() => () => { finishUserLayoutRef.current?.(); }, []);
     const display = (value: string) => presentation.enabled && presentation.voiceTranscript ? filterVoiceDisplayText(value) : value;
     const renderContent = (content: string, extraClass?: string) => {
         if (mode === "plain") return <PlainTextContent content={content} className={extraClass} />;
@@ -651,7 +660,11 @@ export const BilingualTextBlock = memo(function BilingualTextBlock({
 
     if (presentation.enabled) return (
         <div className={`chat-bilingual-block im-bilingual-block ${className ?? ""}`.trim()}>
-            <TranslationBody expanded={expanded} controls={translationId} onToggle={() => setExpanded(v => !v)}>
+            <TranslationBody expanded={expanded} controls={translationId} onToggle={target => {
+                finishUserLayoutRef.current?.();
+                finishUserLayoutRef.current = presentation.beforeTranslationToggle?.(target) ?? null;
+                setExpanded(v => !v);
+            }}>
                 {renderContent(display(bilingual.original), "chat-bilingual-content")}
             </TranslationBody>
             {expanded && <div id={translationId} data-im-text-body="" className="chat-bilingual-section-translation im-bilingual-translation">

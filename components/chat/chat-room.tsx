@@ -23,6 +23,7 @@ import { dispatchChatMessageNotice } from "@/lib/chat-notification-events";
 import { shouldSendChatInputOnEnter } from "@/lib/chat-input-keyboard";
 import { useChatBottomReserve } from "./use-chat-bottom-reserve";
 import { createChatScrollStability } from "@/lib/chat-scroll-stability";
+import { beginChatUserLayoutChange, releaseChatUserLayoutHold } from "@/lib/chat-user-layout-intent";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
@@ -1390,12 +1391,22 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     useEffect(() => { hasMoreRef.current = hasMore; }, [hasMore]);
     // Session-local geometry tracking. It never reads stored message content.
     const scrollStability = useMemo(() => createChatScrollStability(), [session.id]);
+    const beforeTranslationToggle = useCallback((target: HTMLElement) =>
+        beginChatUserLayoutChange(scrollRef.current, target, scrollStability.suspend),
+    [scrollStability]);
     useChatBottomReserve(
         wrapperRef,
         scrollRef,
         `${session.id}:${offlineMode}:${isMultiSelectMode}:${showEmojiPanel}:${showStickerPanel}:${showPlusMenu}:${theaterMode}:${!!quotingMessage}`,
         scrollStability.isPinned,
     );
+
+    // Keep a manual translation's native anchor disabled across consecutive
+    // clicks; never leak the guard into another session or an unmounted room.
+    useEffect(() => {
+        const el = scrollRef.current;
+        return () => releaseChatUserLayoutHold(el);
+    }, [session.id]);
 
     const selectStoredMessageWindow = useCallback((allMsgs: ChatMessage[]) => {
         if (allMsgs.length <= INITIAL_LOAD) {
@@ -2072,10 +2083,12 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             prevMsgCountRef.current = displayMessages.length;
             ++initialScrollVersionRef.current;
             // Do not wait for image load. Correct again if media/iMessage later resize.
+            releaseChatUserLayoutHold(el);
             scrollStability.initial();
         } else if ((displayMessages.length > prevMsgCountRef.current || tailChanged) && el) {
             // Own sends jump to the newest message; incoming messages only follow
             // while the user is pinned, never while reading older history.
+            releaseChatUserLayoutHold(el);
             scrollStability.appended(ownSend);
         }
         prevMsgCountRef.current = displayMessages.length;
@@ -6156,7 +6169,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                                             {/* Message Actions Popup */}
                                             {activeMessageId === msg.id && renderBubbleContextMenu(msg)}
 
-                                            <ImessagePresentation.Provider key={`${session.id}:${msg.id}`} value={{ enabled: imessagePresentation && (!renderMsg.mediaType || renderMsg.mediaType === "quote") && !renderMsg.mediaData?.readingQuote, voiceTranscript: false }}>
+                                            <ImessagePresentation.Provider key={`${session.id}:${msg.id}`} value={{ enabled: imessagePresentation && (!renderMsg.mediaType || renderMsg.mediaType === "quote") && !renderMsg.mediaData?.readingQuote, voiceTranscript: false, beforeTranslationToggle }}>
                                             <MessageBubble
                                                 msg={renderMsg}
                                                 displayContent={msg.displayProjected ? undefined : bubbleDisplayContent}

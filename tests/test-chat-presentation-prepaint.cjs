@@ -24,7 +24,7 @@ assert.match(block, /useLayoutEffect\(\(\) => \{\s*if \(presentation\.enabled\) 
   'Theme activation must collapse translations before paint but not upon every user toggle');
 assert.match(block, /if \(!presentation\.enabled\) setExpanded\(defaultExpanded\)/,
   'Other themes must retain their default expand option');
-assert.match(block, /onToggle=\{\(\) => setExpanded\(v => !v\)\}/,
+assert.match(block, /onToggle=\{target => \{/,
   'Manual iMessage translation toggle must remain interactive');
 assert.match(block, /if \(presentation\.enabled\) return \(/,
   'iMessage presentation branch must remain intact');
