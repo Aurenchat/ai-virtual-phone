@@ -1404,7 +1404,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     // Session-local geometry tracking. It never reads stored message content.
     const scrollStability = useMemo(() => createChatScrollStability(), [session.id]);
     const beforeTranslationToggle = useCallback((target: HTMLElement) =>
-        beginChatUserLayoutChange(scrollRef.current, target, scrollStability.suspend),
+        beginChatUserLayoutChange(scrollRef.current, target, scrollStability.suspend, scrollStability.resumeIfAtBottom),
     [scrollStability]);
     const beforeVoiceTranscriptToggle = useCallback((messageId: string) => {
         const scroller = scrollRef.current;
@@ -1413,7 +1413,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         // from the clicked menu button would silently disable the layout guard.
         const bubble = Array.from(scroller.querySelectorAll<HTMLElement>("[data-msg-id]"))
             .find(element => element.dataset.msgId === messageId);
-        return bubble ? beginChatUserLayoutChange(scroller, bubble, scrollStability.suspend) : undefined;
+        return bubble ? beginChatUserLayoutChange(scroller, bubble, scrollStability.suspend, scrollStability.resumeIfAtBottom) : undefined;
     }, [scrollStability]);
     useChatBottomReserve(
         wrapperRef,

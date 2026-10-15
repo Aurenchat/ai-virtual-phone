@@ -12,6 +12,7 @@ export type ChatScrollStability = {
     appended: (forceForOwnMessage?: boolean) => void;
     followIfPinned: () => void;
     suspend: () => void;
+    resumeIfAtBottom: () => void;
     stabilizeTarget: (center: () => void) => void;
     isPinned: () => boolean;
 };
@@ -259,6 +260,12 @@ export function createChatScrollStability(): ChatScrollStability {
         },
         followIfPinned: () => scheduleAlign(),
         suspend: () => { gesture = null; touchScrollTop = null; suspend(); },
+        resumeIfAtBottom: () => {
+            if (!scroller || bottomDistance() > REJOIN_BOTTOM_PX) return;
+            gesture = null;
+            touchScrollTop = null;
+            rejoin();
+        },
         stabilizeTarget,
         isPinned: () => pinned,
     };

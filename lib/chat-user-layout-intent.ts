@@ -88,13 +88,17 @@ export function beginChatUserLayoutChange(
     scroller: HTMLElement | null,
     trigger: HTMLElement,
     suspendFollow: () => void,
+    resumeIfAtBottom?: () => void,
 ): (() => void) | undefined {
     if (!scroller?.isConnected || !trigger.isConnected || !scroller.contains(trigger)) return;
     const anchor = trigger.closest<HTMLElement>("[data-msg-id]") ?? trigger;
     if (!scroller.contains(anchor)) return;
 
-    // A translation toggle is a reading action even if pinned was already
-    // turned off by an earlier toggle. Capture BEFORE React changes height.
+    // Capture physical bottom position before changing layout or pinned state.
+    // A manual toggle only follows when the viewport was actually at the bottom;
+    // history readers keep the v2.2 tapped-bubble position policy.
+    const followBottom = !!resumeIfAtBottom &&
+        Math.abs(scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight) <= 2;
     holdNativeAnchorForReading(scroller);
     suspendFollow();
     const originalTop = anchor.getBoundingClientRect().top;
@@ -103,6 +107,14 @@ export function beginChatUserLayoutChange(
         if (finished) return;
         finished = true;
         if (!scroller.isConnected || !anchor.isConnected || !scroller.contains(anchor)) return;
+        if (followBottom) {
+            // Pre-paint bottom alignment; never animate via scrollTo({behavior:"smooth"}).
+            // Keep native anchoring suspended so it cannot compete with JS.
+            const bottom = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+            if (Math.abs(scroller.scrollTop - bottom) > 1) scroller.scrollTop = bottom;
+            resumeIfAtBottom?.(); // Re-arm later media/AI bottom following only at the bottom.
+            return;
+        }
         const shift = anchor.getBoundingClientRect().top - originalTop;
         // Only correct a real coordinate shift; no scrollTop write on a stable
         // commit. Browser clamps if the requested position is out of range.
