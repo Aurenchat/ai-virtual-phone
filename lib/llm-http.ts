@@ -7,11 +7,13 @@
 import type { LlmRequestPayload } from "./llm-provider-adapter";
 import { protectProviderBody } from "./custom-app-protected-policy";
 import { markGenerationDiagnostic } from "./chat-generation-diagnostics";
+import { captureFailedProviderRequest, rememberProviderResponseRequest } from "./chat-request-failure-diagnostics";
 
 export type FetchLlmPayloadOptions = {
     signal?: AbortSignal;
     diagnosticRunId?: string;
     diagnosticStreaming?: boolean;
+    auditSessionId?: string;
 };
 
 export async function fetchLlmPayload(
@@ -19,25 +21,40 @@ export async function fetchLlmPayload(
     options: FetchLlmPayloadOptions = {},
 ): Promise<Response> {
     markGenerationDiagnostic(options.diagnosticRunId, "PROVIDER_PAYLOAD_BEGIN");
-    const bodyText = JSON.stringify(await protectProviderBody(payload.body, payload.providerKind));
-    if (payload.serverProxy) {
-        const proxyBody = JSON.stringify({ url: payload.url, headers: payload.headers, body: bodyText });
-        const pending = fetch("/api/llm-proxy", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: proxyBody,
-            signal: options.signal,
-        });
+    const begin = Date.now();
+    let stage: "payload_prepare" | "fetch" = "payload_prepare";
+    let bodyChars: number | undefined;
+    let diagnosticPayload: Pick<LlmRequestPayload, "providerKind" | "body"> = payload;
+    try {
+        const preparedBody = await protectProviderBody(payload.body, payload.providerKind);
+        diagnosticPayload = { providerKind: payload.providerKind, body: preparedBody };
+        const bodyText = JSON.stringify(preparedBody);
+        bodyChars = bodyText.length;
+        stage = "fetch";
+        // Keep the original request behavior; only inspect errors and non-2xx responses.
+        const pending = payload.serverProxy
+            ? fetch("/api/llm-proxy", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ url: payload.url, headers: payload.headers, body: bodyText }),
+                signal: options.signal,
+            })
+            : fetch(payload.url, {
+                method: "POST", headers: payload.headers, body: bodyText, signal: options.signal,
+            });
+        // fetch has returned a Promise, remote receipt is still unknown.
         markGenerationDiagnostic(options.diagnosticRunId, "PROVIDER_REQUEST_BEGIN", { streaming: options.diagnosticStreaming });
-        return pending;
+        const response = await pending;
+        rememberProviderResponseRequest(response, diagnosticPayload);
+        if (!response.ok) captureFailedProviderRequest(diagnosticPayload, {
+            sessionId: options.auditSessionId, phase: "http_status", httpStatus: response.status,
+            bodyChars, elapsedMs: Date.now() - begin, streaming: options.diagnosticStreaming,
+        });
+        return response;
+    } catch (error) {
+        captureFailedProviderRequest(diagnosticPayload, {
+            sessionId: options.auditSessionId, phase: stage, error,
+            bodyChars, elapsedMs: Date.now() - begin, streaming: options.diagnosticStreaming,
+        });
+        throw error;
     }
-    const pending = fetch(payload.url, {
-        method: "POST",
-        headers: payload.headers,
-        body: bodyText,
-        signal: options.signal,
-    });
-    // fetch has returned its Promise: local invocation occurred, remote receipt is unknown.
-    markGenerationDiagnostic(options.diagnosticRunId, "PROVIDER_REQUEST_BEGIN", { streaming: options.diagnosticStreaming });
-    return pending;
 }

@@ -158,6 +158,10 @@ function inspectWire(request: LlmRequestPayload, emit: (f: AuditFinding) => void
         const toolCalls = array(m.tool_calls).map(record);
         if (toolCalls.length > 0) {
             calls += toolCalls.length;
+            if (i > 0 && record(messages[i - 1]).role === "assistant") {
+                emit({ stage: "wire", severity: "warning", code: "OPENAI_TOOL_CALL_AFTER_ASSISTANT", index: i,
+                    description: "最终 OpenAI 兼容请求中，携带 tool_calls 的 assistant 紧跟另一条 assistant；部分 Gemini 中转可能拒绝此顺序。" });
+            }
             if (m.role !== "assistant") emit({ stage: "wire", severity: "error", code: "OPENAI_CALL_ROLE", index: i,
                 description: "tool_calls 未处于 assistant turn。" });
             for (const call of toolCalls) expected.set(nonblank(call.id), i);

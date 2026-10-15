@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useSyncExternalStore, useMemo, useCallback
 import { getDebugChatState, getDebugPromptSnapshot, subscribeDebugChatState, subscribeDebugPromptSnapshot, type DebugPromptSnapshot } from "@/lib/debug-store";
 import { previewPromptRequestSnapshot, auditChatPromptRequest, ChatEngineError } from "@/lib/chat-engine";
 import { formatChatProtocolAudit, type ChatProtocolAudit } from "@/lib/chat-protocol-audit";
+import { formatFailedProviderRequestReport } from "@/lib/chat-request-failure-diagnostics";
 import { previewGroupPromptRequestSnapshot } from "@/lib/group-chat-engine";
 import { FileText, Tags, X } from "lucide-react";
 import {
@@ -447,7 +448,7 @@ export function DebugPromptPanel() {
 
     async function handleCopyAudit() {
         if (!auditReport) return;
-        const text = formatChatProtocolAudit(auditReport);
+        const text = formatChatProtocolAudit(auditReport) + "\n\n" + formatFailedProviderRequestReport(activeChatSession?.id ?? "");
         let success = false;
         try {
             await navigator.clipboard.writeText(text);
@@ -1254,7 +1255,7 @@ export function DebugPromptPanel() {
                     {auditError && <div className="pv-error">{auditError}</div>}
                     {auditReport && (
                         <pre style={{ margin: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere", userSelect: "text" }}>
-                            {formatChatProtocolAudit(auditReport)}
+                            {formatChatProtocolAudit(auditReport) + "\n\n" + formatFailedProviderRequestReport(activeChatSession?.id ?? "")}
                         </pre>
                     )}
                 </section>

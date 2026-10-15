@@ -62,6 +62,7 @@ import {
 import { setDebugPromptSnapshot, type DebugPromptSnapshot } from "./debug-store";
 import { extractFinishReason } from "./api-helpers";
 import { fetchLlmPayload } from "./llm-http";
+import { captureFailedProviderResponse } from "./chat-request-failure-diagnostics";
 import { markGenerationDiagnostic, readGenerationDiagnostics } from "./chat-generation-diagnostics";
 import { analyzeChatProtocol, type ChatProtocolAudit } from "./chat-protocol-audit";
 import { loadMemoryConfig, incrementEventCounter } from "./memory-storage";
@@ -755,6 +756,7 @@ async function readSseStream(
     providerKind: ChatCompletionStreamResult["providerKind"],
     callbacks?: ChatCompletionStreamCallbacks,
     stripTimestamps = true,
+    failureContext?: { request: ReturnType<typeof buildProviderRequest>; sessionId?: string },
 ): Promise<{ content: string; rawResponse: string }> {
     if (!response.body) throw new ChatEngineError("流式响应没有 body。");
     const reader = response.body.getReader();
@@ -793,7 +795,12 @@ async function readSseStream(
     };
 
     while (true) {
-        const { done, value } = await reader.read();
+        const { done, value } = await reader.read().catch(error => {
+            if (failureContext) captureFailedProviderResponse(response, failureContext.request, {
+                sessionId: failureContext.sessionId, phase: "stream_read", error, streaming: true,
+            });
+            throw error;
+        });
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const parsed = parseSseEvents(buffer);
@@ -858,7 +865,7 @@ export async function sendLLMStreamRequest(
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
 
     try {
-        const response = await fetchLlmPayload(request, { signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: true });
+        const response = await fetchLlmPayload(request, { auditSessionId: options?.debugSessionId, signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: true });
         markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_HEADERS");
         if (!response.ok) {
             const errorText = await response.text();
@@ -875,7 +882,9 @@ export async function sendLLMStreamRequest(
                 await (pluginCallbacks ?? callbacks)?.onReasoningDelta?.(text);
             },
         };
-        const { content: streamedContent, rawResponse } = await readSseStream(response, request.providerKind, streamLogCallbacks, !options?.skipTimestampStrip);
+        const { content: streamedContent, rawResponse } = await readSseStream(response, request.providerKind, streamLogCallbacks, !options?.skipTimestampStrip, {
+            request, sessionId: options?.debugSessionId,
+        });
         markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_RECEIVED");
         if (!streamedContent.trim()) {
             throw new ChatEngineError("流式响应没有解析到文本增量。");
@@ -981,7 +990,7 @@ export async function sendLLMRequest(
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
 
     try {
-        const response = await fetchLlmPayload(request, { signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: false });
+        const response = await fetchLlmPayload(request, { auditSessionId: options?.debugSessionId, signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: false });
 
         markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_HEADERS");
         if (!response.ok) {
@@ -989,7 +998,10 @@ export async function sendLLMRequest(
             throw new ChatEngineError(`API Error ${response.status}: ${errorText}`);
         }
 
-        const data = await response.json();
+        const data = await response.json().catch(error => {
+            captureFailedProviderResponse(response, request, { sessionId: options?.debugSessionId, phase: "response_json", error, streaming: false });
+            throw error;
+        });
         markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_RECEIVED");
         const parsed = parseProviderResponse(request.providerKind, data);
         let rawOutput = parsed.content || "";
@@ -1161,7 +1173,7 @@ export async function sendLLMToolStreamRequest(
     let firstDiagnosticDelta = true;
 
     try {
-        const response = await fetchLlmPayload(request, { signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: true });
+        const response = await fetchLlmPayload(request, { auditSessionId: options?.debugSessionId, signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: true });
 
         markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_HEADERS");
         if (!response.ok) {
@@ -1213,7 +1225,10 @@ export async function sendLLMToolStreamRequest(
             }
         };
         while (true) {
-            const { value, done } = await reader.read();
+            const { value, done } = await reader.read().catch(error => {
+                captureFailedProviderResponse(response, request, { sessionId: options?.debugSessionId, phase: "stream_read", error, streaming: true });
+                throw error;
+            });
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
             const parsed = parseSseEvents(buffer);
@@ -1314,7 +1329,7 @@ export async function sendLLMToolRequest(
     const detachExternalAbort = attachExternalAbort(llmAbort, options?.signal);
 
     try {
-        const response = await fetchLlmPayload(request, { signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: false });
+        const response = await fetchLlmPayload(request, { auditSessionId: options?.debugSessionId, signal: llmAbort.signal, diagnosticRunId: options?.diagnosticRunId, diagnosticStreaming: false });
 
         markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_HEADERS");
         if (!response.ok) {
@@ -1322,7 +1337,10 @@ export async function sendLLMToolRequest(
             throw new ChatEngineError(`API Tool Error ${response.status}: ${errorText}`);
         }
 
-        const data = await response.json();
+        const data = await response.json().catch(error => {
+            captureFailedProviderResponse(response, request, { sessionId: options?.debugSessionId, phase: "response_json", error, streaming: false });
+            throw error;
+        });
         markGenerationDiagnostic(options?.diagnosticRunId, "PROVIDER_RESPONSE_RECEIVED");
         const parsed = parseProviderResponse(request.providerKind, data);
         let rawOutput = parsed.content || "";

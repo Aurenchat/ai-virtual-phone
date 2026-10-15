@@ -10,7 +10,7 @@ async function main(){
  for(const stmt of ast.statements){
   if(!ts.isImportDeclaration(stmt)||stmt.importClause?.isTypeOnly)continue;
   const id=stmt.moduleSpecifier.text;
-  if(!id.startsWith('@/')||id.endsWith('/chat-protocol-audit'))continue;
+  if(!id.startsWith('@/')||id.endsWith('/chat-protocol-audit')||id.endsWith('/chat-request-failure-diagnostics'))continue;
   const names=stmt.importClause?.namedBindings?.elements?.filter(n=>!n.isTypeOnly).map(n=>(n.propertyName||n.name).text)||[];
   if(!names.length)continue;
   const file=path.join(temp,'mock-'+swaps.length+'.ts');
@@ -18,11 +18,13 @@ async function main(){
   swaps.push([id,file]);
  }
  const entry=`import React from 'react';import {createRoot} from 'react-dom/client';import {DebugPromptPanel} from ${JSON.stringify(path.join(repo,'components/debug-prompt-panel.tsx'))};
+ import {captureFailedProviderRequest,formatFailedProviderRequestReport} from ${JSON.stringify(path.join(repo,'lib/chat-request-failure-diagnostics.ts'))};
  const w=window as any;const listeners=new Set<()=>void>();
  const sessions=[{id:'s1',contactId:'c1',updatedAt:'2026-10-15'},{id:'s2',contactId:'c2',updatedAt:'2026-10-15'},{id:'group',isGroup:true,participantIds:['c1'],groupName:'Fixture group',updatedAt:'2026-10-15'}];
  const chars=[{id:'c1',name:'Krueger synthetic'},{id:'c2',name:'Other synthetic'}];
  const dock={primaryTool:'prompt-viewer',isDocked:false,isExpanded:true,anchorPosition:{left:18,top:600},dockSide:'left'};
  const u=w.__ui={reports:${JSON.stringify(reports)},mode:'ok',calls:[],previewCalls:0,snapshot:null,pending:null,clipboard:[],fallback:[],writes:[],settings:{promptViewerEnabled:true,floatingDockEnabled:true,quickActionEnabled:true},dock};
+ u.captureFailure=(id:string,status:number)=>captureFailedProviderRequest({providerKind:'openai-compatible',body:{messages:[{role:'user',content:'PRIVATE_PROMPT'},{role:'assistant',content:'PRIVATE_VISIBLE'},{role:'assistant',tool_calls:[{id:'PRIVATE_CALL_ID',function:{name:'PRIVATE_TOOL',arguments:'PRIVATE_ARGS'}}]},{role:'tool',tool_call_id:'PRIVATE_CALL_ID',content:'PRIVATE_RESULT'}]}},{sessionId:id,phase:'http_status',httpStatus:status});
  const noop=()=>{};const functions:any={
  getDebugChatState:()=>null,getDebugPromptSnapshot:()=>u.snapshot,subscribeDebugChatState:()=>noop,subscribeDebugPromptSnapshot:(fn:any)=>{listeners.add(fn);return()=>listeners.delete(fn);},
  getFloatingDockState:()=>dock,subscribeFloatingDockState:()=>noop,expandFloatingDock:noop,collapseFloatingDock:noop,setFloatingDockAnchor:noop,setActiveFloatingTool:noop,
@@ -81,8 +83,27 @@ async function main(){
   await page.getByRole('button',{name:'关闭提示词查看器'}).click();await page.getByRole('button',{name:'打开提示词查看器'}).click();check('floating button reopens panel',await audit().isVisible());
   await page.getByRole('button',{name:'关闭提示词查看器'}).click();check('plugin fixture remains usable',await page.locator('#plugin-fixture').isVisible());await page.locator('#plugin-fixture').click();
   check('persistent sentinel untouched and no storage writes',await page.evaluate(()=>localStorage.getItem('sentinel')==='PRIVATE_PERSISTED'&&window.__ui.writes.length===0));
+  await page.evaluate(()=>window.__ui.captureFailure('s1',400));
+  await page.getByRole('button',{name:'打开提示词查看器'}).click();await select().selectOption('s1');await audit().click();await report().locator('pre').waitFor();
+  check('stored HTTP 400 and suspect adjacency appear in selected session',/HTTP 400/.test(await report().innerText())&&/CALL_AFTER_ASSISTANT/.test(await report().innerText()));
+  await page.evaluate(()=>navigator.clipboard.writeText=async t=>window.__ui.clipboard.push(t));
+  await page.getByRole('button',{name:'复制报告',exact:true}).click();await page.getByRole('button',{name:'已复制',exact:true}).waitFor();
+  check('clipboard combines current structural report with captured failure',await page.evaluate(()=>{const t=window.__ui.clipboard.at(-1);return t.includes('HTTP 400')&&t.includes('Float 聊天工具协议只读诊断')&&!t.includes('PRIVATE_')&&!t.includes('s1');}));
+  await page.evaluate(()=>{navigator.clipboard.writeText=async()=>{throw Error('denied');};document.execCommand=(command)=>{window.__ui.fallback.push(document.activeElement.value);return command==='copy';};});
+  await page.getByRole('button',{name:'已复制',exact:true}).click();
+  check('clipboard fallback also includes captured failure',await page.evaluate(()=>window.__ui.fallback.at(-1).includes('HTTP 400')));
+  await select().selectOption('s2');await audit().click();await report().locator('pre').waitFor();
+  check('different session cannot see prior failure',!/HTTP 400/.test(await report().innerText())&&/暂无记录/.test(await report().innerText()));
+  await page.evaluate(()=>window.__ui.captureFailure('s2',503));await audit().click();await report().locator('pre').waitFor();
+  check('HTTP 503 remains separate from HTTP 400',/HTTP 503/.test(await report().innerText())&&!/HTTP 400/.test(await report().innerText()));
+  check('only dedicated diagnostic key is written',await page.evaluate(()=>window.__ui.writes.length===2&&window.__ui.writes.every(k=>k==='float:chat-request-failures:v1')&&localStorage.getItem('sentinel')==='PRIVATE_PERSISTED'));
+  await page.reload();await page.getByRole('button',{name:'打开提示词查看器'}).click();await select().selectOption('s1');await audit().click();await report().locator('pre').waitFor();
+  check('failure ring survives reload',/HTTP 400/.test(await report().innerText()));
+  await page.screenshot({path:path.join(temp,'diagnostic-mobile.png'),fullPage:true});
+  await report().evaluate(e=>e.scrollTop=e.scrollHeight);
+  await page.screenshot({path:path.join(temp,'failure-report-mobile.png'),fullPage:true});
   check('no browser runtime errors',errors.length===0);
-  console.log(JSON.stringify({checks,screenshot:path.join(temp,'diagnostic-mobile.png'),scope:'real React component with synthetic engine seam; not IPA device evidence'}));
+  console.log(JSON.stringify({checks,screenshot:path.join(temp,'diagnostic-mobile.png'),failureScreenshot:path.join(temp,'failure-report-mobile.png'),scope:'real React component with synthetic engine seam; not IPA device evidence'}));
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

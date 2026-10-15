@@ -71,3 +71,14 @@ const rawBroken = make('openai-compatible',{messages:[]},[
 ]);
 assert(rawBroken.findings.some(f=>f.code==='BROKEN_ADJACENCY'));
 console.log('PASS 7 protocol audit scenarios; no content leakage');
+
+const callAfterAssistant = make('openai-compatible', {messages:[
+  {role:'user',content:'PRIVATE'}, {role:'assistant',content:'PRIVATE'},
+  {role:'assistant',tool_calls:[{id:'c',function:{name:'f',arguments:'{}'}}]},
+  {role:'tool',tool_call_id:'c',content:'PRIVATE'},
+]});
+assert(callAfterAssistant.findings.some(f=>f.code==='OPENAI_TOOL_CALL_AFTER_ASSISTANT'&&f.severity==='warning'));
+assert.equal(callAfterAssistant.wireFunctionCalls,1);
+assert.equal(callAfterAssistant.wireFunctionResponses,1);
+assert(!callAfterAssistant.findings.some(f=>f.severity==='error'));
+console.log('PASS v1.1 advisory for paired tool call following ordinary assistant');
