@@ -62,7 +62,8 @@ import {
 import { setDebugPromptSnapshot, type DebugPromptSnapshot } from "./debug-store";
 import { extractFinishReason } from "./api-helpers";
 import { fetchLlmPayload } from "./llm-http";
-import { markGenerationDiagnostic } from "./chat-generation-diagnostics";
+import { markGenerationDiagnostic, readGenerationDiagnostics } from "./chat-generation-diagnostics";
+import { analyzeChatProtocol, type ChatProtocolAudit } from "./chat-protocol-audit";
 import { loadMemoryConfig, incrementEventCounter } from "./memory-storage";
 import { retrieveCoreMemoriesForPrompt, retrieveMemoriesForPrompt } from "./memory-service";
 import { formatCoreMemories, formatLongTermMemories } from "./memory-injector";
@@ -3098,6 +3099,44 @@ export async function previewPromptPayload(
         model: config.defaultModel,
         presetName: preset?.name ?? "(无预设)",
     };
+}
+
+/** Read-only diagnostics for a single chat. Does not publish huge Prompt snapshots. */
+export async function auditChatPromptRequest(
+    session: ChatSession,
+    history: ChatMessage[],
+): Promise<ChatProtocolAudit> {
+    if (session.isGroup) throw new ChatEngineError("一键诊断暂只支持单聊，群聊需独立协议审计。");
+    const { llmMessages, character, config, preset, userIdentity, toolsEnabled } =
+        await buildChatPromptMessages(session, history, { appTags: ["chat", "text"] });
+    const assembledMessages = toLlmRequestMessages(llmMessages);
+    const enabledTools = toolsEnabled ? getEnabledTools("chat") : [];
+    let request: ReturnType<typeof buildProviderRequest>;
+    if (nativeToolProtocolForConfig(config) && enabledTools.length > 0) {
+        const persistedSession = loadChatSessions().find(item => item.id === session.id);
+        const expandedSourceIds = normalizeNativeExpandedToolSourceIds(
+            persistedSession?.nativeExpandedToolSourceIds || session.nativeExpandedToolSourceIds,
+            enabledTools,
+        );
+        const nativeBundle = buildNativeChatTools(enabledTools, expandedSourceIds, {
+            characterName: character.name,
+            userName: userIdentity?.name ?? "用户",
+        });
+        request = buildProviderRequest(config, preset, assembledMessages, { tools: nativeBundle.definitions });
+    } else {
+        request = buildProviderRequest(config, preset, assembledMessages);
+    }
+    return analyzeChatProtocol({
+        request,
+        assembledMessages,
+        history,
+        recentRuns: readGenerationDiagnostics().runs,
+        tokenBudgets: {
+            shortTerm: loadMemoryConfig().shortTermTokenBudget,
+            longTerm: loadMemoryConfig().longTermTokenBudget,
+            core: loadMemoryConfig().coreMemoryTokenBudget,
+        },
+    });
 }
 
 export async function previewPromptRequestSnapshot(

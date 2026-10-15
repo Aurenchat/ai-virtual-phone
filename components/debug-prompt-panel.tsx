@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useSyncExternalStore, useMemo, useCallback, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type CSSProperties } from "react";
 import { getDebugChatState, getDebugPromptSnapshot, subscribeDebugChatState, subscribeDebugPromptSnapshot, type DebugPromptSnapshot } from "@/lib/debug-store";
-import { previewPromptRequestSnapshot, ChatEngineError } from "@/lib/chat-engine";
+import { previewPromptRequestSnapshot, auditChatPromptRequest, ChatEngineError } from "@/lib/chat-engine";
+import { formatChatProtocolAudit, type ChatProtocolAudit } from "@/lib/chat-protocol-audit";
 import { previewGroupPromptRequestSnapshot } from "@/lib/group-chat-engine";
 import { FileText, Tags, X } from "lucide-react";
 import {
@@ -119,6 +120,11 @@ export function DebugPromptPanel() {
     const [followUpMode, setFollowUpMode] = useState(false);
     const [offlinePreviewMode, setOfflinePreviewMode] = useState(false);
     const [offlinePendingText, setOfflinePendingText] = useState("");
+    const [auditBusy, setAuditBusy] = useState(false);
+    const [auditReport, setAuditReport] = useState<ChatProtocolAudit | null>(null);
+    const [auditError, setAuditError] = useState<string | null>(null);
+    const [auditCopied, setAuditCopied] = useState(false);
+    const auditSerialRef = useRef(0);
 
     // Moments state
     const [momentsResult, setMomentsResult] = useState<MomentsPreviewResult | null>(null);
@@ -416,6 +422,59 @@ export function DebugPromptPanel() {
             setLoading(false);
         }
     }
+
+    // Diagnose locally without sending a chat completion or copying the full
+    // 460k-character prompt into another React report. Memory lookups may run.
+    async function handleChatAudit() {
+        if (!activeChatSession || activeChatSession.isGroup || auditBusy) return;
+        const serial = ++auditSerialRef.current;
+        setAuditBusy(true);
+        setAuditError(null);
+        setAuditReport(null);
+        setAuditCopied(false);
+        try {
+            const report = await auditChatPromptRequest(
+                activeChatSession,
+                loadChatMessages(activeChatSession.id),
+            );
+            if (serial === auditSerialRef.current) setAuditReport(report);
+        } catch (err) {
+            if (serial === auditSerialRef.current) setAuditError(err instanceof Error ? err.message : String(err));
+        } finally {
+            if (serial === auditSerialRef.current) setAuditBusy(false);
+        }
+    }
+
+    async function handleCopyAudit() {
+        if (!auditReport) return;
+        const text = formatChatProtocolAudit(auditReport);
+        let success = false;
+        try {
+            await navigator.clipboard.writeText(text);
+            success = true;
+        } catch {
+            // WKWebView/IPA may not expose Clipboard API; use selection fallback.
+            const field = document.createElement("textarea");
+            field.value = text;
+            field.style.position = "fixed";
+            field.style.left = "-9999px";
+            document.body.appendChild(field);
+            field.focus();
+            field.select();
+            try { success = document.execCommand("copy"); } catch { success = false; }
+            field.remove();
+        }
+        setAuditCopied(success);
+        if (!success) setAuditError("复制失败；可长按下方报告手动复制。");
+    }
+
+    useEffect(() => {
+        auditSerialRef.current += 1;
+        setAuditReport(null);
+        setAuditError(null);
+        setAuditCopied(false);
+        setAuditBusy(false);
+    }, [selectedChatSessionId, mode]);
 
     // ── Calendar Preview ──
     async function handleCalendarPreview() {
@@ -1103,6 +1162,15 @@ export function DebugPromptPanel() {
                         <button onClick={handleChatPreview} disabled={loading || !activeChatSession} className="pv-btn pv-btn-primary">
                             {loading ? "加载中..." : "预览 Prompt"}
                         </button>
+                        <button
+                            type="button"
+                            onClick={handleChatAudit}
+                            disabled={auditBusy || !activeChatSession || activeChatSession.isGroup}
+                            className="pv-btn pv-btn-ghost"
+                            title="只读检查工具调用顺序及近期重复回复痕迹，不发送聊天生成请求，不导出正文"
+                        >
+                            {auditBusy ? "诊断中..." : "一键诊断"}
+                        </button>
                         {activeChatSession && !activeChatSession.isGroup && (
                             <button onClick={() => setFollowUpMode(f => !f)} className="pv-toggle" {...(followUpMode ? { "data-active": "" } : {})}>
                                 {followUpMode ? "追发 ON" : "追发 OFF"}
@@ -1172,6 +1240,25 @@ export function DebugPromptPanel() {
                     <span className="pv-toolbar-meta">{resultMeta.model} · {resultMeta.presetName}</span>
                 )}
             </div>
+            {mode === "chat" && (auditReport || auditError) && (
+                <section aria-label="聊天协议诊断报告" style={{ padding: "10px 12px", maxHeight: 260, overflowY: "auto", fontSize: 12 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        <strong>只读结构诊断</strong>
+                        <span style={{ flex: 1 }} />
+                        {auditReport && (
+                            <button type="button" className="pv-btn pv-btn-ghost" onClick={handleCopyAudit}>
+                                {auditCopied ? "已复制" : "复制报告"}
+                            </button>
+                        )}
+                    </div>
+                    {auditError && <div className="pv-error">{auditError}</div>}
+                    {auditReport && (
+                        <pre style={{ margin: 0, whiteSpace: "pre-wrap", overflowWrap: "anywhere", userSelect: "text" }}>
+                            {formatChatProtocolAudit(auditReport)}
+                        </pre>
+                    )}
+                </section>
+            )}
             <div className="pv-divider" />
 
             {/* Body */}
