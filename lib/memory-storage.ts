@@ -88,7 +88,7 @@ export async function loadMemoryEntries(characterId: string, options?: { include
             const allEntries: MemoryEntry[] = await runRequest(tx.objectStore(STORE_NAME).getAll());
             entries = allEntries.filter(entry => entry.characterId === characterId);
         }
-        entries.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+        entries.sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
         if (options?.includeInvalidated || !entries.some(e => e.provenance)) return entries;
         const revisions = await readMemoryRevisions();
         return entries.filter(e => isMemoryProvenanceValid(e.provenance, revisions));
@@ -120,15 +120,28 @@ export async function deleteMemoryEntry(id: string): Promise<void> {
     }
 }
 
-export async function deleteMemoryEntries(ids: string[]): Promise<void> {
+export async function deleteMemoryEntries(
+    ids: string[], scope?: { characterId: string; type: MemoryEntry["type"] },
+): Promise<void> {
     if (ids.length === 0) return;
     const db = await openDb();
-    if (!db) return;
+    if (!db) {
+        if (scope) throw new Error("本地记忆数据库无法访问，已取消删除");
+        return;
+    }
     try {
         const tx = db.transaction(STORE_NAME, "readwrite");
         const store = tx.objectStore(STORE_NAME);
         for (const id of ids) {
-            store.delete(id);
+            if (!scope) store.delete(id);
+            else {
+                // Ownership is checked in the same transaction as the delete.
+                const request = store.get(id);
+                request.onsuccess = () => {
+                    const entry = request.result as MemoryEntry | undefined;
+                    if (entry?.characterId === scope.characterId && entry.type === scope.type) store.delete(id);
+                };
+            }
         }
         await new Promise<void>((res, rej) => {
             tx.oncomplete = () => res();
@@ -265,4 +278,29 @@ export function getLastCoreSummarizedTimestamp(characterId: string): string | nu
 export function setLastCoreSummarizedTimestamp(characterId: string, ts: string): void {
     if (typeof window === "undefined") return;
     kvSet(LAST_CORE_SUMMARY_TS_PREFIX + characterId, ts);
+}
+
+// Atomic, insert-only restore. Duplicate IDs abort the full transaction;
+// never replace an existing MemoryEntry (including invalidated memories).
+export async function insertMemoryEntriesAtomically(entries: MemoryEntry[]): Promise<void> {
+    if (entries.length === 0) return;
+    const db = await openDb();
+    if (!db) throw new Error("本地记忆数据库无法访问，已取消导入");
+    try {
+        const tx = db.transaction(STORE_NAME, "readwrite");
+        const store = tx.objectStore(STORE_NAME);
+        try {
+            for (const entry of entries) store.add(entry);
+        } catch (error) {
+            tx.abort();
+            throw error;
+        }
+        await new Promise<void>((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onabort = () => reject(tx.error ?? new Error("记忆导入事务中止，未写入任何记录"));
+            tx.onerror = () => reject(tx.error ?? new Error("记忆导入写入失败"));
+        });
+    } finally {
+        db.close();
+    }
 }

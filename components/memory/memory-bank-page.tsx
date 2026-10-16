@@ -5,6 +5,8 @@ import { Trash2, Zap, Clock, Users, Archive, AlertCircle, Search, Brain, FileTex
 import { ConfirmDialog } from "@/components/ui/modal";
 import { MemoryTimeline } from "./memory-timeline";
 import { MemoryEntryVirtualList } from "./memory-entry-virtual-list";
+import { MemoryExportSection } from "./memory-export-section";
+import { MemoryImportSection } from "./memory-import-section";
 import { Toggle } from "@/components/ui/form";
 import { loadCharacters } from "@/lib/character-storage";
 import type { Character } from "@/lib/character-types";
@@ -16,6 +18,8 @@ import {
     loadMemoryEntriesByType,
     saveMemoryEntry,
     deleteMemoryEntry,
+    deleteMemoryEntries,
+    loadMemoryEntries,
     deleteCharacterMemoriesByType,
     getAllCharacterIdsWithMemories,
     getMemoryCountByType,
@@ -97,7 +101,22 @@ type MemoryEditorState = {
     type: MemoryEntry["type"];
     entry?: MemoryEntry;
     content: string;
+    createdAtLocal: string;
 };
+
+function toLocalDateTimeInput(value: string): string {
+    const d = new Date(value);
+    if (!Number.isFinite(d.getTime())) return "";
+    const n = (value: number) => String(value).padStart(2, "0");
+    return `${d.getFullYear()}-${n(d.getMonth() + 1)}-${n(d.getDate())}T${n(d.getHours())}:${n(d.getMinutes())}`;
+}
+
+function toUtcDateTime(value: string): string | null {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime()) || toLocalDateTimeInput(date.toISOString()) !== value) return null;
+    return date.toISOString();
+}
 
 const memorySettingsIconStyle = (color: string): CSSProperties => ({
     "--icon-color": color,
@@ -207,6 +226,13 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
     const [savingMemory, setSavingMemory] = useState(false);
     const [summarizeRangeOpen, setSummarizeRangeOpen] = useState(false);
     const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
+    const [batchMode, setBatchMode] = useState(false);
+    const [selectedMemoryIds, setSelectedMemoryIds] = useState<string[]>([]);
+    const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
+    const [batchDeleting, setBatchDeleting] = useState(false);
+
+    const toggleBatchId = (id: string) => setSelectedMemoryIds(prev =>
+        prev.includes(id) ? prev.filter(value => value !== id) : [...prev, id]);
 
     const disabledSourceCount = MEMORY_SOURCE_OPTIONS
         .filter(source => (config.shortTermAllowedSources ?? {})[source.key] === false).length;
@@ -304,6 +330,11 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
         if (view === "detail" && selectedCharId) {
             setActiveTab("short");
             setExpandedId(null);
+            setBatchMode(false);
+            setSelectedMemoryIds([]);
+            setConfirmBatchDelete(false);
+            setMemoryEditor(null);
+            setEntryMenuId(null);
             loadDetailData(selectedCharId);
         }
     }, [view, selectedCharId, loadDetailData]);
@@ -490,23 +521,34 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
 
     const openCreateMemoryEditor = (type: MemoryEntry["type"]) => {
         setEntryMenuId(null);
-        setMemoryEditor({ type, content: "" });
+        setMemoryEditor({ type, content: "", createdAtLocal: toLocalDateTimeInput(new Date().toISOString()) });
     };
 
     const openEditMemoryEditor = (entry: MemoryEntry) => {
         setEntryMenuId(null);
-        setMemoryEditor({ type: entry.type, entry, content: entry.content });
+        setMemoryEditor({ type: entry.type, entry, content: entry.content, createdAtLocal: toLocalDateTimeInput(entry.createdAt) });
     };
 
     const handleSaveManualMemory = async () => {
         if (!selectedCharId || !memoryEditor || savingMemory) return;
-        const content = memoryEditor.content.trim();
+        const trimmedContent = memoryEditor.content.trim();
+        const content = memoryEditor.entry?.content.trim() === trimmedContent
+            ? memoryEditor.entry.content : trimmedContent;
         if (!content) {
             showNotice("记忆内容不能为空");
             return;
         }
-        if (content.length > MANUAL_MEMORY_CONTENT_LIMIT) {
+        if (content.length > MANUAL_MEMORY_CONTENT_LIMIT
+            && (!memoryEditor.entry || memoryEditor.entry.content.trim() !== trimmedContent)) {
             showNotice(`记忆内容过长，请控制在 ${MANUAL_MEMORY_CONTENT_LIMIT} 字以内`);
+            return;
+        }
+        const createdAt = memoryEditor.entry
+            && toLocalDateTimeInput(memoryEditor.entry.createdAt) === memoryEditor.createdAtLocal
+            ? memoryEditor.entry.createdAt
+            : toUtcDateTime(memoryEditor.createdAtLocal);
+        if (!createdAt) {
+            showNotice("请选择有效的记忆日期与时间");
             return;
         }
 
@@ -515,7 +557,7 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
             const now = new Date().toISOString();
             const type = memoryEditor.type;
             const source = memoryEditor.entry;
-            const contentChanged = !source || source.content.trim() !== content;
+            const contentChanged = !source || source.content !== content;
             const embedding = type === "long_term"
                 ? (contentChanged ? await maybeBuildManualMemoryEmbedding(type, content) : source?.embedding)
                 : undefined;
@@ -523,9 +565,10 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                 ? {
                     ...source,
                     content,
-                    embedding,
+                    ...(type === "long_term" ? { embedding } : {}),
+                    createdAt,
                     updatedAt: now,
-                    metadata: {
+                    metadata: !contentChanged ? source.metadata : {
                         ...(source.metadata ?? {}),
                         origin: isManualMemoryEntry(source) ? "user_manual" : "user_edited",
                         editedByUser: true,
@@ -539,19 +582,19 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                     content,
                     embedding,
                     importance: type === "core" ? 0.95 : 0.8,
-                    createdAt: now,
+                    createdAt,
                     updatedAt: now,
                     metadata: {
                         origin: "user_manual",
                     },
                 };
 
-            await saveMemoryEntry(entry);
-            if (type === "core") {
-                setCoreEntries(prev => source ? prev.map(item => item.id === entry.id ? entry : item) : [...prev, entry]);
-            } else {
-                setLongTermEntries(prev => source ? prev.map(item => item.id === entry.id ? entry : item) : [...prev, entry]);
-            }
+            await saveMemoryEntry(entry, { required: true });
+            const updateList = (prev: MemoryEntry[]) => (
+                source ? prev.map(item => item.id === entry.id ? entry : item) : [...prev, entry]
+            ).sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+            if (type === "core") setCoreEntries(updateList);
+            else setLongTermEntries(updateList);
             setMemoryEditor(null);
             setExpandedId(entry.id);
             loadCharacterList();
@@ -561,6 +604,31 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
             showNotice("记忆保存失败: " + String(error));
         } finally {
             setSavingMemory(false);
+        }
+    };
+
+    const handleBatchDelete = async () => {
+        if (!selectedCharId || batchDeleting || (activeTab !== "long" && activeTab !== "core")) return;
+        const type: MemoryEntry["type"] = activeTab === "core" ? "core" : "long_term";
+        setBatchDeleting(true);
+        try {
+            // Re-check character ownership/type before issuing delete IDs.
+            const dbEntries = await loadMemoryEntries(selectedCharId, { includeInvalidated: true });
+            const allowed = new Set(dbEntries.filter(e => e.type === type).map(e => e.id));
+            const ids = selectedMemoryIds.filter(id => allowed.has(id));
+            if (!ids.length) throw new Error("未选中可删除的记忆");
+            await deleteMemoryEntries(ids, { characterId: selectedCharId, type });
+            if (type === "core") setCoreEntries(prev => prev.filter(e => !ids.includes(e.id)));
+            else setLongTermEntries(prev => prev.filter(e => !ids.includes(e.id)));
+            setSelectedMemoryIds([]);
+            setBatchMode(false);
+            void loadCharacterList();
+            showNotice(`已删除 ${ids.length} 条${type === "core" ? "核心" : "长期"}记忆`);
+        } catch (error) {
+            showNotice("批量删除失败：" + String(error));
+        } finally {
+            setConfirmBatchDelete(false);
+            setBatchDeleting(false);
         }
     };
 
@@ -576,16 +644,33 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                         setEntryMenuId(null);
                         return;
                     }
+                    if (batchMode) {
+                        toggleBatchId(entry.id);
+                        return;
+                    }
                     setExpandedId(expandedId === entry.id ? null : entry.id);
                 }}
+                style={batchMode && selectedMemoryIds.includes(entry.id) ? { outline: "2px solid var(--primary, #6561ba)" } : undefined}
             >
                 <div className="mem-report-head">
-                    <span className="ts-11 text-secondary" style={{ letterSpacing: "1px" }}>[ DATE: {relativeTime(entry.createdAt)} ]</span>
+                    <div className="flex items-center gap-2">
+                        {batchMode && (
+                            <input type="checkbox" aria-label={`选择记忆 ${entry.id}`}
+                                checked={selectedMemoryIds.includes(entry.id)}
+                                onClick={event => event.stopPropagation()}
+                                onChange={() => toggleBatchId(entry.id)} />
+                        )}
+                        <button type="button" className="ts-11 text-secondary" style={{ letterSpacing: "1px", textAlign: "left", padding: 0, border: "none", background: "none", cursor: "pointer" }}
+                            title={`${entry.createdAt} · 点击修改时间`}
+                            onClick={event => { event.stopPropagation(); batchMode ? toggleBatchId(entry.id) : openEditMemoryEditor(entry); }}>
+                            [ DATE: {relativeTime(entry.createdAt)} ]
+                        </button>
+                    </div>
                     <div className="mem-report-actions">
                         <span className={`mem-origin-badge ${isManualMemoryEntry(entry) ? "is-manual" : ""}`}>
                             {isManualMemoryEntry(entry) ? "MANUAL" : "AUTO"}
                         </span>
-                        <div className="mem-entry-menu-wrap">
+                        {!batchMode && <div className="mem-entry-menu-wrap">
                             <button
                                 className="mem-entry-menu-btn"
                                 onClick={(event) => {
@@ -614,7 +699,7 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                                     </button>
                                 </div>
                             )}
-                        </div>
+                        </div>}
                     </div>
                 </div>
                 <div className="ts-12 leading-[1.7]">
@@ -638,12 +723,35 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                             <Plus size={15} strokeWidth={1.8} />
                             <span>新增{label}</span>
                         </button>
+                        <button type="button" className="mem-entry-add-btn" disabled={batchDeleting}
+                            onClick={() => {
+                                setBatchMode(prev => !prev);
+                                setSelectedMemoryIds([]);
+                                setEntryMenuId(null);
+                            }}>
+                            <Check size={15} strokeWidth={1.8} />
+                            <span>{batchMode ? "退出多选" : "批量管理"}</span>
+                        </button>
                         <button
                             className="mem-entry-clear-btn"
+                            disabled={batchMode}
                             onClick={() => setConfirmClearAll(true)}
                         >
                             <Trash2 size={15} strokeWidth={1.8} />
                             <span>清除{label}</span>
+                        </button>
+                    </div>
+                )}
+                {batchMode && entries.length > 0 && (
+                    <div className="flex items-center gap-2 px-1 pb-2" style={{ flexWrap: "wrap" }}>
+                        <button type="button" className="ui-btn ui-btn-outline py-1 px-3 ts-12"
+                            onClick={() => setSelectedMemoryIds(entries.map(e => e.id))}>全选本类（{entries.length}）</button>
+                        <button type="button" className="ui-btn ui-btn-outline py-1 px-3 ts-12"
+                            onClick={() => setSelectedMemoryIds([])}>取消选择</button>
+                        <button type="button" className="ui-btn py-1 px-3 ts-12" style={{ color: "#c93333" }}
+                            disabled={!selectedMemoryIds.length || batchDeleting}
+                            onClick={() => setConfirmBatchDelete(true)}>
+                            <Trash2 size={14} className="mr-1" />删除所选（{selectedMemoryIds.length}）
                         </button>
                     </div>
                 )}
@@ -731,6 +839,9 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                             onClick={() => {
                                 setActiveTab(tab.key);
                                 setEntryMenuId(null);
+                                setBatchMode(false);
+                                setSelectedMemoryIds([]);
+                                setConfirmBatchDelete(false);
                             }}
                         >
                             <tab.icon size={18} />
@@ -748,7 +859,8 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                         ? "记录稳定、长期影响角色判断的事实，例如关系身份、重大约定、长期设定。"
                         : "记录一次重要事件、承诺、偏好、关系变化，后续对话会参考。";
                     const contentLength = memoryEditor.content.trim().length;
-                    const overLimit = contentLength > MANUAL_MEMORY_CONTENT_LIMIT;
+                    const overLimit = contentLength > MANUAL_MEMORY_CONTENT_LIMIT
+                        && (!memoryEditor.entry || memoryEditor.entry.content.trim() !== memoryEditor.content.trim());
                     return (
                         <div className="modal-overlay modal-overlay-bottom" data-ui="modal" onClick={() => savingMemory ? undefined : setMemoryEditor(null)}>
                             <div className="modal-sheet mem-edit-sheet" data-ui="modal-sheet" onClick={event => event.stopPropagation()}>
@@ -770,6 +882,13 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                                     </button>
                                 </div>
                                 <div className="modal-body mem-edit-body" data-ui="modal-body">
+                                    <label className="menu-desc flex flex-col gap-1" style={{ marginBottom: 12 }}>
+                                        记忆日期与时间（当前设备本地时区）
+                                        <input type="datetime-local" className="ui-input" value={memoryEditor.createdAtLocal}
+                                            disabled={savingMemory}
+                                            onChange={event => setMemoryEditor(prev => prev ? { ...prev, createdAtLocal: event.target.value } : prev)} />
+                                        <span>未修改时间时保留原秒和毫秒；修改后按分钟保存并重新排序。</span>
+                                    </label>
                                     <textarea
                                         className="ui-textarea mem-edit-textarea"
                                         value={memoryEditor.content}
@@ -794,6 +913,17 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                     );
                 })()}
 
+                {confirmBatchDelete && (
+                    <ConfirmDialog
+                        title="确认批量删除？"
+                        message={`将永久删除当前角色所选的 ${selectedMemoryIds.length} 条${activeTab === "core" ? "核心" : "长期"}记忆，不能撤销。`}
+                        icon={AlertCircle}
+                        variant="danger"
+                        confirmLabel={batchDeleting ? "删除中..." : "确认删除"}
+                        onConfirm={() => { void handleBatchDelete(); }}
+                        onCancel={() => { if (!batchDeleting) setConfirmBatchDelete(false); }}
+                    />
+                )}
                 {/* Confirm delete single entry */}
                 {confirmDeleteEntryId && (
                     <ConfirmDialog
@@ -910,6 +1040,25 @@ export function MemoryBankPage({ view, selectedCharId, onSelectChar, onNotice }:
                             </div>
                         ) : null}
                     </>
+                )}
+
+                {selectedCharId && selectedChar && (
+                    <MemoryExportSection
+                        key={`export-${selectedCharId}`}
+                        characterId={selectedCharId}
+                        characterName={selectedChar.name}
+                        onNotice={onNotice}
+                    />
+                )}
+
+                {selectedCharId && selectedChar && (
+                    <MemoryImportSection
+                        key={`import-${selectedCharId}`}
+                        characterId={selectedCharId}
+                        characterName={selectedChar.name}
+                        onNotice={onNotice}
+                        onImported={() => { void loadCharacterList(); }}
+                    />
                 )}
 
                 {/* Memory source filter — one entry row, full picker lives in a bottom sheet */}
