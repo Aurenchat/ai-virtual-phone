@@ -772,9 +772,22 @@ function SessionItem({ session, onSelect, isPinned }: { session: ChatSession, on
         ].slice(0, 4)
         : [];
 
+    // Deliberately lazy: no batch wall-paper reads when the list opens.
+    // A touch/mouse press may overlap the room transition; acquire still owns
+    // its short idle lease, and a cold preview must never delay onSelect.
+    const prewarmBackground = () => {
+        const source = session.backgroundImage || "";
+        if (!source.startsWith("chat_bg_")) return;
+        void import("@/lib/chat-background-resource")
+            .then(({ acquireChatBackground }) => acquireChatBackground(source))
+            .then(lease => lease?.release())
+            .catch(() => {});
+    };
+
     return (
         <div
             className={`minimal-list-item${isPinned ? ' chat-pinned' : ''}`}
+            onPointerDown={prewarmBackground}
             onClick={onSelect}
         >
             {isGroup ? (

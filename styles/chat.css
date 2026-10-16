@@ -99,6 +99,11 @@
   padding-bottom: 18px;
   scroll-padding-bottom: calc(var(--chat-bottom-reserve, 120px) + 18px);
 }
+/* Do not reveal the first message geometry while its initial pinned scroll is
+   still settling. This selector NEVER hides header, composer or wallpaper. */
+.chat-app .chat-room-wrapper > .page-body[data-entry-positioning] {
+  visibility: hidden;
+}
 /* Pre-commit iMessage scroll geometry: the presentation opt-in is resolved in
    useLayoutEffect before the first visible paint. Don't wait for Bridge's
    im-header-ready flag to change padding-top a frame after entry. */
@@ -3078,6 +3083,17 @@
 .chat-room-wrapper {
   background-color: var(--c-page-body-bg, #fff);
   transition: opacity 0.15s ease-in-out;
+}
+/* A wallpaper-configured room enters wallpaper GEOMETRY immediately, even while
+   its image URL is pending. On a cold/missing resource, keep text and chrome
+   readable against the fallback surface. No geometry/timing changes here. */
+.chat-app .chat-room-wrapper.im-wallpaper[data-has-bg-image]:not([data-bg-url-acquired]) {
+  --im-incoming: #e9e9eb;
+  --im-time-color: #737378;
+  --im-time-shadow: none;
+  --im-heart-collapsed: rgba(142,142,147,.48);
+  --im-header-fade: linear-gradient(180deg, rgba(255,255,255,.96), rgba(255,255,255,.84) 68%, transparent);
+  --im-footer-fade: linear-gradient(0deg,rgba(255,255,255,.96),rgba(255,255,255,.08));
 }
 .chat-room-wrapper > .page-body {
   background: transparent;

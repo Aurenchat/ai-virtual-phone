@@ -23,6 +23,8 @@ import { dispatchChatMessageNotice } from "@/lib/chat-notification-events";
 import { shouldSendChatInputOnEnter } from "@/lib/chat-input-keyboard";
 import { useChatBottomReserve } from "./use-chat-bottom-reserve";
 import { createChatScrollStability } from "@/lib/chat-scroll-stability";
+import { acquireHotChatBackground } from "@/lib/chat-background-hot";
+import { createChatEntryVisualReadiness } from "@/lib/chat-entry-visual-readiness";
 import { beginChatUserLayoutChange, releaseChatUserLayoutHold } from "@/lib/chat-user-layout-intent";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
@@ -1229,6 +1231,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     const [bgResource, setBgResource] = useState<{ source: string; url: string; request: object } | null>(null);
     // Source and request identity prevent reuse of a released lease on A -> B -> A.
     const bgReady = bgResource?.source === backgroundSource && bgResource?.request === bgRequestRef.current;
+    // Only display owned wallpaper URLs; no unleased first-frame Blob hints.
     const bgImageResolved = bgReady ? bgResource?.url || null : null;
     const bgLoading = !!backgroundSource && !bgReady;
 
@@ -1290,7 +1293,11 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [messages]);
 
-    useEffect(() => {
+    // Warm resources are acquired synchronously in layout phase and leased
+    // BEFORE React can paint CSS using their object URL. A revoked idle URL
+    // is never read from an unowned first-frame hint. Cold resources still
+    // load asynchronously without blocking the rest of the room.
+    useLayoutEffect(() => {
         const source = session.backgroundImage || "";
         const request = {};
         bgRequestRef.current = request;
@@ -1302,23 +1309,31 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         if (!source) {
             resolve("");
         } else if (source.startsWith("data:") || /^https?:\/\//i.test(source)) {
-            // Keep existing behavior for legacy inline URLs and remote wallpapers.
+            // Preserve legacy inline and remote wallpaper behavior.
             resolve(source);
         } else {
-            void import("@/lib/chat-background-resource")
-                .then(({ acquireChatBackground }) => acquireChatBackground(source))
-                .then(lease => {
-                    if (cancelled) {
-                        lease?.release();
-                        return;
-                    }
-                    release = lease?.release ?? (() => {});
-                    resolve(lease?.url ?? "");
-                })
-                .catch(() => {
-                    // Missing/unreadable wallpaper must never block the chat room.
-                    resolve("");
-                });
+            const warm = acquireHotChatBackground(source);
+            if (warm) {
+                // The cache entry cannot be retired while this room holds it.
+                release = warm.release;
+                resolve(warm.url);
+            } else {
+                // Cache miss: no delay or visual gate for the room.
+                void import("@/lib/chat-background-resource")
+                    .then(({ acquireChatBackground }) => acquireChatBackground(source))
+                    .then(lease => {
+                        if (cancelled) {
+                            lease?.release();
+                            return;
+                        }
+                        release = lease?.release ?? (() => {});
+                        resolve(lease?.url ?? "");
+                    })
+                    .catch(() => {
+                        // Missing/unreadable wallpaper must not block chat.
+                        resolve("");
+                    });
+            }
         }
         return () => {
             cancelled = true;
@@ -2048,6 +2063,64 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             })
             .map(item => item.msg);
     }, [messages, transientMessages]);
+
+    // The first message commit is positioned before paint, but the opt-in
+    // iMessage Bridge may apply its grouping/line metrics *after* two rAFs.
+    // Keep only the message pane hidden until its actual tail geometry has
+    // settled AFTER the Bridge presentation class is present. Header, composer
+    // and wallpaper remain immediately visible. Bound this one-time gate: the
+    // screen must never wait for a slow plugin or a missing Bridge.
+    const [entryPositionReady, setEntryPositionReady] = useState(false);
+    const hasEntryMessages = displayMessages.length > 0;
+    useLayoutEffect(() => {
+        if (!hasEntryMessages || entryPositionReady) return;
+        const tracker = createChatEntryVisualReadiness(performance.now());
+        let frame = 0;
+        let cancelled = false;
+        const sample = (timestamp: number) => {
+            if (cancelled) return;
+            const pane = scrollRef.current;
+            const wrapper = wrapperRef.current;
+            if (!pane || !wrapper) return;
+            const messageNodes = pane.querySelectorAll<HTMLElement>('[data-msg-id]');
+            const tail = messageNodes[messageNodes.length - 1];
+            const rect = tail?.getBoundingClientRect();
+            const expectsBridge = !!imessagePresentation && !offlineMode;
+            const bridgeReady = !expectsBridge || wrapper.classList.contains('im-single') || wrapper.classList.contains('im-group');
+            const outcome = tracker.sample({
+                now: timestamp,
+                expectsBridge,
+                bridgeReady,
+                scrollHeight: pane.scrollHeight,
+                clientHeight: pane.clientHeight,
+                scrollTop: pane.scrollTop,
+                tailTop: rect?.top ?? null,
+                tailBottom: rect?.bottom ?? null,
+            });
+            if (outcome.ready) {
+                if (outcome.timedOut) {
+                    // Diagnostic-only marker: Codex must treat a timeout plus
+                    // any >1px visible drift as STOP, never a passing gate.
+                    wrapper.dataset.entryVisualFallback = outcome.reason;
+                }
+                // Final hidden-frame positioning must be synchronous, before
+                // React reveals the pane. Do not modify the v2.3 controller.
+                if (scrollStability.isPinned()) {
+                    const bottom = Math.max(0, pane.scrollHeight - pane.clientHeight);
+                    if (Math.abs(pane.scrollTop - bottom) > 1) pane.scrollTop = bottom;
+                }
+                setEntryPositionReady(true);
+            } else {
+                scrollStability.followIfPinned();
+                frame = requestAnimationFrame(sample);
+            }
+        };
+        frame = requestAnimationFrame(sample);
+        return () => {
+            cancelled = true;
+            if (frame) cancelAnimationFrame(frame);
+        };
+    }, [hasEntryMessages, entryPositionReady, imessagePresentation, offlineMode, scrollStability, session.id]);
 
     const previousDisplayedIdsRef = useRef(new Set<string>());
     const previousTailIdRef = useRef<string | null>(null);
@@ -5587,8 +5660,13 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         backgroundRepeat: "no-repeat",
     } : undefined;
 
+    // Installed iMessage Bridge versions use data-has-bg-image to select text
+    // geometry. That decision must use the CONFIGURED source, not the delayed
+    // image lease/URL. Otherwise a cold wallpaper changes group gaps after the
+    // first visible frame (the observed -6.03125px entry movement).
+    // Keep actual resource acquisition separate; do not touch v2.3 scrolling.
     return (
-        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper chat-mode-${offlineMode ? "offline" : "online"} page-shell inset-0 flex flex-col z-20`} style={chatRoomBackgroundStyle} {...(bgLoading ? { "data-loading": "" } : {})} {...(bgImageResolved ? { "data-has-bg-image": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})} {...(!offlineMode && imessagePresentation ? { "data-im-presentation": "" } : {})}>
+        <div ref={wrapperRef} className={`session-${session.id} chat-room-wrapper chat-mode-${offlineMode ? "offline" : "online"} page-shell inset-0 flex flex-col z-20`} style={chatRoomBackgroundStyle} {...(bgLoading ? { "data-loading": "" } : {})} {...(backgroundSource ? { "data-has-bg-image": "" } : {})} {...(bgImageResolved ? { "data-bg-url-acquired": "" } : {})} {...(showSettings ? { "data-settings-open": "" } : {})} {...(!offlineMode && imessagePresentation ? { "data-im-presentation": "" } : {})}>
             {/* Custom CSS Injection for this session — scoped to prevent leaking */}
             {liveCSS && (
                 <SessionCustomCSS css={liveCSS} scope={`.session-${session.id}`} />
@@ -5631,6 +5709,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             <div
                 ref={scrollRef}
                 className="page-body chat-room-main-pane flex flex-col gap-4 chat-scroll-anchored"
+                {...(hasEntryMessages && !entryPositionReady ? { "data-entry-positioning": "" } : {})}
                 onScroll={(e) => {
                     if (activeMessageId || activeOfflineTarget) closeContextMenu();
                 }}

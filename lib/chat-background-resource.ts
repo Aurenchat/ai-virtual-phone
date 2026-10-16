@@ -11,6 +11,7 @@
  */
 import { getChatImageFromIndexedDB } from "@/lib/chat-asset-storage";
 import { getOrCreateChatWallpaperPreview, getChatWallpaperRevision, onChatWallpaperInvalidated } from "@/lib/chat-wallpaper-preview";
+import { publishHotChatBackground, forgetHotChatBackground } from "@/lib/chat-background-hot";
 
 export type ChatBackgroundLease = {
     url: string;
@@ -65,6 +66,7 @@ function retire(resource: CachedResource): void {
     if (resource.users !== 0 || resources.get(resource.assetId) !== resource) return;
     if (resource.idleTimer !== null) clearTimeout(resource.idleTimer);
     resources.delete(resource.assetId);
+    forgetHotChatBackground(resource.assetId, resource.url);
     revokeResource(resource);
 }
 
@@ -107,6 +109,8 @@ function lease(resource: CachedResource): ChatBackgroundLease {
 
 /** Forget a hot resource if its authoritative theme asset was replaced. */
 export function invalidateChatBackgroundResource(assetId: string): void {
+    // Clear the synchronous first-frame hint even if the resource already left the map.
+    forgetHotChatBackground(assetId);
     inFlight.delete(assetId);
     inFlightRevisions.delete(assetId);
     const resource = resources.get(assetId);
@@ -196,6 +200,13 @@ export async function acquireChatBackground(source: string, retryOnInvalidation 
     // Otherwise another asset could trim a zero-user, still-pending resource.
     if (resource.objectUrl) {
         resources.set(source, resource);
+        // Publish an acquisition factory, NOT a bare URL: the layout effect
+        // obtains a real lease before the URL is ever used by room CSS.
+        publishHotChatBackground(source, resource.url, () => {
+            if (!resource.objectUrl || resources.get(source) !== resource ||
+                resource.revision !== getChatWallpaperRevision(source)) return null;
+            return lease(resource);
+        });
         return lease(resource);
     }
     // Legacy/failure fallback is NOT retained in the hot cache.
