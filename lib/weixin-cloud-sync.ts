@@ -59,7 +59,7 @@ import { buildCalendarScheduleMarker, getCurrentCalendarScheduleForPrompt } from
 import { getWeekStartIso } from "./calendar-utils";
 import { buildCharacterTimeContext } from "./character-time";
 import { isNeteaseConfigured } from "./music-service";
-import { kvGet, kvSet, registerKvMigration } from "./kv-db";
+import { kvGet, kvSet, kvSetAsync, isKvHydrated, registerKvMigration } from "./kv-db";
 import { getWeixinCloudDeployedAt } from "./cloud-deploy-status";
 import {
   isCloudBackupConfigured,
@@ -97,6 +97,8 @@ export type WeixinCloudSyncConfig = {
   enabled: boolean;
   lastSyncedAt?: string;
   lastRuntimePackagePath?: string;
+  /** Explicit pause overrides legacy deployed/runtime auto enable. */
+  explicitlyPaused?: boolean;
 };
 
 export type WeixinCloudRuntimeSnapshot = {
@@ -318,6 +320,11 @@ export type WeixinLocalAssistantConfig = {
   pollIntervalSeconds: number;
 };
 
+// A successful pause needs a fresh app lifecycle: ongoing pull/upload work from
+// this JS instance must never be treated as stopped just because KV changed.
+let weixinPauseNeedsReload = false;
+export function isWeixinSyncPauseAwaitingReload(): boolean { return weixinPauseNeedsReload; }
+
 export function loadWeixinCloudSyncConfig(): WeixinCloudSyncConfig {
   if (typeof window === "undefined") return getDefaultWeixinCloudSyncConfig();
   try {
@@ -329,8 +336,10 @@ export function loadWeixinCloudSyncConfig(): WeixinCloudSyncConfig {
     const parsed = JSON.parse(raw) as Partial<WeixinCloudSyncConfig>;
     const hasSyncedRuntime = typeof parsed.lastRuntimePackagePath === "string"
       && parsed.lastRuntimePackagePath.length > 0;
+    const explicitlyPaused = parsed.explicitlyPaused === true;
     return {
-      enabled: parsed.enabled === true || hasSyncedRuntime || Boolean(getWeixinCloudDeployedAt()),
+      enabled: !explicitlyPaused && (parsed.enabled === true || hasSyncedRuntime || Boolean(getWeixinCloudDeployedAt())),
+      explicitlyPaused,
       lastSyncedAt: typeof parsed.lastSyncedAt === "string" ? parsed.lastSyncedAt : undefined,
       lastRuntimePackagePath: typeof parsed.lastRuntimePackagePath === "string" ? parsed.lastRuntimePackagePath : undefined,
     };
@@ -341,11 +350,36 @@ export function loadWeixinCloudSyncConfig(): WeixinCloudSyncConfig {
 
 export function saveWeixinCloudSyncConfig(config: WeixinCloudSyncConfig): void {
   if (typeof window === "undefined") return;
+  // Old metadata snapshots must not undo an explicit pause. Only the async
+  // user-controlled resume path below can clear the persisted marker.
+  const explicitlyPaused = config.explicitlyPaused === true || loadWeixinCloudSyncConfig().explicitlyPaused === true;
   kvSet(WEIXIN_CLOUD_CONFIG_KEY, JSON.stringify({
-    enabled: config.enabled === true,
+    enabled: config.enabled === true && !explicitlyPaused,
+    explicitlyPaused,
     lastSyncedAt: config.lastSyncedAt,
     lastRuntimePackagePath: config.lastRuntimePackagePath,
   }));
+}
+
+/** Persist an explicit local-device pause before requiring a full reload.
+ * Does NOT disable the remote deployed assistant or erase runtime metadata.
+ * Only the explicit resume path can clear the pause; normal metadata saves
+ * preserve it via saveWeixinCloudSyncConfig().
+ */
+export async function setWeixinSyncPausedForLocalPrune(paused: boolean): Promise<void> {
+  if (typeof window === "undefined") throw new Error("只能在本机客户端操作微信同步");
+  if (!isKvHydrated()) throw new Error("微信同步设置仍在加载，尚未更改；请稍后重试");
+  const current = loadWeixinCloudSyncConfig();
+  // kvSetAsync changes its cache before IDB settles. Raise this fence first
+  // and keep it raised on failure, so an optimistic value cannot permit prune.
+  weixinPauseNeedsReload = true;
+  await kvSetAsync(WEIXIN_CLOUD_CONFIG_KEY, JSON.stringify({
+    enabled: paused ? false : current.enabled,
+    explicitlyPaused: paused,
+    lastSyncedAt: current.lastSyncedAt,
+    lastRuntimePackagePath: current.lastRuntimePackagePath,
+  }));
+  window.dispatchEvent(new Event("weixin-config-changed"));
 }
 
 export function isWeixinCloudSupabaseReady(config: CloudBackupConfig = loadCloudBackupConfig()): boolean {
@@ -1501,15 +1535,23 @@ export function startWeixinCloudRealtimeSync(): () => void {
   };
 
   const onMessagesDeleted = (event: Event) => {
-    const messages = (event as CustomEvent).detail?.messages as ChatMessage[] | undefined;
+    const detail = (event as CustomEvent<{
+      messages?: ChatMessage[];
+      cloudEventPolicy?: "local-only" | "already-handled";
+    }>).detail;
+    const messages = detail?.messages;
     if (!Array.isArray(messages) || messages.length === 0) return;
     for (const message of messages) {
       uploadQueue.delete(message.id);
       deletedLocalMessageIds.add(message.id);
     }
-    void deleteWeixinCloudMessagesFromCloud(messages).catch((err) => {
-      console.warn("[WeixinCloudSync] cloud delete failed:", err);
-    });
+    // Native prune already performed cloud-first deletion, or was explicitly
+    // authorized for local-only. Neither case may re-delete via this listener.
+    if (detail?.cloudEventPolicy !== "local-only" && detail?.cloudEventPolicy !== "already-handled") {
+      void deleteWeixinCloudMessagesFromCloud(messages).catch((err) => {
+        console.warn("[WeixinCloudSync] cloud delete failed:", err);
+      });
+    }
 
     // 只删云消息对象不够，理由和上面编辑回复那条完全一样：删掉的若是运行包生成
     // 之前的消息，它早就被烘焙进 bakedHistoryMessages 了，而助手按
@@ -1520,7 +1562,7 @@ export function startWeixinCloudRealtimeSync(): () => void {
     // 但只有删到微信那个角色的消息才需要重烘：运行包里只有绑定 bot 的角色，
     // 删别的角色的消息重烘出来一模一样，白传一遍不说，用户在别处聊天时
     // 还会莫名其妙看见「微信运行包同步中…」。
-    if (messages.some(touchesWeixinRuntime)) scheduleRuntimeSync();
+    if (detail?.cloudEventPolicy !== "local-only" && messages.some(touchesWeixinRuntime)) scheduleRuntimeSync();
   };
 
   // ── 运行包自动同步 ──
@@ -1701,6 +1743,17 @@ export async function syncEditedWeixinCloudMessageToCloud(
   return true;
 }
 
+function describeCloudDeleteFailure(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const status = message.match(/\b([45]\d{2})\b/)?.[1];
+  if (status === "401" || status === "403") return `HTTP ${status}（认证或存储权限被拒绝）`;
+  if (status === "429") return "HTTP 429（请求被限流）";
+  if (status) return `HTTP ${status}（云端存储请求失败）`;
+  if (/超时|timed?\s*out/i.test(message)) return "云端请求超时";
+  if (/network|fetch|load failed/i.test(message)) return "网络连接失败";
+  return "未知错误（请检查浏览器控制台中的云端删除日志）";
+}
+
 export async function deleteWeixinCloudMessagesFromCloud(messages: ChatMessage[]): Promise<number> {
   const cloudConfig = loadCloudBackupConfig();
   if (!isCloudBackupConfigured(cloudConfig)) return 0;
@@ -1723,17 +1776,20 @@ export async function deleteWeixinCloudMessagesFromCloud(messages: ChatMessage[]
   // 重试时只剩漏网的那几条要删，不会推倒重来。
   let deleted = 0;
   let failed = 0;
+  let firstFailure = "";
   for (const path of paths) {
     try {
       await removeObject(cloudConfig, path);
       deleted += 1;
     } catch (err) {
       failed += 1;
+      // Never expose object paths, API tokens or raw server responses in UI.
+      if (!firstFailure) firstFailure = describeCloudDeleteFailure(err);
       console.warn("[WeixinCloudSync] remove cloud message failed:", path, err);
     }
   }
   if (failed > 0) {
-    throw new Error(`有 ${failed} 条云端消息没删掉（已删 ${deleted} 条），请重试。`);
+    throw new Error(`有 ${failed} 条云端消息没删掉（已删 ${deleted} 条）；首个失败原因：${firstFailure}。本地记录未由本轮提交删除。`);
   }
   return deleted;
 }

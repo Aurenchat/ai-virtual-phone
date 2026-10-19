@@ -1,15 +1,32 @@
+import { isKvHydrated } from "./kv-db";
 import { chatDb, withChatHistoryImportLock } from "./chat-db";
 import { fingerprintPruneMessages, createPruneDiskChecker } from "./chat-prune-validation";
 import { loadChatMessages, loadChatSessions, isChatStorageHydrated, getChatSessionRevision,
     assertChatHistoryPruneBoundary, withChatHistoryPruneLock, deleteChatMessagesByIds,
     type ChatMessage, type ChatSession } from "./chat-storage";
 import { deleteChatMessagesFromCloudChecked } from "./chat-cloud-delete";
-import { syncAllWeixinBotRuntimesToCloud } from "./weixin-cloud-sync";
+import { syncAllWeixinBotRuntimesToCloud, loadWeixinCloudSyncConfig, isWeixinSyncPauseAwaitingReload } from "./weixin-cloud-sync";
+import { loadWeixinBots } from "./weixin-storage";
 import { isBackgroundReplyGenerating } from "./follow-up-service";
 
 export type ChatHistoryPrunePreview = Readonly<{ sessionId: string; total: number; remove: number; retain: number; keep: number }>;
 type Snapshot = { messages: ChatMessage[]; session: ChatSession; revision: number; fingerprint: string };
 const previews = new WeakMap<ChatHistoryPrunePreview, Snapshot>();
+export type HistoryPruneCloudMode = "cloud-first" | "local-only";
+export type HistoryPruneExecutionOptions = {
+    cloudMode?: HistoryPruneCloudMode;
+    confirmedLocalOnlyRisk?: boolean;
+};
+/** A local-only prune must never race an enabled Weixin pull or active bot. */
+function assertLocalOnlySafe(): void {
+    if (!isKvHydrated()) throw new Error("微信同步设置仍在加载或读取失败，当前禁止仅本地裁剪；请加载完成后重新预检。");
+    if (isWeixinSyncPauseAwaitingReload()) {
+        throw new Error("本机微信同步设置已变更或尚未确认保存，请先完全重载 Float，再重新预检；本次没有执行删除。");
+    }
+    if (loadWeixinCloudSyncConfig().enabled === true || loadWeixinBots().some(bot => bot.enabled === true)) {
+        throw new Error("微信云同步或微信 Bot 仍处于启用状态。请先关闭同步并停用 Bot，避免旧消息重新导入；当前没有执行删除。");
+    }
+}
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
 // Persisted "sending"/"pending" markers can survive a cancelled request or
 // interrupted WKWebView session indefinitely. They are not proof of a live job.
@@ -109,21 +126,36 @@ async function confirmPruneDiskMatchesCache(sessionId: string): Promise<void> {
     });
 }
 
-export async function executeChatHistoryPrune(preview: ChatHistoryPrunePreview): Promise<{ deleted: number; warning?: string }> {
+export async function executeChatHistoryPrune(preview: ChatHistoryPrunePreview, options: HistoryPruneExecutionOptions = {}): Promise<{ deleted: number; warning?: string }> {
+    const cloudMode = options.cloudMode ?? "cloud-first";
+    if (cloudMode !== "cloud-first" && cloudMode !== "local-only") throw new Error("未知云端处理方式，禁止裁剪");
+    if (cloudMode === "local-only") {
+        if (options.confirmedLocalOnlyRisk !== true) throw new Error("请先确认云端记录不会随本地裁剪删除");
+        assertLocalOnlySafe();
+    }
     const snapshot = previews.get(preview);
     if (!snapshot) throw new Error("预检已使用或失效，请重新预检");
     previews.delete(preview); // one-shot, including failed attempts
     return withChatHistoryImportLock("prune", () => withChatHistoryPruneLock(preview.sessionId, async () => {
         await verify(snapshot);
+        if (cloudMode === "local-only") assertLocalOnlySafe();
         const deleted = snapshot.messages.slice(0, preview.remove);
         let cloudCount = 0;
-        // Do not race a timeout: a still-running cloud request must retain the busy lock.
-        for (let i = 0; i < deleted.length; i += 200) {
-            try { cloudCount += await deleteChatMessagesFromCloudChecked(deleted.slice(i, i + 200)); }
-            catch (error) { throw new Error("云端删除未完成，本地未执行；云端可能已部分删除。" + String(error)); }
+        // Default remains cloud-first; local-only never starts an outbound delete.
+        if (cloudMode === "cloud-first") {
+            // Do not race a timeout: a still-running cloud request must retain the busy lock.
+            for (let i = 0; i < deleted.length; i += 200) {
+                try { cloudCount += await deleteChatMessagesFromCloudChecked(deleted.slice(i, i + 200)); }
+                catch (error) { throw new Error("云端删除未完成，本地未执行；云端可能已部分删除。" + String(error)); }
+            }
         }
         await verify(snapshot);
-        const count = await deleteChatMessagesByIds(preview.sessionId, deleted.map(m => m.id), { expected: snapshot.messages, session: snapshot.session });
+        if (cloudMode === "local-only") assertLocalOnlySafe();
+        const count = await deleteChatMessagesByIds(preview.sessionId, deleted.map(m => m.id), {
+            expected: snapshot.messages,
+            session: snapshot.session,
+            cloudEventPolicy: cloudMode === "local-only" ? "local-only" : "already-handled",
+        });
         if (count !== preview.remove) throw new Error("删除数量不一致，请重新加载检查，未确认成功");
         // A second independent connection may have queued a stale put(old)
         // while our write transaction was active. A new readonly transaction

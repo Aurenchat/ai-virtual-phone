@@ -1846,6 +1846,8 @@ export async function withChatHistoryPruneLock<T>(sessionId: string, work: () =>
 export type ConfirmedHistoryPrune = {
     expected: ChatMessage[];
     session: ChatSession;
+    /** Only a confirmed native prune may suppress Weixin cloud side effects. */
+    cloudEventPolicy?: "local-only" | "already-handled";
 };
 
 export function assertChatHistoryPruneBoundary(expected: ChatMessage[], deleted: ChatMessage[]): void {
@@ -1913,7 +1915,7 @@ async function deleteHistoryConfirmed(sessionId: string, messageIds: string[], o
             ? { ..._sessionsCache[index], historyPrunedMessageIds: updatedSession.historyPrunedMessageIds } : updatedSession;
         replaceMessagesCache(_messagesCache.filter(message => message.sessionId !== sessionId || !targets.has(message.id)));
     } finally { _historyPruneLocks.add(sessionId); }
-    dispatchDeletedMessages(deleted);
+    dispatchDeletedMessages(deleted, { cloudEventPolicy: options.cloudEventPolicy });
     return deleted.length;
 }
 
@@ -1970,9 +1972,9 @@ export function clearChatSessionMessages(sessionId: string) {
     dispatchDeletedMessages(deletedMessages);
 }
 
-function dispatchDeletedMessages(messages: ChatMessage[]): void {
+function dispatchDeletedMessages(messages: ChatMessage[], options?: { cloudEventPolicy?: "local-only" | "already-handled" }): void {
     if (typeof window === "undefined" || messages.length === 0) return;
-    window.dispatchEvent(new CustomEvent(CHAT_MESSAGES_DELETED_EVENT, { detail: { messages } }));
+    window.dispatchEvent(new CustomEvent(CHAT_MESSAGES_DELETED_EVENT, { detail: { messages, cloudEventPolicy: options?.cloudEventPolicy } }));
     for (const message of messages) {
         emitChatPluginEvent("message.deleted", { id: message.id, sessionId: message.sessionId });
     }
