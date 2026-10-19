@@ -11,9 +11,38 @@ export type ChatHistoryPrunePreview = Readonly<{ sessionId: string; total: numbe
 type Snapshot = { messages: ChatMessage[]; session: ChatSession; revision: number; fingerprint: string };
 const previews = new WeakMap<ChatHistoryPrunePreview, Snapshot>();
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+// Persisted "sending"/"pending" markers can survive a cancelled request or
+// interrupted WKWebView session indefinitely. They are not proof of a live job.
+// Still reject an actual running background generation and recently pending rows.
+// Never repair, overwrite or delete the original message flags here.
+const PRUNE_RECENT_PENDING_MS = 6 * 60 * 60 * 1000;
 function assertIdle(sessionId: string, messages: ChatMessage[]) {
-    if (isBackgroundReplyGenerating(sessionId) || messages.some(m => m.status === "sending" || m.isTyping || m.mediaData?.imageGenerationStatus === "pending")) {
-        throw new Error("会话仍在生成或保存内容，请等待结束后重新预检");
+    if (isBackgroundReplyGenerating(sessionId)) {
+        throw new Error("该会话确实有后台回复正在生成，请结束后重新预检");
+    }
+    const now = Date.now();
+    let recent = 0;
+    let invalidDate = 0;
+    let sending = 0;
+    let typing = 0;
+    let images = 0;
+    for (const m of messages) {
+        const s = m.status === "sending";
+        const t = m.isTyping === true;
+        const i = m.mediaData?.imageGenerationStatus === "pending";
+        if (!s && !t && !i) continue;
+        const created = Date.parse(m.createdAt);
+        // Malformed/future timestamps must NOT disable this safety check.
+        if (!Number.isFinite(created) || now - created < PRUNE_RECENT_PENDING_MS) {
+            recent++;
+            if (!Number.isFinite(created)) invalidDate++;
+            if (s) sending++;
+            if (t) typing++;
+            if (i) images++;
+        }
+    }
+    if (recent > 0) {
+        throw new Error(`发现 ${recent} 条近期未完成状态（发送中 ${sending} / 输入中 ${typing} / 生图中 ${images}，时间异常 ${invalidDate}）。请确认任务确实结束后再处理；为保护近期消息，当前禁止裁剪。`);
     }
 }
 async function verify(snapshot: Snapshot) {
