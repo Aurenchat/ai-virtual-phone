@@ -216,7 +216,8 @@ async function persistChatMediaPatch(
 ): Promise<void> {
   const nextMessage: ChatMessage = { ...message, ...patch };
   const cached = updateChatMessage(message.id, patch);
-  await chatDb.messages.put(cached ?? nextMessage);
+  // Updating metadata must never recreate a message deleted while this task was awaiting.
+  await chatDb.messages.update(message.id, cached ?? nextMessage);
 }
 
 async function compactChatImage(message: ChatMessage, nowIso: string): Promise<{ changed: boolean; freedBytes: number }> {
@@ -285,7 +286,8 @@ async function compactChatImage(message: ChatMessage, nowIso: string): Promise<{
     mediaUrl: nextMessage.mediaUrl,
     mediaData: nextMessage.mediaData,
   });
-  await chatDb.messages.put(cached ?? nextMessage);
+  // Updating metadata must never recreate a message deleted while this task was awaiting.
+  await chatDb.messages.update(message.id, cached ?? nextMessage);
   const beforeBytes = oldBytes || sourceBlob.size;
   return { changed: compressed !== null || mediaUrl !== nextRef, freedBytes: Math.max(0, beforeBytes - nextBlob.size) };
 }
@@ -322,7 +324,8 @@ export async function cleanChatImage(message: ChatMessage, nowIso: string): Prom
     mediaUrl: undefined,
     mediaData: nextMessage.mediaData,
   });
-  await chatDb.messages.put(cached ?? nextMessage);
+  // Updating metadata must never recreate a message deleted while this task was awaiting.
+  await chatDb.messages.update(message.id, cached ?? nextMessage);
   return freedBytes + estimateValueBytes(message.mediaUrl);
 }
 

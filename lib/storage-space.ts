@@ -335,7 +335,8 @@ async function cleanChatGenericMedia(message: ChatMessage, nowIso: string): Prom
     mediaCleanedAt: nowIso,
   };
   const cached = updateChatMessage(message.id, { mediaUrl: undefined, mediaData: nextMediaData });
-  await chatDb.messages.put(cached ?? { ...message, mediaUrl: undefined, mediaData: nextMediaData });
+  // An async cleanup may finish after history pruning: update only if the row still exists.
+  await chatDb.messages.update(message.id, cached ?? { ...message, mediaUrl: undefined, mediaData: nextMediaData });
   return freedBytes;
 }
 

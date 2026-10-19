@@ -35,7 +35,7 @@ const defaultDependencies: ShoppingSharePurchaseDependencies = {
   async markShare(messageId, data) {
     const updated = updateChatMessage(messageId, { mediaData: data });
     if (!updated) throw new Error("原商品分享消息已不存在");
-    await chatDb.messages.put(updated);
+    if (!await chatDb.messages.update(messageId, updated)) throw new Error("原商品分享消息已不存在");
   },
   async withLock(key, run) {
     if (typeof navigator === "undefined" || !navigator.locks?.request) {

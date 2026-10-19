@@ -1,3 +1,4 @@
+import { withChatHistoryImportLock } from "../chat-db";
 import type {
   ClearResult,
   DataSource,
@@ -515,7 +516,14 @@ async function ensureStores(dbName: string, specs: StoreSpec[]): Promise<IDBData
   return db;
 }
 
-export async function importSource(
+export async function importSource(...args: Parameters<typeof importSourceUnlocked>): ReturnType<typeof importSourceUnlocked> {
+  const payload = args[0];
+  return payload.type === "indexeddb" && payload.dbName === "AiPhoneChatDB"
+    ? withChatHistoryImportLock("import", () => importSourceUnlocked(...args))
+    : importSourceUnlocked(...args);
+}
+
+async function importSourceUnlocked(
   payload: SourceBackup,
   overwrite = false,
   resolver?: MediaResolver,

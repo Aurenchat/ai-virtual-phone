@@ -1,5 +1,7 @@
 "use client";
 
+import { getWeixinCloudDeleteTargetCount, deleteChatMessagesFromCloudChecked } from "@/lib/chat-cloud-delete";
+
 import { forwardRef, Fragment, memo, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ChatSession, ChatMessage, CHAT_APP_SETTINGS_UPDATED_EVENT, CHAT_INITIAL_VISIBLE_MESSAGE_COUNT, CHAT_LOAD_MORE_MESSAGE_COUNT, CHAT_REQUEST_REPLY_EVENT, loadChatAppSettings, loadChatMessages, loadChatContacts, loadChatSessions, saveChatSessions, pushChatMessage, updateChatMessage, deleteChatMessage, deleteChatMessagesFrom, deleteChatMessagesByIds, retractChatMessage, editChatMessage, updateMessageMediaData, replaceResponseBatchWithParts, replaceGroupResponseRound, isReadingDiscussMessage, isSystemInstructionMessage, createResponseBatchId, createResponseRoundId, getLatestStateValues, getLatestCharacterStateValues, compareChatMessages, isSessionStreamingEnabled } from "@/lib/chat-storage";
 import { cleanStreamText, splitStreamPreviewSegments, stripLiteralTexts, stripXmlTagBlocks } from "@/lib/stream-preview";
@@ -49,7 +51,7 @@ import { GroupCallScreen } from "./group-call-screen";
 import { TransferTargetModal } from "./transfer-target-modal";
 import { GiftPickerModal } from "./gift-picker-modal";
 import { ConfirmDialog } from "@/components/ui/modal";
-import { deleteWeixinCloudMessagesFromCloud, emitWeixinSyncToast, syncAllWeixinBotRuntimesToCloud } from "@/lib/weixin-cloud-sync";
+import { emitWeixinSyncToast, syncAllWeixinBotRuntimesToCloud } from "@/lib/weixin-cloud-sync";
 import { commitXhsShareActions } from "@/lib/xiaohongshu-chat-share-commit";
 import { isXhsSavedChatReply, newestXhsShareMessage } from "@/lib/xiaohongshu-chat-share";
 import { getXiaohongshuShareReadableContent } from "@/lib/chat-share";
@@ -221,16 +223,6 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string)
     });
 }
 
-function getWeixinCloudDeleteTargetCount(messages: ChatMessage[]): number {
-    const targets = new Set<string>();
-    for (const message of messages) {
-        const sync = message.cloudSync;
-        if (sync?.source !== "weixin-cloud") continue;
-        if (!sync.botId || !sync.externalId) continue;
-        targets.add(`${sync.botId}\u0000${sync.externalId}`);
-    }
-    return targets.size;
-}
 
 const CHAT_MEDIA_BUBBLE_TYPES = new Set([
     "sticker",
@@ -5020,7 +5012,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         setCloudDeletePending({ count: cloudTargetCount });
         try {
             const deletedCount = await withTimeout(
-                deleteWeixinCloudMessagesFromCloud(targetMessages),
+                deleteChatMessagesFromCloudChecked(targetMessages),
                 WEIXIN_CLOUD_DELETE_TIMEOUT_MS,
                 "云端删除超时，请检查网络后重试。",
             );

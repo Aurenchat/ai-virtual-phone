@@ -58,7 +58,8 @@ async function publish(record: PaymentRecord): Promise<ChatMessage> {
   const existing = await chatDb.messages.get(record.id);
   const msg = existing || pushChatMessage({ id: record.id, sessionId: record.sessionId, role: "user", content: "",
     createdAt: record.createdAt, mediaType: record.kind, mediaData: paymentProjection(record) }, { deferPaymentWrite: true });
-  await chatDb.transaction("rw", chatDb.messages, async () => {
+  await chatDb.transaction("rw", chatDb.messages, chatDb.sessions, async () => {
+    if ((await chatDb.sessions.get(record.sessionId))?.historyPrunedMessageIds?.includes(record.id)) throw new Error("支付消息已被裁剪，拒绝旧发布任务重新创建");
     if (!await chatDb.messages.get(record.id)) await chatDb.messages.put(msg);
   });
   const projected = await project(msg, record);

@@ -180,26 +180,53 @@ function safeParse<T>(raw: string | null): T[] {
 
 // ── Async persistence helpers (fire-and-forget) ──
 
-export function dbPutMessage(msg: ChatMessage): void {
-    chatDb.messages.put(msg).catch(err => console.warn("[ChatDB] put message failed:", err));
-}
-
-/**
- * Optional commit-confirming write for background AI publication only.
- * Unlike a bare table.put(), the outer Dexie transaction resolves after commit.
- * No retry or duplicate insert is attempted here; callers own failure handling.
- */
+/** Native writes consult the deletion ledger in the same transaction as the write. */
 export function dbPutMessageConfirmed(msg: ChatMessage): Promise<boolean> {
-    return chatDb.transaction("rw", chatDb.messages, () => chatDb.messages.put(msg))
-        .then(() => true)
-        .catch(err => {
-            console.warn("[ChatDB] confirmed put message failed:", err);
-            return false;
-        });
+    return chatDb.transaction("rw", chatDb.messages, chatDb.sessions, async () => {
+        const session = await chatDb.sessions.get(msg.sessionId);
+        if (session?.historyPrunedMessageIds?.includes(msg.id)) return false;
+        await chatDb.messages.put(msg); // genuine insert remains an insert
+        return true;
+    });
+}
+export function dbPutMessage(msg: ChatMessage, settled?: (saved: boolean) => void): void {
+    void dbPutMessageConfirmed(msg).then(saved => settled?.(saved)).catch(error => {
+        console.warn("[ChatDB] put message failed:", error);
+        settled?.(false);
+    });
+}
+export function dbUpdateMessageConfirmed(msg: ChatMessage): Promise<boolean> {
+    return chatDb.transaction("rw", chatDb.messages, async () => (await chatDb.messages.update(msg.id, msg)) === 1);
+}
+export function dbPutMessages(msgs: ChatMessage[], settled?: (rejected: ChatMessage[]) => void): void {
+    void chatDb.transaction("rw", chatDb.messages, chatDb.sessions, async () => {
+        const sessions = new Map<string, Set<string>>();
+        for (const id of new Set(msgs.map(m => m.sessionId))) sessions.set(id, new Set((await chatDb.sessions.get(id))?.historyPrunedMessageIds || []));
+        const accepted = msgs.filter(m => !sessions.get(m.sessionId)!.has(m.id));
+        await chatDb.messages.bulkPut(accepted);
+        return msgs.filter(m => sessions.get(m.sessionId)!.has(m.id));
+    }).then(rejected => settled?.(rejected)).catch(error => {
+        console.warn("[ChatDB] bulkPut messages failed:", error);
+        settled?.(msgs);
+    });
 }
 
-export function dbPutMessages(msgs: ChatMessage[]): void {
-    chatDb.messages.bulkPut(msgs).catch(err => console.warn("[ChatDB] bulkPut messages failed:", err));
+/** Only chat-history pruning and explicit ChatDB restores use this lock. */
+export async function withChatHistoryImportLock<T>(operation: "prune" | "import", run: () => Promise<T>): Promise<T> {
+    if (typeof navigator === "undefined" || !navigator.locks?.request) {
+        if (operation === "import") return run(); // prune is disabled in this environment
+        throw new Error("当前环境不支持安全裁剪所需的数据库互斥锁");
+    }
+    return navigator.locks.request("float:chat-history-import-prune", { mode: "exclusive", ifAvailable: true }, async lock => {
+        if (!lock) throw new Error("聊天记录正在恢复或裁剪，请等待完成后重试");
+        return run();
+    });
+}
+
+async function preservePrunedIds(session: ChatSession): Promise<ChatSession> {
+    const existing = await chatDb.sessions.get(session.id);
+    const ids = [...new Set([...(existing?.historyPrunedMessageIds || []), ...(session.historyPrunedMessageIds || [])])];
+    return ids.length ? { ...session, historyPrunedMessageIds: ids } : session;
 }
 
 export function dbDeleteMessage(id: string): void {
@@ -211,22 +238,30 @@ export function dbDeleteMessagesBySession(sessionId: string): void {
         .catch(err => console.warn("[ChatDB] delete session messages failed:", err));
 }
 
-export function dbDeleteMessagesByIds(ids: string[]): void {
-    chatDb.messages.bulkDelete(ids).catch(err => console.warn("[ChatDB] bulkDelete messages failed:", err));
+export function dbDeleteMessagesByIds(ids: string[], confirmed: true): Promise<void>;
+export function dbDeleteMessagesByIds(ids: string[]): void;
+export function dbDeleteMessagesByIds(ids: string[], confirmed?: true): Promise<void> | void {
+    const operation = chatDb.messages.bulkDelete(ids);
+    // The caller's outer transaction supplies the commit boundary.
+    if (confirmed) return operation;
+    void operation.catch(err => console.warn("[ChatDB] bulkDelete messages failed:", err));
 }
 
 export function dbPutSession(session: ChatSession): void {
-    chatDb.sessions.put(session).catch(err => console.warn("[ChatDB] put session failed:", err));
+    dbPutSessions([session]);
 }
 
 export function dbPutSessions(sessions: ChatSession[]): void {
-    chatDb.sessions.bulkPut(sessions).catch(err => console.warn("[ChatDB] bulkPut sessions failed:", err));
+    void chatDb.transaction("rw", chatDb.sessions, async () => {
+        await chatDb.sessions.bulkPut(await Promise.all(sessions.map(preservePrunedIds)));
+    }).catch(err => console.warn("[ChatDB] bulkPut sessions failed:", err));
 }
 
 export function dbReplaceSessions(sessions: ChatSession[]): void {
     chatDb.transaction("rw", chatDb.sessions, async () => {
+        const preserved = await Promise.all(sessions.map(preservePrunedIds));
         await chatDb.sessions.clear();
-        await chatDb.sessions.bulkPut(sessions);
+        await chatDb.sessions.bulkPut(preserved);
     }).catch(err => console.warn("[ChatDB] replace sessions failed:", err));
 }
 

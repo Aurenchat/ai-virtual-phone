@@ -1,10 +1,11 @@
+import { equalPruneMessages, createPruneDiskChecker } from "./chat-prune-validation";
 // lib/chat-storage.ts
 import { markBootStage } from "./boot-diagnostics";
 
 import {
     chatDb,
     initChatDb,
-    dbPutMessage, dbPutMessageConfirmed, dbDeleteMessage, dbDeleteMessagesBySession, dbDeleteMessagesByIds,
+    dbPutMessage, dbPutMessageConfirmed, dbUpdateMessageConfirmed, dbDeleteMessage, dbDeleteMessagesBySession, dbDeleteMessagesByIds,
     dbPutMessages, dbPutSessions, dbPutContacts, dbDeleteSession,
     dbReplaceContacts, dbReplaceSessions,
 } from "./chat-db";
@@ -38,6 +39,8 @@ export type ChatContact = {
 
 export type ChatSession = {
     id: string;
+    /** IDs removed by confirmed history pruning; native writes must not recreate them. */
+    historyPrunedMessageIds?: string[];
     contactId: string;
     lastMessageId?: string;
     lastMessagePreview?: string;
@@ -541,7 +544,7 @@ function reindexSessionMessageOrders(sessionId: string): void {
 
     if (changed.size === 0) return;
     replaceMessagesCache(_messagesCache.map(msg => changed.get(msg.id) || msg));
-    dbPutMessages([...changed.values()]);
+    persistCachedMessageUpdates([...changed.values()]);
 }
 
 export function reindexSessionMessageOrdersByTime(sessionId: string): void {
@@ -561,7 +564,7 @@ export function reindexSessionMessageOrdersByTime(sessionId: string): void {
 
     if (changed.size > 0) {
         replaceMessagesCache(_messagesCache.map(msg => changed.get(msg.id) || msg));
-        dbPutMessages([...changed.values()]);
+        persistCachedMessageUpdates([...changed.values()]);
     }
 
     const lastMsg = getLastVisibleSessionMessage(sessionId);
@@ -672,6 +675,11 @@ if (typeof window !== "undefined") window.addEventListener("chat-preview-context
 
 /** Bulk edits may rebuild buckets once, retaining sorted views for unchanged sessions. */
 function replaceMessagesCache(messages: ChatMessage[]): void {
+    for (const sessionId of _historyPruneLocks) {
+        const before = _sessionMessageIndex.get(sessionId) || [];
+        const after = messages.filter(message => message.sessionId === sessionId);
+        if (before.length !== after.length || before.some((message, i) => message !== after[i])) assertChatHistoryWritable(sessionId);
+    }
     const previous = _sessionMessageIndex;
     const next = new Map<string, ChatMessage[]>();
     for (const message of messages) {
@@ -691,6 +699,8 @@ function replaceMessagesCache(messages: ChatMessage[]): void {
 
 function replaceCachedMessage(index: number, message: ChatMessage): void {
     const previous = _messagesCache[index];
+    assertChatHistoryWritable(previous.sessionId);
+    assertChatHistoryWritable(message.sessionId);
     if (previous.sessionId !== message.sessionId) {
         const next = _messagesCache.slice();
         next[index] = message;
@@ -704,7 +714,13 @@ function replaceCachedMessage(index: number, message: ChatMessage): void {
     refreshChangedSessionPreview(message.sessionId);
 }
 
-function appendCachedMessage(message: ChatMessage, refreshPreview = true): void {
+function appendCachedMessage(message: ChatMessage, refreshPreview = true, allowNewDuringPrune = false): void {
+    if (allowNewDuringPrune && _historyPruneLocks.has(message.sessionId)
+        && !_historyPruneOriginalIds.get(message.sessionId)?.has(message.id)) {
+        // A genuinely new message invalidates the preflight/active transaction instead
+        // of being dropped. After commit it is retained alongside the surviving rows.
+        _historyPruneHasNewMessages.add(message.sessionId);
+    } else assertChatHistoryWritable(message.sessionId);
     const sorted = _sortedSessionMessages.get(message.sessionId);
     const before = _sessionMessageIndex.get(message.sessionId) || [];
     const order = getStableMessageOrder(message);
@@ -1274,6 +1290,9 @@ export function loadChatSessions(): ChatSession[] {
 }
 
 export function saveChatSessions(sessions: ChatSession[]) {
+    for (const sessionId of _historyPruneLocks) {
+        if (JSON.stringify(sessions.find(s => s.id === sessionId)) !== _historyPruneSessionSnapshots.get(sessionId)) assertChatHistoryWritable(sessionId);
+    }
     const normalized = normalizeChatSessions(sessions);
     const redirectedMessages = redirectMessagesToPreferredSessions(normalized.redirects);
     const refreshed = refreshSessionPreviewMetadata(normalized.items);
@@ -1331,6 +1350,7 @@ export function createGroupSession(groupName: string, participantIds: string[], 
 }
 
 export function deleteChatSession(sessionId: string) {
+    assertChatHistoryWritable(sessionId);
     const sessions = loadChatSessions();
     const filtered = sessions.filter(s => s.id !== sessionId);
     saveChatSessions(filtered);
@@ -1350,7 +1370,7 @@ export function reassignChatSessionMessages(fromSessionId: string, toSessionId: 
         return updated;
     }));
     if (changed.length === 0) return 0;
-    dbPutMessages(changed);
+    persistCachedMessageUpdates(changed);
     reindexSessionMessageOrdersByTime(toSessionId);
     return changed.length;
 }
@@ -1383,6 +1403,7 @@ export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "sta
     status?: ChatMessageStatus;
     createdAt?: string;
 }, options?: { deferPaymentWrite?: boolean; onMessageCommit?: (committed: Promise<boolean>) => void }): ChatMessage {
+    if (msg.id && _sessionsCache.find(session => session.id === msg.sessionId)?.historyPrunedMessageIds?.includes(msg.id)) throw new Error("该消息已被裁剪，拒绝旧任务重新插入");
     if (msg.id) {
         const existing = _messagesCache.find(item => item.id === msg.id);
         if (existing) return existing;
@@ -1406,15 +1427,15 @@ export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "sta
         if (statusRendererId) newMsg = { ...newMsg, statusRendererId };
     }
 
-    appendCachedMessage(newMsg, false);
+    appendCachedMessage(newMsg, false, true);
     if (!options?.deferPaymentWrite) {
         // Keep all normal/payment callers on the original fire-and-forget path.
         // Only an explicit background publisher opts into a commit confirmation.
         if (options?.onMessageCommit) {
-            const committed = dbPutMessageConfirmed(newMsg);
+            const committed = dbPutMessageConfirmed(newMsg).then(saved => { if (!saved) void reconcileNativeMessage(newMsg); return saved; }).catch(error => { void reconcileNativeMessage(newMsg); console.warn("[ChatDB] confirmed insert failed:", error); return false; });
             options.onMessageCommit(committed);
         } else {
-            dbPutMessage(newMsg);
+            dbPutMessage(newMsg, saved => { if (!saved) void reconcileNativeMessage(newMsg); });
         }
     }
 
@@ -1440,6 +1461,7 @@ export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "sta
 }
 
 export function upsertImportedChatMessage(msg: ChatMessage): { message: ChatMessage; inserted: boolean } {
+    if (_sessionsCache.find(session => session.id === msg.sessionId)?.historyPrunedMessageIds?.includes(msg.id)) throw new Error("该消息已被裁剪，拒绝晚到导入");
     const existing = _messagesCache.find(item => item.id === msg.id);
     if (existing) return { message: existing, inserted: false };
 
@@ -1450,8 +1472,10 @@ export function upsertImportedChatMessage(msg: ChatMessage): { message: ChatMess
         order: typeof msg.order === "number" ? msg.order : getNextMessageOrder(msg.sessionId),
     };
 
-    appendCachedMessage(newMsg);
-    dbPutMessage(newMsg);
+    appendCachedMessage(newMsg, true, true);
+    dbPutMessage(newMsg, saved => { if (!saved) void reconcileNativeMessage(newMsg); });
+
+    if (_historyPruneLocks.has(newMsg.sessionId)) return { message: newMsg, inserted: true };
 
     const preview = getChatMessagePreview(newMsg);
     const sessions = loadChatSessions();
@@ -1638,7 +1662,7 @@ function syncDeletedResponseBatchMetadata(deletedMessages: ChatMessage[]): void 
 
     if (changed.size === 0) return;
     replaceMessagesCache(_messagesCache.map(message => changed.get(message.id) || message));
-    dbPutMessages([...changed.values()]);
+    persistCachedMessageUpdates([...changed.values()]);
 }
 
 function expandToolExecutionDeleteSet(messages: ChatMessage[]): ChatMessage[] {
@@ -1731,7 +1755,11 @@ export function deleteChatMessagesFrom(messageId: string) {
     dispatchDeletedMessages(deletedMessages);
 }
 
-export function deleteChatMessagesByIds(sessionId: string, messageIds: string[]): number {
+export function deleteChatMessagesByIds(sessionId: string, messageIds: string[], options: ConfirmedHistoryPrune): Promise<number>;
+export function deleteChatMessagesByIds(sessionId: string, messageIds: string[]): number;
+export function deleteChatMessagesByIds(sessionId: string, messageIds: string[], options?: ConfirmedHistoryPrune): number | Promise<number> {
+    if (options) return deleteHistoryConfirmed(sessionId, messageIds, options);
+    assertChatHistoryWritable(sessionId);
     const targetIds = new Set(messageIds);
     if (targetIds.size === 0) return 0;
 
@@ -1766,11 +1794,134 @@ export function deleteChatMessagesByIds(sessionId: string, messageIds: string[])
     return deletedIds.length;
 }
 
+/** Reconcile only the exact optimistic object; never overwrite a newer edit. */
+async function reconcileNativeMessage(message: ChatMessage): Promise<void> {
+    try {
+        while (_historyPruneLocks.has(message.sessionId)) await new Promise<void>(resolve => {
+            const waiters = _historyPruneReleaseWaiters.get(message.sessionId) || [];
+            waiters.push(resolve); _historyPruneReleaseWaiters.set(message.sessionId, waiters);
+        });
+        const stored = await chatDb.messages.get(message.id);
+        if (_historyPruneLocks.has(message.sessionId)) return reconcileNativeMessage(message);
+        const index = _messagesCache.findIndex(item => item.id === message.id);
+        if (index === -1 || _messagesCache[index] !== message) return;
+        if (stored) replaceCachedMessage(index, stored);
+        else replaceMessagesCache(_messagesCache.filter(item => item !== message));
+    } catch (error) { console.warn("[ChatDB] message cache reconciliation failed:", error); }
+}
+function persistCachedMessageUpdate(message: ChatMessage): void {
+    void dbUpdateMessageConfirmed(message).then(saved => { if (!saved) return reconcileNativeMessage(message); })
+        .catch(async error => { console.warn("[ChatDB] metadata update failed:", error); await reconcileNativeMessage(message); });
+}
+function persistCachedMessageUpdates(messages: ChatMessage[]): void {
+    for (const message of messages) persistCachedMessageUpdate(message);
+}
+
+// A narrow native prune mode: exact record boundary, no reindexing of survivors.
+// The old synchronous multi-select contract remains unchanged.
+const _historyPruneLocks = new Set<string>();
+const _historyPruneReleaseWaiters = new Map<string, Array<() => void>>();
+const _historyPruneOriginalIds = new Map<string, Set<string>>();
+const _historyPruneHasNewMessages = new Set<string>();
+const _historyPruneSessionSnapshots = new Map<string, string>();
+function assertChatHistoryWritable(sessionId: string): void {
+    if (_historyPruneLocks.has(sessionId)) throw new Error("该会话正在裁剪历史，请等待完成");
+}
+export async function withChatHistoryPruneLock<T>(sessionId: string, work: () => Promise<T>): Promise<T> {
+    assertChatHistoryWritable(sessionId);
+    _historyPruneLocks.add(sessionId);
+    _historyPruneOriginalIds.set(sessionId, new Set(loadChatMessages(sessionId).map(message => message.id)));
+    _historyPruneSessionSnapshots.set(sessionId, JSON.stringify(_sessionsCache.find(s => s.id === sessionId)));
+    try { return await work(); }
+    finally {
+        _historyPruneLocks.delete(sessionId);
+        _historyPruneSessionSnapshots.delete(sessionId);
+        _historyPruneOriginalIds.delete(sessionId);
+        _historyPruneHasNewMessages.delete(sessionId);
+        const waiters = _historyPruneReleaseWaiters.get(sessionId) || [];
+        _historyPruneReleaseWaiters.delete(sessionId);
+        for (const resolve of waiters) resolve();
+    }
+}
+export type ConfirmedHistoryPrune = {
+    expected: ChatMessage[];
+    session: ChatSession;
+};
+
+export function assertChatHistoryPruneBoundary(expected: ChatMessage[], deleted: ChatMessage[]): void {
+    const ids = new Set(deleted.map(message => message.id));
+    for (const field of ["toolExecutionId", "responseBatchId", "responseRoundId"] as const) {
+        const groups = new Set(deleted.map(message => message[field]).filter(Boolean));
+        if (expected.some(message => !ids.has(message.id) && message[field] && groups.has(message[field]))) {
+            throw new Error("裁剪边界切开了关联回复，请调整保留条数后重新预检");
+        }
+    }
+    const links = (message: ChatMessage): string[] => [
+        ...(message.nativeToolCalls || []).map(call => "tool:" + call.id),
+        ...(message.nativeToolResult ? ["tool:" + message.nativeToolResult.toolCallId] : []),
+        ...(message.cloudSync?.source === "weixin-cloud" && message.cloudSync.botId && message.cloudSync.externalId
+            ? ["cloud:" + message.cloudSync.botId + "\0" + message.cloudSync.externalId] : []),
+    ];
+    const deletedLinks = new Set(deleted.flatMap(links));
+    if (expected.some(message => !ids.has(message.id) && links(message).some(link => deletedLinks.has(link)))) {
+        throw new Error("裁剪边界切开了工具调用或云端消息，请调整保留条数后重新预检");
+    }
+    const expanded = expandToolExecutionDeleteSet(deleted);
+    if (expanded.length !== deleted.length) throw new Error("关联消息已变化，请重新预检");
+}
+
+async function deleteHistoryConfirmed(sessionId: string, messageIds: string[], options: ConfirmedHistoryPrune): Promise<number> {
+    if (!_historyPruneLocks.has(sessionId) || !_hydrated) throw new Error("裁剪尚未就绪");
+    const expected = options.expected;
+    const targets = new Set(messageIds);
+    const deleted = expected.filter(message => targets.has(message.id));
+    if (expected.some(message => message.sessionId !== sessionId) || options.session.id !== sessionId
+        || deleted.length !== targets.size || new Set(expected.map(m => m.id)).size !== expected.length) throw new Error("会话或消息范围不匹配");
+    if (!deleted.length) return 0;
+    const remaining = expected.filter(message => !targets.has(message.id));
+    if (!remaining.length || expected.slice(0, deleted.length).some(message => !targets.has(message.id))) throw new Error("只能裁剪最旧的消息");
+    assertChatHistoryPruneBoundary(expected, deleted);
+    const sessionSnapshot = JSON.stringify(options.session);
+    const assertCurrent = () => {
+        if (!equalPruneMessages(expected, loadChatMessages(sessionId))
+            || JSON.stringify(_sessionsCache.find(session => session.id === sessionId)) !== sessionSnapshot) throw new Error("预检已失效，请重新预检");
+    };
+    assertCurrent();
+    const last = [...remaining].reverse().find(isSessionPreviewCandidate);
+    const updatedSession = { ...options.session, historyPrunedMessageIds: [...new Set([...(options.session.historyPrunedMessageIds || []), ...messageIds])], lastMessageId: last?.id, lastMessagePreview: last ? getChatMessagePreview(last) : "",
+        ...(last ? { updatedAt: last.createdAt } : {}) };
+    await chatDb.transaction("rw", chatDb.messages, chatDb.sessions, async () => {
+        // IndexedDB cursor avoids materializing the entire rich-media chat twice.
+        const diskCheck = createPruneDiskChecker(expected);
+        await chatDb.messages.where("sessionId").equals(sessionId).each(message => diskCheck.inspect(message));
+        diskCheck.complete();
+        if (JSON.stringify(await chatDb.sessions.get(sessionId)) !== sessionSnapshot) throw new Error("持久化记录与预检不一致，请等待保存后重新预检");
+        for (let offset = 0; offset < messageIds.length; offset += 200) {
+            assertCurrent();
+            await dbDeleteMessagesByIds(messageIds.slice(offset, offset + 200), true);
+        }
+        await chatDb.sessions.put(updatedSession);
+        assertCurrent();
+    });
+    // No cache mutation, notifications or success before the outer commit resolves.
+    // Publish using the existing index/preview machinery, without rewriting survivors.
+    _historyPruneLocks.delete(sessionId);
+    try {
+        const index = _sessionsCache.findIndex(session => session.id === sessionId);
+        // An append in the commit callback has already published a newer preview.
+        if (index !== -1) _sessionsCache[index] = _historyPruneHasNewMessages.has(sessionId)
+            ? { ..._sessionsCache[index], historyPrunedMessageIds: updatedSession.historyPrunedMessageIds } : updatedSession;
+        replaceMessagesCache(_messagesCache.filter(message => message.sessionId !== sessionId || !targets.has(message.id)));
+    } finally { _historyPruneLocks.add(sessionId); }
+    dispatchDeletedMessages(deleted);
+    return deleted.length;
+}
+
 export function editChatMessage(messageId: string, newContent: string) {
     const msgIdx = _messagesCache.findIndex(m => m.id === messageId);
     if (msgIdx !== -1) {
         replaceCachedMessage(msgIdx, { ..._messagesCache[msgIdx], content: newContent });
-        dbPutMessage(_messagesCache[msgIdx]);
+        persistCachedMessageUpdate(_messagesCache[msgIdx]);
 
         const sessionId = _messagesCache[msgIdx].sessionId;
         const lastMsg = getLastVisibleSessionMessage(sessionId);
@@ -1788,7 +1939,7 @@ export function retractChatMessage(messageId: string) {
     const msgIdx = _messagesCache.findIndex(m => m.id === messageId);
     if (msgIdx !== -1) {
         replaceCachedMessage(msgIdx, { ..._messagesCache[msgIdx], isRetracted: true });
-        dbPutMessage(_messagesCache[msgIdx]);
+        persistCachedMessageUpdate(_messagesCache[msgIdx]);
 
         const sessionId = _messagesCache[msgIdx].sessionId;
         const lastMsg = getLastVisibleSessionMessage(sessionId);
@@ -1896,7 +2047,7 @@ export function clearChatSessionToolHistory(sessionId: string): ClearChatSession
     }
 
     if (deletedIds.size > 0) dbDeleteMessagesByIds([...deletedIds]);
-    if (cleanedMessages.length > 0) dbPutMessages(cleanedMessages);
+    if (cleanedMessages.length > 0) persistCachedMessageUpdates(cleanedMessages);
     if (deletedIds.size > 0) reindexSessionMessageOrders(sessionId);
 
     const lastMsg = getLastVisibleSessionMessage(sessionId);
@@ -1980,7 +2131,7 @@ export function updateMessageMediaStatus(messageId: string, newStatus: "pending"
     const idx = _messagesCache.findIndex(m => m.id === messageId);
     if (idx !== -1) {
         replaceCachedMessage(idx, { ..._messagesCache[idx], mediaData: { ..._messagesCache[idx].mediaData, status: newStatus } });
-        dbPutMessage(_messagesCache[idx]);
+        persistCachedMessageUpdate(_messagesCache[idx]);
     }
 }
 
@@ -1989,12 +2140,14 @@ export function updateMessageMediaData(messageId: string, data: ChatMessage["med
     const idx = _messagesCache.findIndex(m => m.id === messageId);
     if (idx !== -1) {
         replaceCachedMessage(idx, { ..._messagesCache[idx], mediaData: data });
-        dbPutMessage(_messagesCache[idx]);
+        persistCachedMessageUpdate(_messagesCache[idx]);
     }
 }
 
 /** Payment projection only: acknowledge durable storage before announcing completion. */
 export async function persistPaymentMediaData(messageId: string, data: ChatMessage["mediaData"]): Promise<ChatMessage["mediaData"]> {
+    const cached = _messagesCache.find(message => message.id === messageId);
+    if (cached) assertChatHistoryWritable(cached.sessionId);
     const saved = await chatDb.transaction("rw", chatDb.messages, async () => {
         const current = await chatDb.messages.get(messageId);
         if (!current) throw new Error("支付消息尚未保存，请稍后重试");
@@ -2012,7 +2165,7 @@ export function updateMessageMediaUrl(messageId: string, mediaUrl: string) {
     const idx = _messagesCache.findIndex(m => m.id === messageId);
     if (idx !== -1) {
         replaceCachedMessage(idx, { ..._messagesCache[idx], mediaUrl });
-        dbPutMessage(_messagesCache[idx]);
+        persistCachedMessageUpdate(_messagesCache[idx]);
     }
 }
 
@@ -2034,20 +2187,30 @@ export async function persistMessageVoiceAudio(
             mediaData: { ..._messagesCache[idx].mediaData, synthesizedFromText },
         };
         replaceCachedMessage(idx, next);
-        dbPutMessage(next);
+        try {
+            if (!await dbUpdateMessageConfirmed(next)) throw new Error("语音消息已不存在，未保存合成结果");
+        } catch (error) {
+            await reconcileNativeMessage(next);
+            throw error;
+        }
         return;
     }
     try {
         const stored = await chatDb.messages.get(messageId);
         if (stored) {
-            await chatDb.messages.put({
-                ...stored,
+            assertChatHistoryWritable(stored.sessionId);
+            // A voice synthesis task may have captured this old row before
+            // history pruning. Only update an existing row: put() could revive
+            // a message that pruning committed while the task was awaiting.
+            const matched = await chatDb.messages.update(messageId, {
                 mediaUrl,
                 mediaData: { ...stored.mediaData, synthesizedFromText },
             });
+            if (!matched) throw new Error("语音消息已不存在，未保存合成结果");
         }
     } catch (err) {
         console.warn("[ChatDB] persist voice audio failed:", err);
+        throw err;
     }
 }
 
@@ -2060,7 +2223,7 @@ export function updateChatMessage(
 
     replaceCachedMessage(idx, { ..._messagesCache[idx], ...patch });
     const updated = _messagesCache[idx];
-    dbPutMessage(updated);
+    persistCachedMessageUpdate(updated);
 
     const sessions = loadChatSessions();
     const sessIdx = sessions.findIndex(s => s.id === updated.sessionId);
@@ -2151,7 +2314,7 @@ export function syncChatGeneratedImagePromptText(
     if (changed.size === 0) return [];
     replaceMessagesCache(_messagesCache.map(msg => changed.get(msg.id) || msg));
     const updatedMessages = [...changed.values()];
-    dbPutMessages(updatedMessages);
+    persistCachedMessageUpdates(updatedMessages);
     return updatedMessages;
 }
 
@@ -2167,6 +2330,7 @@ export function replaceMessageWithParts(
     if (idx === -1 || parts.length === 0) return [];
 
     const original = _messagesCache[idx];
+    assertChatHistoryWritable(original.sessionId);
     const baseOrder = getStableMessageOrder(original) ?? getNextMessageOrder(original.sessionId);
 
     // Remove original
@@ -2201,7 +2365,7 @@ export function replaceMessageWithParts(
             senderCharacterId: original.senderCharacterId,
             senderName: original.senderName,
         };
-        dbPutMessage(newMsg);
+        dbPutMessage(newMsg, saved => { if (!saved) void reconcileNativeMessage(newMsg); });
         newMsgs.push(newMsg);
     }
 
@@ -2298,7 +2462,7 @@ export function replaceResponseBatchWithParts(
     const newMessages = toolCallMessage ? [...visibleMessages, toolCallMessage] : visibleMessages;
 
     spliceCachedMessages(insertIdx, 0, ...newMessages);
-    dbPutMessages(newMessages);
+    dbPutMessages(newMessages, rejected => { for (const message of rejected) void reconcileNativeMessage(message); });
     reindexSessionMessageOrders(sessionId);
 
     const lastMsg = getLastVisibleSessionMessage(sessionId);
@@ -2399,7 +2563,7 @@ export function replaceGroupResponseRound(
     }));
 
     spliceCachedMessages(insertIdx, 0, ...newMessages);
-    dbPutMessages(newMessages);
+    dbPutMessages(newMessages, rejected => { for (const message of rejected) void reconcileNativeMessage(message); });
     reindexSessionMessageOrders(sessionId);
 
     const lastMsg = getLastVisibleSessionMessage(sessionId);
