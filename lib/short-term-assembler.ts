@@ -4,7 +4,7 @@ import { paymentDirective } from "./payment-directive";
 // a unified timeline. Replaces the old ShortTermEvent IndexedDB approach.
 // Used by: memory-bank-page (UI display), memory-summarizer (summarization input).
 
-import { isReadingDiscussMessage, isSystemInstructionMessage, loadChatSessions, loadChatMessages, type ChatMessage } from "./chat-storage";
+import { isReadingDiscussMessage, isSystemInstructionMessage, loadChatSessions, loadChatMessages, getChatSessionChannel, type ChatMessage } from "./chat-storage";
 import { buildGroupAdminBracketText } from "./group-admin";
 import { isCachedMemoryProvenanceValid, memorySourceEnvelope } from "./memory-provenance";
 import { formatGiftForPrompt } from "./gift-prompt";
@@ -61,6 +61,7 @@ export type NativeTimelineEntry = {
     authorType?: "user" | "character" | "npc"; // who authored this entry
     postAuthorType?: "user" | "character"; // for moments: who owns the parent post
     sessionId?: string;
+    chatChannel?: "private" | "secure";
     groupSessionId?: string; // for group chat: which group session
     groupName?: string;      // for group chat: display name of the group
     timestamp: string; // ISO date
@@ -172,6 +173,8 @@ export function loadNativeTimeline(
         // Internal optimization: retain only activation-relevant current-chat
         // events. Do not use for non-chat consumers or full-history exports.
         directChatActivationTailOnly?: boolean;
+        /** Only current history may use the activation-only tail; other channels need full recent entries. */
+        directChatActivationSessionId?: string;
         appId?: import("./settings-types").ContentAppId;
         excludeOfflineSessionId?: string;
         timeAware?: boolean;
@@ -187,8 +190,8 @@ export function loadNativeTimeline(
 
     // ── Chat messages ──
     const sessions = loadChatSessions();
-    // Include direct chat session AND group sessions where this character participates
-    const session = sessions.find(s => !s.isGroup && s.contactId === characterId);
+    // All direct channels are the SAME character's lived experiences.
+    const directSessions = sessions.filter(s => !s.isGroup && s.contactId === characterId);
     const groupSessions = sessions.filter(s => s.isGroup && s.participantIds?.includes(characterId));
 
     // Process group sessions
@@ -272,7 +275,7 @@ export function loadNativeTimeline(
         }
     }
 
-    if (session) {
+    for (const session of directSessions) {
         const messages = loadChatMessages(session.id);
         // The direct-chat event formatter is shared by full timeline consumers
         // and the read-only 10-entry worldbook activation tail.
@@ -282,7 +285,8 @@ export function loadNativeTimeline(
             if (isPromptHiddenChatMessage(msg)) return null;
             if (options?.afterTimestamp && msg.createdAt <= options.afterTimestamp) return null;
 
-            const msgLabel = formatPromptEventLabel("私聊", msg.createdAt, timeAware, timestampOptions);
+            const channel = getChatSessionChannel(session);
+            const msgLabel = formatPromptEventLabel(channel === "secure" ? "Secure Line" : "私聊", msg.createdAt, timeAware, timestampOptions);
 
             if (msg.role === "system") {
                 // UI-only notification — skip from prompt
@@ -378,12 +382,15 @@ export function loadNativeTimeline(
                 id: msg.id,
                 sourceApp: "chat",
                 sourceDetail: "direct",
+                sessionId: session.id,
+                chatChannel: channel,
                 timestamp: msg.createdAt,
                 content: `${msgLabel} ${sender}: ${content}`,
             });
         };
 
-        if (options?.directChatActivationTailOnly === true) {
+        if (options?.directChatActivationTailOnly === true
+            && (!options.directChatActivationSessionId || session.id === options.directChatActivationSessionId)) {
             // P1 retained only the newest 10, but formatted every historical
             // chat event first. Rank cheap message references instead and format
             // only the newest *valid* events. The index tie-break reproduces
@@ -960,6 +967,8 @@ export function prepareShortTermContext(
         excludeOfflineSessionId?: string;
         includeNativeToolHistory?: boolean;
         includeDirectChatEntries?: boolean;
+        /** Session whose original history is already in this prompt. */
+        excludeDirectSessionId?: string;
         timeAware?: boolean;
         promptTimestampOptions?: PromptTimestampOptions;
     },
@@ -974,6 +983,7 @@ export function prepareShortTermContext(
     let timeline = loadNativeTimeline(characterId, {
         userName: options?.userName,
         directChatActivationTailOnly: skipDirectChatEntries,
+        directChatActivationSessionId: options?.excludeDirectSessionId,
         appId: appId as import("./settings-types").ContentAppId,
         excludeOfflineSessionId: options?.excludeOfflineSessionId,
         timeAware,
@@ -1081,8 +1091,14 @@ export function prepareShortTermContext(
     }
 
     // Direct chat from timeline — skipped only when the current history already comes from chat/group_chat.
-    if (!skipDirectChatEntries) {
-        const chatEntries = timeline.filter(e => e.sourceApp === "chat" && e.sourceDetail === "direct");
+    {
+        // Preserve other-channel recent messages, but never duplicate current
+        // session's raw ChatMessage[] (including when appId is chat).
+        const chatEntries = timeline.filter(e =>
+            e.sourceApp === "chat" && e.sourceDetail === "direct"
+            && e.sessionId !== options?.excludeDirectSessionId
+            && (!skipDirectChatEntries || !!options?.excludeDirectSessionId)
+        );
         if (chatEntries.length > 0) {
             raw.push({ tag: "recent_chat", order: FEATURE_ORDER.chat, entries: chatEntries });
         }

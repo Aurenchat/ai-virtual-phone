@@ -14,6 +14,7 @@ import {
     getChatMessagePreview,
     pushChatMessage,
     removeChatContact,
+    getChatSessionChannel,
     normalizeVisionImagePromptLimit,
     MAX_VISION_IMAGE_PROMPT_LIMIT,
     type ChatMessage,
@@ -1247,7 +1248,7 @@ export function ChatSettingsPanel({
 
                 {/* Destructive Actions */}
                 <div className="menu-group">
-                    {!session.isGroup && (
+                    {!session.isGroup && getChatSessionChannel(session) === "private" && (
                     <button className="menu-item" onClick={() => setShowConfirmDelete(true)}>
                         <ChatInfoIcon icon={UserMinus} color="var(--c-danger)" />
                         <div className="menu-label-group"><span className="menu-label menu-label-danger">删除好友</span></div>
@@ -1293,13 +1294,15 @@ export function ChatSettingsPanel({
                     >
                         <ChatInfoIcon icon={Trash2} color="var(--c-danger)" />
                         <div className="menu-label-group">
-                            <span className="menu-label menu-label-danger">删除会话</span>
+                            <span className="menu-label menu-label-danger">{getChatSessionChannel(session) === "secure" ? "删除 Secure Line 联系人" : "删除会话"}</span>
                             <span className="menu-desc">
                                 {offlineHistoryBusy
                                     ? "线下回复生成中，完成后再删除"
                                     : session.isGroup
                                         ? "解散并移除该群聊，线上线下记录一并删除"
-                                        : "移除该会话及线上线下记录，好友保留"}
+                                        : getChatSessionChannel(session) === "secure"
+                                            ? "仅移除这条安全线及消息；私人好友、私人会话、角色与长期记忆不变"
+                                            : "移除该会话及线上线下记录，好友保留"}
                             </span>
                         </div>
                     </button>
@@ -1529,8 +1532,10 @@ export function ChatSettingsPanel({
             {/* Modal: Confirm Delete Session */}
             {showConfirmDeleteSession && (
                 <ConfirmDialog
-                    title="确定要删除该会话吗？"
-                    message={session.isGroup
+                    title={getChatSessionChannel(session) === "secure" ? "删除 Secure Line 联系人？" : "确定要删除该会话吗？"}
+                    message={getChatSessionChannel(session) === "secure"
+                        ? "仅删除本安全会话和所属聊天记录；私人好友、私人会话与角色长期记忆不受影响。此操作无法撤销。"
+                        : session.isGroup
                         ? "群聊将从列表移除，线上与线下聊天记录一并删除，无法恢复。是否继续？"
                         : "会话将从列表移除，线上与线下聊天记录一并删除，好友不受影响，重新发起聊天会从空白开始。是否继续？"}
                     icon={AlertCircle}

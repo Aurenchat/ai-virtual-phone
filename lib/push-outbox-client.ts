@@ -7,7 +7,7 @@ import type { RegexConfig } from "./settings-types";
 import { stripHallucinatedTimestamps } from "./llm-provider-adapter";
 import { MacroEngine } from "./macro-engine";
 import { getActiveAppTags } from "./content-tag-utils";
-import { loadChatMessages, loadChatSessions, reindexSessionMessageOrdersByTime } from "./chat-storage";
+import { loadChatMessages, loadChatSessions, getChatSessionChannel, reindexSessionMessageOrdersByTime } from "./chat-storage";
 import { hasAccountPushSubscription } from "./push-client";
 import { isPersonalPushCloudActive, loadPersonalPushCloudState, personalPushFetch } from "./personal-push-cloud";
 import { removeTimedWakeSchedule } from "./timed-wake-storage";
@@ -99,6 +99,27 @@ export async function consumeServerOutbox(options?: { silent?: boolean; force?: 
                             screenChatResponseBatchId?: string;
                             screenChatAssistantAt?: string;
                         };
+                        // Fail closed before Reality Bridge can create a private session or parse a reply.
+                        // Explicit targets can be private only; missing/deleted IDs are unsafe too.
+                        const bridgeChat = bridgeMeta.chat as { sessionId?: unknown } | null | undefined;
+                        const declaredSessionIds = [
+                            entry.session_id,
+                            bridgeMeta.sessionId,
+                            bridgeMeta.reply?.sessionId,
+                            bridgeChat?.sessionId,
+                        ].filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+                        if (declaredSessionIds.length > 0) {
+                            const availableSessions = loadChatSessions();
+                            if (declaredSessionIds.some(id => {
+                                const target = availableSessions.find(session => session.id === id);
+                                return !target || getChatSessionChannel(target) === "secure";
+                            })) {
+                                // v1 secure background/outbox is disabled; consume stale unsafe entries.
+                                consumedIds.push(entry.id);
+                                if (entry.trigger_key) handledTriggerKeys.add(entry.trigger_key);
+                                continue;
+                            }
+                        }
                         const engine = await import("./reality-bridge/engine");
                         const applied = await engine.applyServerBridgeEntry(bridgeMeta as Parameters<typeof engine.applyServerBridgeEntry>[0]);
                         const replyMeta = bridgeMeta.reply || null;
@@ -175,6 +196,11 @@ export async function consumeServerOutbox(options?: { silent?: boolean; force?: 
                         continue;
                     }
 
+                    // A secure session never consumes unsolicited server replies in v1.
+                    if (getChatSessionChannel(session) === "secure") {
+                        consumedIds.push(entry.id);
+                        continue;
+                    }
                     const periodCare = (meta as { periodCare?: { characterId?: string; cycleKey?: string } }).periodCare;
                     if (periodCare?.characterId && periodCare.cycleKey) {
                         const { saveMenstrualPeriodCareTrigger } = await import("./menstrual-storage");

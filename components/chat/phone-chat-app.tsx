@@ -8,7 +8,7 @@ import { ChatRoom } from "./chat-room";
 import { MascotChatRoom } from "./mascot-chat-room";
 import { UserProfilePanel } from "./user-profile-panel";
 import { MessageCircle, Users, Aperture, UserRound } from "lucide-react";
-import { ChatSession, loadChatSessions, pushChatMessage, hydrateChatStorage } from "@/lib/chat-storage";
+import { ChatSession, getChatSessionChannel, loadChatSessions, pushChatMessage, hydrateChatStorage } from "@/lib/chat-storage";
 import { notifyMascotPageContext } from "@/lib/mascot-events";
 import { loadCharacters } from "@/lib/character-storage";
 import { SessionCustomCSS } from "@/components/ui/session-custom-css";
@@ -47,7 +47,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
             setDbReady(true);
             // Resolve initial session after hydration
             if (initialSessionId) {
-                const s = loadChatSessions().find(s => s.id === initialSessionId);
+                const s = loadChatSessions().find(s => s.id === initialSessionId && getChatSessionChannel(s) === "private");
                 if (s) setActiveSession(s);
             }
         });
@@ -64,7 +64,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
             setActiveSession(null);
             return;
         }
-        const s = loadChatSessions().find(s => s.id === initialSessionId);
+        const s = loadChatSessions().find(s => s.id === initialSessionId && getChatSessionChannel(s) === "private");
         if (s) setActiveSession(s);
     }, [initialSessionId, dbReady]);
 
@@ -82,7 +82,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
         const handler = (e: Event) => {
             const sessionId = (e as CustomEvent<{ sessionId?: string }>).detail?.sessionId;
             if (!sessionId) return;
-            const session = loadChatSessions().find(s => s.id === sessionId);
+            const session = loadChatSessions().find(s => s.id === sessionId && getChatSessionChannel(s) === "private");
             if (!session) return;
             setActiveMascot(false);
             setActiveSession(session);
@@ -254,7 +254,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
                             const sessionId = addContactReturnSessionRef.current;
                             addContactReturnSessionRef.current = null;
                             if (!sessionId) return;
-                            const session = loadChatSessions().find(s => s.id === sessionId);
+                            const session = loadChatSessions().find(s => s.id === sessionId && getChatSessionChannel(s) === "private");
                             if (!session) return;
                             setActiveSession(session);
                             setActiveTab("messages");

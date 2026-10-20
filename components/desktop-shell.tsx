@@ -13,6 +13,7 @@ import { PhoneThemeApp } from "@/components/phone-theme-app";
 import { PhoneCharacterApp } from "@/components/phone-character-app";
 import { PhoneSettingsApp } from "@/components/phone-settings-app";
 import { PhoneChatApp } from "@/components/chat/phone-chat-app";
+import { SecureLineApp } from "@/components/secure-line/secure-line-app";
 import { PhonePlaceholderApp } from "@/components/phone-placeholder-app";
 import MusicApp from "@/components/music/music-app";
 import MusicPlayer from "@/components/music/music-player";
@@ -128,7 +129,7 @@ import { WidgetRenderer } from "@/components/widgets/widget-renderer";
 import type { DIYWidgetTemplate } from "@/lib/widget-types";
 import { DebugPromptPanel } from "@/components/debug-prompt-panel";
 import { QuickActionFloat } from "@/components/quick-action-float";
-import { CHAT_MESSAGE_PUSHED_EVENT, CHAT_REQUEST_REPLY_EVENT, hydrateChatStorage, loadChatSessions, loadChatMessages, pushChatMessage, type ChatMessage, type ChatSession } from "@/lib/chat-storage";
+import { CHAT_MESSAGE_PUSHED_EVENT, CHAT_REQUEST_REPLY_EVENT, hydrateChatStorage, loadChatSessions, loadChatMessages, getChatSessionChannel, pushChatMessage, type ChatMessage, type ChatSession } from "@/lib/chat-storage";
 import { ensureGlobalBindingDefaults, resolveUserIdentity } from "@/lib/settings-storage";
 import { loadCharacters } from "@/lib/character-storage";
 import { generateChatCompletion, flattenCompletionResult } from "@/lib/chat-engine";
@@ -1877,7 +1878,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
       if (detail.__fromBar) return;
       const sessions = loadChatSessions();
       const session = sessions.find(s => s.id === detail.sessionId);
-      if (!session) return;
+      if (!session || getChatSessionChannel(session) === "secure") return;
       const chars = loadCharacters();
       const isGroup = !!session.isGroup;
       // Group chat: use characterName from event detail; 1:1: use session.contactId
@@ -1934,7 +1935,7 @@ export function DesktopShell({ initialThemeProfile, initialThemeAssets }: Deskto
     if (!desktopReady) return;
     const CALL_VALID_MS = 120_000;
     const trigger = (sessionId: string, callTs: number, answered: boolean) => {
-      if (!sessionId) return;
+      if (!sessionId || loadChatSessions().some(s => s.id === sessionId && getChatSessionChannel(s) === "secure")) return;
       if (callTs > 0 && Date.now() - callTs > CALL_VALID_MS) return;
       if (answered) {
         // 壳上已经按过接听：跳过横幅，直接开聊天进通话屏（同横幅接听键的路径）
@@ -2459,6 +2460,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
       chatMessageNoticeTimerRef.current = null;
     }
     setChatMessageNotice(null);
+    if (loadChatSessions().some(s => s.id === sessionId && getChatSessionChannel(s) === "secure")) return;
     setShowMiniChat(false);
     setActiveApp("chat" as IconId);
     setChatInitSessionId(sessionId);
@@ -2479,7 +2481,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
 
       const sessions = loadChatSessions();
       const sessionId = detail.sessionId
-        || sessions.find(session => !session.isGroup && session.contactId === detail.characterId)?.id
+        || sessions.find(session => !session.isGroup && getChatSessionChannel(session) === "private" && session.contactId === detail.characterId)?.id
         || "";
       if (!sessionId) return;
 
@@ -2552,7 +2554,7 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
 
       const sessions = loadChatSessions();
       const session = sessions.find(s => s.id === detail.sessionId);
-      if (!session) return;
+      if (!session || getChatSessionChannel(session) === "secure") return;
 
       const chars = loadCharacters();
       const isGroup = detail.isGroup ?? !!session.isGroup;
@@ -3996,6 +3998,10 @@ html,body{margin:0;padding:0;width:100%;height:100%;background:#121110;color:rgb
           onSessionChange={setActiveChatSession}
         />
       );
+    }
+
+    if (activeApp === "secure_line") {
+      return <SecureLineApp onClose={() => setActiveApp(null)} />;
     }
 
     if (activeApp === "theme") {

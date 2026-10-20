@@ -37,11 +37,18 @@ export type ChatContact = {
     addedAt: string; // ISO date
 };
 
+/** Missing channel on old archives means private; never migrate old sessions. */
+export type ChatChannel = "private" | "secure";
+export function getChatSessionChannel(session: Pick<ChatSession, "channel">): ChatChannel {
+    return session.channel === "secure" ? "secure" : "private";
+}
+
 export type ChatSession = {
     id: string;
     /** IDs removed by confirmed history pruning; native writes must not recreate them. */
     historyPrunedMessageIds?: string[];
     contactId: string;
+    channel?: ChatChannel;
     lastMessageId?: string;
     lastMessagePreview?: string;
     unreadCount: number;
@@ -872,9 +879,11 @@ function normalizeChatSessions(sessions: ChatSession[]): NormalizedSessionList {
             continue;
         }
 
-        const existingIndex = privateIndexByContact.get(session.contactId);
+        // Never redirect messages across account channels.
+        const channelKey = `${getChatSessionChannel(session)}:${session.contactId}`;
+        const existingIndex = privateIndexByContact.get(channelKey);
         if (existingIndex === undefined) {
-            privateIndexByContact.set(session.contactId, normalized.length);
+            privateIndexByContact.set(channelKey, normalized.length);
             normalized.push(session);
             continue;
         }
@@ -938,6 +947,7 @@ function restoreContactsForPrivateSessions(contacts: ChatContact[], sessions: Ch
     const removedByUser = loadRemovedContactIds();
     const privateSessionsWithMessages = sessions.filter(session =>
         !session.isGroup
+        && getChatSessionChannel(session) === "private"
         && session.contactId
         && characterIds.has(session.contactId)
         && !removedByUser.has(session.contactId)
@@ -1307,12 +1317,16 @@ export function saveChatSessions(sessions: ChatSession[]) {
     else dbPutSessions(refreshed.items);
 }
 
-export function createOrGetSession(contactId: string): ChatSession {
+export function createOrGetSession(contactId: string, channel: ChatChannel = "private"): ChatSession {
     const sessions = loadChatSessions();
-    const existing = sessions.find(s => s.contactId === contactId);
+    const existing = sessions.find(s => !s.isGroup && s.contactId === contactId && getChatSessionChannel(s) === channel);
     if (existing) return existing;
+    if (channel === "secure" && !loadCharacters().some(c => c.id === contactId)) {
+        throw new Error("Secure Line contact must reference an existing Character");
+    }
 
     const newSession: ChatSession = {
+        ...(channel === "secure" ? { channel: "secure" as const } : {}),
         id: `sess_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         contactId,
         unreadCount: 0,

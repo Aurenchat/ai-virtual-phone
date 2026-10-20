@@ -16,6 +16,7 @@ type ParsedChat = {
     timestamp: string;
     sender: string;
     isUser: boolean;
+    chatChannel?: "private" | "secure";
     message: string;
     innerMonologue?: string;
 };
@@ -111,18 +112,19 @@ function parseEntry(evt: NativeTimelineEntry, userName: string): ParsedEntry | n
         };
     }
 
-    // Direct chat: [私聊 ...] Sender: message
+    // Direct chat: [私聊 ...] or [Secure Line ...] Sender: message
     if (evt.sourceApp === "chat" && evt.sourceDetail !== "group") {
-        const m = content.match(/^\[私聊(?: [^\]]+)?\] (.+?): ([\s\S]*)$/);
+        const m = content.match(/^\[(私聊|Secure Line)(?: [^\]]+)?\] (.+?): ([\s\S]*)$/);
         if (m) {
-            const raw = m[2];
+            const raw = m[3];
             const inner = raw.match(/^([\s\S]*?)\n[（(]内心[：:]\s?([\s\S]+?)[）)]\s*$/);
             return {
                 type: "chat",
                 id: evt.id,
                 timestamp: evt.timestamp,
-                sender: m[1],
-                isUser: m[1] === userName,
+                sender: m[2],
+                isUser: m[2] === userName,
+                chatChannel: m[1] === "Secure Line" || evt.chatChannel === "secure" ? "secure" : "private",
                 message: inner ? inner[1] : raw,
                 innerMonologue: inner ? inner[2] : undefined,
             };
@@ -469,6 +471,7 @@ function ClusterDetail({ cluster }: { cluster: TimelineCluster }) {
                                                 <span className="mem-tl-bubble-name">
                                                     {e.sender}
                                                     {e.type === "group" && <span className="mem-tl-bubble-group">{e.groupName}</span>}
+                                                    {e.type === "chat" && e.chatChannel === "secure" && <span className="mem-tl-bubble-group">Secure Line</span>}
                                                     <span className="mem-tl-bubble-ts">{fmtTime(e.timestamp)}</span>
                                                 </span>
                                                 <div className="chat-music-share-card">
@@ -496,6 +499,7 @@ function ClusterDetail({ cluster }: { cluster: TimelineCluster }) {
                                             <span className="mem-tl-bubble-name">
                                                 {e.sender}
                                                 {e.type === "group" && <span className="mem-tl-bubble-group">{e.groupName}</span>}
+                                                {e.type === "chat" && e.chatChannel === "secure" && <span className="mem-tl-bubble-group">Secure Line</span>}
                                                 <span className="mem-tl-bubble-ts">{fmtTime(e.timestamp)}</span>
                                             </span>
                                             <div className="mem-tl-bubble-body">

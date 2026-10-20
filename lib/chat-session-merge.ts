@@ -8,6 +8,7 @@ import { getLastChatOfflineTurn, loadChatOfflineTurns, saveChatOfflineTurns } fr
 import { removeChatSessionCompletely } from "./chat-session-remove";
 import {
     getLastVisibleSessionMessage,
+    getChatSessionChannel,
     loadChatSessions,
     reassignChatSessionMessages,
     saveChatSessions,
@@ -54,7 +55,7 @@ function sessionActivityTime(session: ChatSession): number {
 }
 
 function duplicateKey(session: ChatSession): string | null {
-    if (!session.isGroup) return `direct:${session.contactId}`;
+    if (!session.isGroup) return `direct:${getChatSessionChannel(session)}:${session.contactId}`;
     const members = [...(session.participantIds || [])].sort();
     if (members.length === 0) return null;
     return `group:${session.isSpectator ? "1" : "0"}:${members.join(",")}`;

@@ -7,6 +7,7 @@
 
 import {
     loadChatSessions,
+    getChatSessionChannel,
     loadChatMessages,
     pushChatMessage,
     loadAllFollowUpSchedules,
@@ -179,6 +180,12 @@ export function stopFollowUpService() {
 /** Schedule a follow-up for a session (called by ChatRoom after AI replies).
  *  Purely anxiety-driven: no anxiety field or below threshold → no follow-up. */
 export function scheduleFollowUp(sessionId: string, count: number, stateValues?: StateValue[]) {
+    // v1: no secure proactive sends or cloud bailout reservations.
+    if (loadChatSessions().some(s => s.id === sessionId && getChatSessionChannel(s) === "secure")) {
+        clearFollowUpSchedule(sessionId);
+        cancelFollowUpBailout(sessionId);
+        return;
+    }
     const config = loadFollowUpConfig();
 
     if (!stateValues || stateValues.length === 0) {
@@ -218,6 +225,7 @@ export async function requestBackgroundChatReply(sessionId: string): Promise<{ o
     if (backgroundReplyFiringSet.has(sessionId)) return { ok: false, skipped: "already_running" };
     const session = loadChatSessions().find(s => s.id === sessionId);
     if (!session) return { ok: false, skipped: "missing_session" };
+    if (getChatSessionChannel(session) === "secure") return { ok: false, skipped: "secure_background_disabled" };
 
     backgroundReplyFiringSet.add(sessionId);
     let diagnosticRunId: string | undefined;
@@ -433,7 +441,7 @@ function pollMenstrualPeriodCare(now: number) {
 
     const selectedIds = new Set(config.periodCareCharacterIds);
     const sessions = loadChatSessions()
-        .filter(session => !session.isGroup && selectedIds.has(session.contactId))
+        .filter(session => !session.isGroup && getChatSessionChannel(session) === "private" && selectedIds.has(session.contactId))
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     const latestSessionByCharacter = new Map<string, (typeof sessions)[number]>();
     for (const session of sessions) {
@@ -470,7 +478,7 @@ async function fireFollowUp(sched: { sessionId: string; count: number; delaySec?
     try {
         const sessions = loadChatSessions();
         const session = sessions.find(s => s.id === sched.sessionId);
-        if (!session) return;
+        if (!session || getChatSessionChannel(session) === "secure") return;
 
         diagnosticRunId = startBackgroundDiagnostic(session.id, Boolean(session.isGroup));
         markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOAD_BEGIN");
@@ -619,7 +627,7 @@ async function fireIdleReconnect(rule: IdleReconnectRule, lastUserAt: number) {
     let diagnosticRunId: string | undefined;
     try {
         const session = loadChatSessions().find(s => s.id === rule.sessionId);
-        if (!session || session.isGroup || session.contactId !== rule.characterId) return;
+        if (!session || getChatSessionChannel(session) === "secure" || session.isGroup || session.contactId !== rule.characterId) return;
 
         // 本地接手当前这次生成，先撤销服务端同规则排队任务；生成成功后才记连发次数。
         void cancelBailoutPrefix(`idle:${rule.id}:`);
@@ -688,7 +696,7 @@ async function fireTimedWake(sched: TimedWakeSchedule) {
     try {
         const sessions = loadChatSessions();
         const session = sessions.find(s => s.id === sched.sessionId);
-        if (!session || session.contactId !== sched.characterId) return;
+        if (!session || getChatSessionChannel(session) === "secure" || session.contactId !== sched.characterId) return;
 
         diagnosticRunId = startBackgroundDiagnostic(session.id, Boolean(session.isGroup));
         markGenerationDiagnostic(diagnosticRunId, "HISTORY_LOAD_BEGIN");
@@ -763,7 +771,7 @@ async function fireMenstrualPeriodCare(input: {
     try {
         const sessions = loadChatSessions();
         const session = sessions.find(s => s.id === input.sessionId);
-        if (!session || session.isGroup || session.contactId !== input.characterId) return;
+        if (!session || getChatSessionChannel(session) === "secure" || session.isGroup || session.contactId !== input.characterId) return;
         if (hasMenstrualPeriodCareTriggered(input.characterId, input.event.cycleKey)) return;
 
         diagnosticRunId = startBackgroundDiagnostic(session.id, Boolean(session.isGroup));

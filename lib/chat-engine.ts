@@ -17,6 +17,7 @@ import type { Character } from "./character-types";
 import {
     ChatSession,
     ChatMessage,
+    getChatSessionChannel,
     loadFollowUpSchedule,
     loadChatAppSettings,
     getMaxToolRounds,
@@ -1930,6 +1931,7 @@ export async function buildChatPromptMessages(
     markGenerationDiagnostic(options?.diagnosticRunId, "SHORT_TERM_ASSEMBLY_BEGIN");
     const { recentBlocks, truncatedHistory, wbActivationContext, unifiedRecentItems } = prepareShortTermContext(character.id, resolvedAppId, {
         history: historyForPrompt,
+        excludeDirectSessionId: session.id,
         includeDirectChatEntries: isOfflineMode,
         includeNativeToolHistory: usesNativeActions,
         excludeOfflineSessionId: options?.excludeOfflineSessionId,
@@ -2041,6 +2043,13 @@ export async function buildChatPromptMessages(
         shoppingPurchaseToolAvailable: toolsEnabled && !session.isGroup && resolvedAppId === "chat"
             && enabledTools.some(tool => tool.name === SHOPPING_SHARE_PURCHASE_TOOL_NAME),
     });
+    if (getChatSessionChannel(session) === "secure" && !session.isGroup) {
+        // Channel metadata only: identity, API and persona still resolve using appId="chat".
+        llmMessages.push({
+            role: "system",
+            content: `当前通信渠道为 Secure Line（工作安全线路）。与你交谈的是同一位用户 ${userIdentity?.name || "用户"} 本人，不是匿名身份、假名或另一个人。这里与私人聊天是两条独立通讯会话；Secure Line 是渠道名，不是用户姓名。`,
+        });
+    }
     if (promptProfile?.output === "plain_text") {
         llmMessages.push({
             role: "system",
