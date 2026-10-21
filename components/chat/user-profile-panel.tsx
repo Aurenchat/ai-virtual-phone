@@ -16,6 +16,7 @@ import { PageShell } from "@/components/ui/page-shell";
 import { CHAT_APP_CSS_EXAMPLE } from "@/lib/css-examples";
 import { Toggle } from "@/components/ui/form";
 import { StickerManager } from "./sticker-manager";
+import { ChatHistoryPruneDialog } from "./chat-history-prune-dialog";
 import { ChatPluginManager } from "./chat-plugin-manager";
 import { ChatPluginPageBoundary } from "./chat-plugin-page-boundary";
 import { WalletPanel } from "./wallet-panel";
@@ -47,6 +48,7 @@ import {
     MessageSquareDashed,
     Palette,
     Puzzle,
+    Scissors,
     Keyboard,
     Vibrate,
     Radio,
@@ -152,6 +154,7 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
     const [showFollowUpEditor, setShowFollowUpEditor] = useState(false);
     const [showApiLog, setShowApiLog] = useState(false);
     const [showStickerManager, setShowStickerManager] = useState(false);
+    const [showHistoryPrune, setShowHistoryPrune] = useState(false);
     const [showPluginManager, setShowPluginManager] = useState(false);
     const [showCSSEditor, setShowCSSEditor] = useState(false);
     const [showMomentsSettings, setShowMomentsSettings] = useState(false);
@@ -282,6 +285,7 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
 
     return (
         <>
+            {showHistoryPrune && <ChatHistoryPruneDialog onClose={() => setShowHistoryPrune(false)} />}
             <style>{`
                 .user-profile-page-root {
                     background: var(--c-page-body-bg) !important;
@@ -465,6 +469,15 @@ export function UserProfilePanel({ onClose, className }: UserProfilePanelProps) 
                             <div className="flex flex-col flex-1 text-left gap-0.5">
                                 <span className="ts-14 font-semibold text-[var(--c-text-title)]">扩展插件</span>
                                 <span className="ts-11 text-[var(--c-text)] opacity-70">JS 插件拦截聊天管线、注入提示词、自由渲染界面</span>
+                            </div>
+                            <ChevronRight size={16} className="text-[var(--c-icon)] opacity-50" />
+                        </button>
+
+                        <button className="flex items-center gap-3 py-3.5 w-full border-b border-[color-mix(in_srgb,var(--c-card-border)_20%,transparent)]" onClick={() => setShowHistoryPrune(true)}>
+                            <Scissors size={18} className="text-[var(--c-icon)] opacity-70" strokeWidth={1.25}/>
+                            <div className="flex flex-col flex-1 text-left gap-0.5">
+                                <span className="ts-14 font-semibold text-[var(--c-text-title)]">裁剪历史</span>
+                                <span className="ts-11 text-[var(--c-text)] opacity-70">选择会话，预检并保留指定数量的最新消息</span>
                             </div>
                             <ChevronRight size={16} className="text-[var(--c-icon)] opacity-50" />
                         </button>

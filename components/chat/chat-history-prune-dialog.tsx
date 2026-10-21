@@ -1,11 +1,84 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { loadChatSessions, loadChatContacts } from "@/lib/chat-storage";
 import { loadCharacters } from "@/lib/character-storage";
 import { loadWeixinCloudSyncConfig, setWeixinSyncPausedForLocalPrune } from "@/lib/weixin-cloud-sync";
 import { previewChatHistoryPrune, executeChatHistoryPrune, type ChatHistoryPrunePreview, type HistoryPruneCloudMode } from "@/lib/chat-history-prune";
 
 export function ChatHistoryPruneDialog({ onClose }: { onClose: () => void }) {
+    const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+    const overlayRef = useRef<HTMLDivElement>(null);
+    const panelRef = useRef<HTMLDivElement>(null);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    useEffect(() => { setPortalTarget(document.body); }, []);
+    useLayoutEffect(() => {
+        if (!portalTarget) return;
+        const overlay = overlayRef.current!;
+        const scroller = scrollRef.current!;
+        const previousFocus = document.activeElement;
+        const { scrollX, scrollY } = window;
+        // Keep the fixed overlay outside themed/transformed chat containers.
+        // Lock the document too: older iOS does not implement overscroll-behavior.
+        const locks: [HTMLElement, Record<string, string>][] = [
+            [document.documentElement, { overflow: "hidden", "overscroll-behavior": "none" }],
+            [document.body, { position: "fixed", top: -scrollY + "px", left: -scrollX + "px", width: "100%", overflow: "hidden", "overscroll-behavior": "none" }],
+        ];
+        const saved = locks.map(([element, values]) => ({ element, values: Object.keys(values).map(key => [key, element.style.getPropertyValue(key), element.style.getPropertyPriority(key)]) }));
+        locks.forEach(([element, values]) => Object.entries(values).forEach(([key, value]) => element.style.setProperty(key, value)));
+        const viewport = window.visualViewport;
+        const fitViewport = () => {
+            Object.assign(overlay.style, {
+                top: (viewport?.offsetTop ?? 0) + "px", left: (viewport?.offsetLeft ?? 0) + "px",
+                width: (viewport?.width ?? window.innerWidth) + "px", height: (viewport?.height ?? window.innerHeight) + "px",
+            });
+        };
+        fitViewport();
+        panelRef.current?.focus({ preventScroll: true });
+        viewport?.addEventListener("resize", fitViewport);
+        viewport?.addEventListener("scroll", fitViewport);
+        window.addEventListener("resize", fitViewport);
+        const keyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                if (!busyRef.current) onCloseRef.current();
+            } else if (event.key === "Tab") {
+                const controls = Array.from(panelRef.current!.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), [tabindex="0"]')).filter(element => element.getClientRects().length > 0);
+                const next = event.shiftKey ? controls.at(-1) : controls[0];
+                if (!panelRef.current!.contains(document.activeElement) || document.activeElement === panelRef.current || document.activeElement === (event.shiftKey ? controls[0] : controls.at(-1))) {
+                    event.preventDefault();
+                    (next ?? panelRef.current)?.focus();
+                }
+            }
+        };
+        document.addEventListener("keydown", keyDown);
+        let x = 0, y = 0;
+        const touchStart = (event: TouchEvent) => { x = event.touches[0]?.clientX ?? 0; y = event.touches[0]?.clientY ?? 0; };
+        const touchMove = (event: TouchEvent) => {
+            if (event.touches.length !== 1) return;
+            const touch = event.touches[0], dx = touch.clientX - x, dy = touch.clientY - y;
+            x = touch.clientX; y = touch.clientY;
+            const inside = event.target instanceof Node && scroller.contains(event.target);
+            if (!inside || Math.abs(dx) > Math.abs(dy) || (dy > 0 && scroller.scrollTop <= 0) || (dy < 0 && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 1)) {
+                event.preventDefault();
+            }
+        };
+        overlay.addEventListener("touchstart", touchStart, { passive: true });
+        overlay.addEventListener("touchmove", touchMove, { passive: false });
+        return () => {
+            document.removeEventListener("keydown", keyDown);
+            viewport?.removeEventListener("resize", fitViewport);
+            viewport?.removeEventListener("scroll", fitViewport);
+            window.removeEventListener("resize", fitViewport);
+            overlay.removeEventListener("touchstart", touchStart);
+            overlay.removeEventListener("touchmove", touchMove);
+            saved.forEach(({ element, values }) => values.forEach(([key, value, priority]) => value ? element.style.setProperty(key, value, priority) : element.style.removeProperty(key)));
+            window.scrollTo(scrollX, scrollY);
+            if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus({ preventScroll: true });
+        };
+    }, [portalTarget]);
     const [sessions] = useState(() => [...loadChatSessions()]);
     const [sessionId, setSessionId] = useState("");
     const [preset, setPreset] = useState("100");
@@ -61,15 +134,17 @@ export function ChatHistoryPruneDialog({ onClose }: { onClose: () => void }) {
             setPreview(null); setConfirming(false);
         } finally { busyRef.current = false; setBusy(false); }
     };
-    return <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="裁剪历史" aria-busy={busy}>
-        <div className="w-full max-w-md max-h-[85dvh] overflow-auto rounded-2xl p-5" style={{ backgroundColor: "#ffffff", color: "#18181b", boxShadow: "0 16px 50px rgba(0,0,0,.3)", border: "1px solid #e4e4e7" }} onKeyDown={e => { if (e.key === "Escape" && !busyRef.current) onClose(); }}>
-            <h2 className="text-lg font-bold mb-3">裁剪历史</h2>
+    if (!portalTarget) return null;
+    return createPortal(<div ref={overlayRef} className="fixed inset-0 z-[1000] flex items-center justify-center overflow-hidden bg-black/50" style={{ overscrollBehavior: "none", boxSizing: "border-box", paddingTop: "max(1rem, env(safe-area-inset-top))", paddingRight: "max(1rem, env(safe-area-inset-right))", paddingBottom: "max(1rem, env(safe-area-inset-bottom))", paddingLeft: "max(1rem, env(safe-area-inset-left))" }} role="dialog" aria-modal="true" aria-label="裁剪历史" aria-busy={busy}>
+        <div ref={panelRef} tabIndex={-1} className="flex min-h-0 min-w-0 w-full max-w-md max-h-full flex-col overflow-hidden rounded-2xl" style={{ overflowWrap: "anywhere", backgroundColor: "#ffffff", color: "#18181b", boxShadow: "0 16px 50px rgba(0,0,0,.3)", border: "1px solid #e4e4e7" }}>
+            <h2 className="shrink-0 text-lg font-bold px-5 pt-5 pb-3">裁剪历史</h2>
+            <div ref={scrollRef} className="min-h-0 min-w-0 overflow-x-hidden overflow-y-auto px-5" style={{ overscrollBehavior: "contain", touchAction: "pan-y", WebkitOverflowScrolling: "touch" }}>
             <p className="text-sm leading-6 mb-4 text-zinc-600">按实际消息记录计数，文字、图片、语音、表情包各占一条。仅处理所选会话的线上消息；线下记录不计入。</p>
-            <fieldset disabled={busy || confirming} className="flex flex-col gap-3">
-                <label>指定会话<select className="mt-1 block w-full rounded-xl p-3 text-sm" style={{ backgroundColor: "#f8fafc", color: "#0f172a", border: "1px solid #cbd5e1" }} value={sessionId} onChange={e => { setSessionId(e.target.value); invalidate(); }}><option value="">请选择会话</option>{sessions.map(s => <option key={s.id} value={s.id}>{label(s.id)} · {s.id}</option>)}</select></label>
-                <label>保留最新<select className="mt-1 block w-full rounded-xl p-3 text-sm" style={{ backgroundColor: "#f8fafc", color: "#0f172a", border: "1px solid #cbd5e1" }} value={preset} onChange={e => { setPreset(e.target.value); invalidate(); }}>{[50,100,200,500,1000].map(n => <option key={n} value={n}>{n} 条</option>)}<option value="custom">自定义</option></select></label>
-                {preset === "custom" && <label>自定义条数<input className="mt-1 block w-full rounded-xl p-3 text-sm" style={{ backgroundColor: "#f8fafc", color: "#0f172a", border: "1px solid #cbd5e1" }} type="number" min="1" step="1" value={custom} onChange={e => { setCustom(e.target.value); invalidate(); }} /></label>}
-                <label>云端处理<select className="mt-1 block w-full rounded-xl p-3 text-sm" style={{ backgroundColor: "#f8fafc", color: "#0f172a", border: "1px solid #cbd5e1" }} value={cloudMode} onChange={e => { setCloudMode(e.target.value as HistoryPruneCloudMode); invalidate(); }}>
+            <fieldset disabled={busy || confirming} className="flex min-w-0 flex-col gap-3">
+                <label>指定会话<select className="mt-1 block min-w-0 w-full max-w-full rounded-xl p-3" style={{ fontSize: 16, backgroundColor: "#f8fafc", color: "#0f172a", border: "1px solid #cbd5e1" }} value={sessionId} onChange={e => { setSessionId(e.target.value); invalidate(); }}><option value="">请选择会话</option>{sessions.map(s => <option key={s.id} value={s.id}>{label(s.id)} · {s.id}</option>)}</select></label>
+                <label>保留最新<select className="mt-1 block min-w-0 w-full max-w-full rounded-xl p-3" style={{ fontSize: 16, backgroundColor: "#f8fafc", color: "#0f172a", border: "1px solid #cbd5e1" }} value={preset} onChange={e => { setPreset(e.target.value); invalidate(); }}>{[50,100,200,500,1000].map(n => <option key={n} value={n}>{n} 条</option>)}<option value="custom">自定义</option></select></label>
+                {preset === "custom" && <label>自定义条数<input className="mt-1 block min-w-0 w-full max-w-full rounded-xl p-3" style={{ fontSize: 16, backgroundColor: "#f8fafc", color: "#0f172a", border: "1px solid #cbd5e1" }} type="number" min="1" step="1" value={custom} onChange={e => { setCustom(e.target.value); invalidate(); }} /></label>}
+                <label>云端处理<select className="mt-1 block min-w-0 w-full max-w-full rounded-xl p-3" style={{ fontSize: 16, backgroundColor: "#f8fafc", color: "#0f172a", border: "1px solid #cbd5e1" }} value={cloudMode} onChange={e => { setCloudMode(e.target.value as HistoryPruneCloudMode); invalidate(); }}>
                     <option value="cloud-first">云端和本地同步删除（默认）</option>
                     <option value="local-only">仅删除本地历史（云端保留）</option>
                 </select></label>
@@ -91,7 +166,8 @@ export function ChatHistoryPruneDialog({ onClose }: { onClose: () => void }) {
             </div>}
             {busy && <p role="status" className="my-3">正在核对或处理，请勿关闭应用或切换页面…</p>}
             {notice && <p role="status" className="my-3 rounded-lg p-3 text-sm leading-6" style={{ backgroundColor: "#fef2f2", color: "#991b1b", overflowWrap: "anywhere" }}>{notice}</p>}
-            <button type="button" className="mt-4 w-full rounded-xl px-4 py-3 font-medium" style={{ backgroundColor: "#f4f4f5", color: "#27272a", border: "1px solid #d4d4d8" }} disabled={busy} onClick={onClose}>关闭</button>
+            </div>
+            <div className="shrink-0 p-5 pt-4"><button type="button" className="w-full rounded-xl px-4 py-3 font-medium" style={{ backgroundColor: "#f4f4f5", color: "#27272a", border: "1px solid #d4d4d8" }} disabled={busy} onClick={onClose}>关闭</button></div>
         </div>
-    </div>;
+    </div>, portalTarget);
 }

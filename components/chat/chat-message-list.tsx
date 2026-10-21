@@ -1,6 +1,5 @@
 "use client";
 
-import { ChatHistoryPruneDialog } from "./chat-history-prune-dialog";
 import React, { useState, useEffect, useSyncExternalStore } from "react";
 import { ChevronLeft } from "lucide-react";
 import { loadChatSessions, loadChatContacts, ChatSession, createOrGetSession, createGroupSession, pushChatMessage, addChatContact, loadChatMessages, getLastVisibleSessionMessage, getChatMessagePreview, getChatSessionChannel } from "@/lib/chat-storage";
@@ -92,7 +91,6 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
     const [listFilter, setListFilter] = useState("");
     const [listTab, setListTab] = useState<"all" | "private" | "group">("all");
     const [showPlusMenu, setShowPlusMenu] = useState(false);
-    const [showHistoryPrune, setShowHistoryPrune] = useState(false);
     const plusMenuRef = React.useRef<HTMLSpanElement>(null);
     useEffect(() => {
         if (!showPlusMenu) return;
@@ -182,7 +180,6 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
 
     return (
         <div className="relative flex-1 h-full">
-            {showHistoryPrune && <ChatHistoryPruneDialog onClose={() => setShowHistoryPrune(false)} />}
             <PageShell
                 leftAction={
                     <div className="flex items-center min-w-max">
@@ -220,7 +217,6 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                         {/* Dropout '+' Menu */}
                         {showPlusMenu && (
                             <div className="g-dropdown absolute top-[40px] right-0 py-2 px-0 w-[140px] z-[100]">
-                                <MenuOption icon={<span>✂</span>} label="裁剪历史" onClick={() => { setShowPlusMenu(false); setShowHistoryPrune(true); }} />
                                 <MenuOption
                                     icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>}
                                     label="发起聊天"
