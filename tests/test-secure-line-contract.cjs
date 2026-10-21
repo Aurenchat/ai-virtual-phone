@@ -87,7 +87,11 @@ check('current direct history always excluded even when offline includes direct 
 });
 check('upstream prune and deleted-friend safeguards retained', () => {
   for (const text of ['historyPrunedMessageIds','reconcileNativeMessage','persistCachedMessageUpdate','assertChatHistoryWritable','removedByUser.has(session.contactId)']) assert(storage.includes(text),text);
-  assert.match(list, /<ChatHistoryPruneDialog/);
+  // main 5881a586 moved pruning to the native profile settings entry.
+  const profile = read("components/chat/user-profile-panel.tsx");
+  assert.match(profile, /showHistoryPrune && <ChatHistoryPruneDialog/);
+  assert.match(profile, /setShowHistoryPrune\(true\)/);
+  assert.doesNotMatch(list, /<ChatHistoryPruneDialog/);
   assert.match(read('lib/chat-history-prune.ts'), /assertLocalOnlySafe/);
   assert.match(read('lib/chat-history-prune.ts'), /isWeixinSyncPauseAwaitingReload/);
 });

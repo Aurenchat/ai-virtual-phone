@@ -191,7 +191,7 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                                 {identity?.avatarUrl ? (
                                     <img src={identity.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
                                 ) : (
-                                    <ChatFallbackAvatar />
+                                    <ChatFallbackAvatar name={identity?.name || "用户"} size="small" />
                                 )}
                             </div>
                             <div className="flex flex-col whitespace-nowrap">
@@ -424,9 +424,7 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                                                     {c.avatar ? (
                                                         <img src={c.avatar} className="w-full h-full object-cover" alt="" />
                                                     ) : (
-                                                        <div className="w-full h-full flex items-center justify-center bg-[var(--c-page-body-bg)] text-[var(--c-icon)]" style={{ fontSize: 14 }}>
-                                                            {c.name.slice(0, 1)}
-                                                        </div>
+                                                        <ChatFallbackAvatar name={c.name} size="small" />
                                                     )}
                                                 </div>
                                                 <div className="menu-label-group" style={{ minWidth: 0 }}>
@@ -455,7 +453,7 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                                         {searchResult.avatar ? (
                                             <img src={searchResult.avatar} className="w-full h-full object-cover" alt="" />
                                         ) : (
-                                            <ChatFallbackAvatar />
+                                            <ChatFallbackAvatar name={searchResult.name} size="small" />
                                         )}
                                     </div>
                                     <div className="menu-label-group">
@@ -735,7 +733,7 @@ function ContactPicker({ onClose, onSelect }: { onClose: () => void; onSelect: (
                                     {c.char.avatar ? (
                                         <img src={c.char.avatar} alt="" />
                                     ) : (
-                                        <ChatFallbackAvatar />
+                                        <ChatFallbackAvatar name={c.char.name} />
                                     )}
                                 </div>
                                 <span className="chat-contact-name">{c.char.name}</span>
@@ -798,7 +796,7 @@ function SessionItem({ session, onSelect, isPinned }: { session: ChatSession, on
                             {c.avatar ? (
                                 <img src={c.avatar} className="w-full h-full object-cover pointer-events-none" alt="" />
                             ) : (
-                                <ChatFallbackAvatar className="pointer-events-none" />
+                                <ChatFallbackAvatar name={c.name} size="mini" className="pointer-events-none" />
                             )}
                         </div>
                     ))}
@@ -811,7 +809,7 @@ function SessionItem({ session, onSelect, isPinned }: { session: ChatSession, on
                     {character?.avatar ? (
                         <img src={character.avatar} className="w-full h-full object-cover pointer-events-none rounded-full" alt="" />
                     ) : (
-                        <ChatFallbackAvatar className="pointer-events-none rounded-full" />
+                        <ChatFallbackAvatar name={session.alias || character?.name || "?"} className="pointer-events-none rounded-full" />
                     )}
                     <span className="minimal-online-dot" />
                 </div>

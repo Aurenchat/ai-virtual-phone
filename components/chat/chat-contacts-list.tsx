@@ -284,7 +284,7 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                                                 {char.avatar ? (
                                                     <img src={char.avatar} className="w-full h-full object-cover rounded-full" alt="" />
                                                 ) : (
-                                                    <ChatFallbackAvatar className="rounded-full" />
+                                                    <ChatFallbackAvatar name={char.name} className="rounded-full" />
                                                 )}
                                             </div>
                                             <div className="flex-1 overflow-hidden h-[48px] flex flex-col justify-center gap-1">
@@ -505,7 +505,7 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                                         {addResult.avatar ? (
                                             <img src={addResult.avatar} className="w-full h-full object-cover" alt="" />
                                         ) : (
-                                            <ChatFallbackAvatar />
+                                            <ChatFallbackAvatar name={addResult.name} size="small" />
                                         )}
                                     </div>
                                     <div className="menu-label-group">
