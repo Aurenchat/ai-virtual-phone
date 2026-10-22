@@ -43,6 +43,19 @@ async function main(){
  await page.waitForFunction(()=>document.querySelector('.im-message-row'));
  const settle=()=>page.waitForTimeout(300);
  const scene=async messages=>{const saved=await page.evaluate(messages=>imTest.scene(messages),messages);await settle();return saved;};
+ // Frozen ordinary-message geometry from the actual installed theme, before/after UI polish.
+ const ordinary=[];
+ for(const input of [{role:'user',content:'Ordinary text'}, {role:'assistant',content:'Incoming text'},
+  {role:'assistant',content:'Original English | 中文翻译'},
+  {role:'user',content:'',mediaType:'audio',mediaData:{label:'Voice transcript',voiceDuration:9}},
+  {role:'assistant',content:'',mediaType:'music_share',mediaData:{musicTitle:'Song',musicArtist:'Artist'}}]){
+  await scene([input]);
+  ordinary.push(await page.locator('[data-ui^="bubble-"]').evaluate(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return {width:r.width,height:r.height,padding:s.padding,font:s.font,color:s.color,background:s.backgroundColor,path:e.querySelector('.im-text-outline path')?.getAttribute('d'),html:e.querySelector('.im-bilingual-block')?.textContent};}));
+ }
+ await fs.writeFile(path.join(output,'ordinary-geometry.json'),JSON.stringify(ordinary,null,2));
+ await page.screenshot({path:path.join(output,'ordinary-music.png')});
+ if(process.env.QUOTE_BASELINE==='1')return;
+ if(process.env.QUOTE_BASELINE_PATH){const baseline=JSON.parse(await fs.readFile(process.env.QUOTE_BASELINE_PATH,'utf8'));check(JSON.stringify(ordinary)===JSON.stringify(baseline),'ordinary outgoing/incoming/bilingual/voice/music geometry and SVG contours unchanged',{baseline,ordinary});}
  // Bidirectional typed references, persistence, model and actual memory assembler.
  const semantic=await page.evaluate(async()=>{
   const t=quoteTest,c=imTest.chat,s=c.loadChatSessions()[0];
@@ -76,11 +89,48 @@ async function main(){
  for(const replyRole of ['user','assistant'])for(const sourceRole of ['user','assistant']){
   const src={id:'original',sessionId:'fixture',role:sourceRole,content:'Foreign original | 中文不应出现'};
   const q=await page.evaluate(src=>quoteTest.createChatQuote(src),src);
-  await scene([{role:replyRole,content:'Reply body',mediaType:'quote',mediaData:{quoteV1:q,quotePreview:q.preview}}]);
-  const g=await page.locator('.fq-root').evaluate(el=>{const p=el.querySelector('.fq-preview'),b=el.querySelector('.fq-body'),outer=el.parentElement,c=el.querySelector('.fq-connector');return {preview:p.textContent,controls:p.querySelectorAll('button,[role=button]').length,align:getComputedStyle(p).alignSelf,connectorLeft:getComputedStyle(c).borderLeftWidth,connectorRight:getComputedStyle(c).borderRightWidth,outerBg:getComputedStyle(outer).backgroundColor,outline:outer.querySelectorAll(':scope > .im-text-outline').length,outerPad:getComputedStyle(outer).padding,bodyWidth:b.getBoundingClientRect().width,previewHeight:p.getBoundingClientRect().height,rootWidth:el.getBoundingClientRect().width};});
-  check(g.preview==='Foreign original'&&g.controls===0&&g.align===(sourceRole==='user'?'flex-end':'flex-start')&&(replyRole==='user'?g.connectorLeft==='3px':g.connectorRight==='3px')&&g.outerBg==='rgba(0, 0, 0, 0)'&&g.outerPad==='0px'&&g.outline===0,'iMessage '+replyRole+' replying to '+sourceRole+': source placement, mirrored connector, no double outline',g);
+  await scene([{role:replyRole,content:replyRole==='user'?'Ordinary text':'Incoming text',mediaType:'quote',mediaData:{quoteV1:q,quotePreview:q.preview}}]);
+  const g=await page.locator('.fq-root').evaluate(el=>{const p=el.querySelector('.fq-preview'),b=el.querySelector('.fq-body'),outer=el.parentElement,c=el.querySelector('.fq-connector'),r=el.getBoundingClientRect(),pr=p.getBoundingClientRect();return {preview:p.textContent,controls:p.querySelectorAll('button,[role=button]').length,align:getComputedStyle(p).alignSelf,connectorTag:c.tagName,stroke:getComputedStyle(c).strokeWidth,mirror:getComputedStyle(c).transform,connectorPath:c.firstElementChild.getAttribute('d'),previewPath:p.querySelector('.fq-outline path').getAttribute('d'),bodyPath:b.querySelector('.fq-outline path').getAttribute('d'),bodyHeight:b.getBoundingClientRect().height,font:getComputedStyle(p).fontSize,left:pr.left-r.left,right:r.right-pr.right,outerBg:getComputedStyle(outer).backgroundColor,outline:outer.querySelectorAll(':scope > .im-text-outline').length,outerPad:getComputedStyle(outer).padding,bodyWidth:b.getBoundingClientRect().width,previewHeight:pr.height,rootWidth:r.width};});
+  check(g.preview==='Foreign original'&&g.controls===0&&g.align===(sourceRole==='user'?'flex-end':'flex-start')&&g.connectorTag==='svg'&&g.stroke==='4px'&&(replyRole==='user'?g.mirror==='none':g.mirror.startsWith('matrix(-1'))&&g.outerBg==='rgba(0, 0, 0, 0)'&&g.outerPad==='0px'&&g.outline===0,'iMessage '+replyRole+' replying to '+sourceRole+': source placement, mirrored SVG connector, no double outline',g);
+  check(Math.abs(sourceRole==='user'?g.right:g.left)<1&&g.rootWidth>320&&g.font==='13px'&&g.previewPath.includes(sourceRole==='user'?'ZM':'L13.2'),'preview attaches to source edge with original role-specific tail and compact text',g);
+  const normal=ordinary[replyRole==='user'?0:1];
+  check(g.bodyPath===normal.path&&g.bodyHeight===normal.height&&g.bodyWidth===normal.width,'reply SVG including tail exactly matches ordinary theme contour',g);
+  await fs.writeFile(path.join(output,`geometry-${replyRole}-${sourceRole}.json`),JSON.stringify(g,null,2));
   await page.screenshot({path:path.join(output,`imessage-${replyRole}-${sourceRole}.png`)});
+  // Ask the installed theme itself to render a normal bubble at preview size.
+  // Compare exact paths; this oracle does not duplicate the contour algorithm.
+  const size=await page.locator('.fq-preview').evaluate(e=>({width:e.getBoundingClientRect().width+'px',height:e.getBoundingClientRect().height+'px'}));
+  await scene([{role:sourceRole,content:'Ordinary tail reference'}]);
+  await page.locator('[data-ui^="bubble-"]').evaluate((e,size)=>{e.style.width=size.width;e.style.height=size.height;e.style.padding='0';},size);await settle();
+  const themePath=await page.locator('[data-ui^="bubble-"] > .im-text-outline path').getAttribute('d');
+  check(g.previewPath===themePath,`${sourceRole} preview uses exact installed ordinary-bubble geometry at preview size`,{preview:g.previewPath,theme:themePath,size});
  }
+ // Acceptance gallery: real local thumbnail, both directions, compact voice.
+ const photo=await page.evaluate(async()=>{const canvas=document.createElement('canvas');canvas.width=90;canvas.height=128;const c=canvas.getContext('2d');c.fillStyle='#b6c9ca';c.fillRect(0,0,90,128);c.fillStyle='#526e5b';c.fillRect(0,72,90,56);c.fillStyle='#e6bf7e';c.beginPath();c.arc(62,35,17,0,Math.PI*2);c.fill();return quoteTest.storeMediaBlob(await new Promise(r=>canvas.toBlob(r,'image/png')),'image/png','image');});
+ const quoteMessage=(role,sourceRole,kind,extra={})=>({role,content:role==='user'?'测试':'收到你的引用',mediaType:'quote',mediaData:{quoteV1:{version:1,sourceRole,kind,preview:kind==='text'?"i don't deal in that currency":kind==='voice'?'[语音]':'[图片]',summary:'UI fixture',...extra}}});
+ await scene([quoteMessage('user','assistant','text'),quoteMessage('user','assistant','voice',{duration:9}),quoteMessage('user','assistant','image',{imageRef:photo}),quoteMessage('assistant','user','text')]);
+ await page.waitForFunction(()=>document.querySelector('.fq-thumb')?.naturalWidth>0);
+ const mini=await page.locator('.fq-preview').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {kind:e.dataset.quoteKind,w:r.width,h:r.height,left:r.left,path:e.querySelector('.fq-outline path').getAttribute('d'),duration:e.querySelector('.fq-duration')?.textContent,image:e.querySelector('img')?.getBoundingClientRect().height};}));
+ check(mini[1].w===148&&mini[1].h===38&&mini[1].duration==='00:09'&&mini[2].image===56&&mini[2].w<=88&&mini.slice(0,3).every(x=>Math.abs(x.left-16)<1),'text/voice/image smaller mini bubbles attach left with ordinary tails',mini);
+ await page.screenshot({path:path.join(output,'acceptance-gallery.png')});
+ await fs.writeFile(path.join(output,'mini-geometry.json'),JSON.stringify(mini,null,2));
+ if(process.env.QUOTE_PREVIEW_BASELINE_PATH){const before=JSON.parse(await fs.readFile(process.env.QUOTE_PREVIEW_BASELINE_PATH,'utf8'));check(mini.every((m,i)=>m.w<before[i].w&&m.h<before[i].h),'all text/voice/image preview boxes shrink versus v1.1',{before,after:mini});}
+ for(const sourceRole of ['assistant','user'])for(const kind of ['voice','image']){
+  await scene([quoteMessage('user',sourceRole,kind,kind==='voice'?{duration:9}:{imageRef:photo})]);
+  if(kind==='image')await page.waitForFunction(()=>document.querySelector('.fq-thumb')?.naturalWidth>0);
+  const p=await page.locator('.fq-preview').evaluate(e=>({width:e.getBoundingClientRect().width+'px',height:e.getBoundingClientRect().height+'px',paths:[...e.querySelectorAll('.fq-outline path')].map(p=>p.getAttribute('d')),transforms:[...e.querySelectorAll('.fq-outline path')].map(p=>p.getAttribute('transform'))}));
+  await scene([{role:sourceRole,content:'Ordinary tail reference'}]);
+  await page.locator('[data-ui^="bubble-"]').evaluate((e,size)=>{e.style.width=size.width;e.style.height=size.height;e.style.padding='0';},p);await settle();
+  const d=await page.locator('[data-ui^="bubble-"] > .im-text-outline path').getAttribute('d');
+  check(p.paths.length===2&&p.paths.every(x=>x===d)&&p.transforms.every(x=>!x),`${sourceRole} ${kind} preview reuses ordinary contour without mirrored substitutes`,{preview:p,theme:d});
+ }
+ for(const width of [320,375,430]){
+  await page.setViewportSize({width,height:874});
+  await scene([{...quoteMessage('user','assistant','text',{preview:'Complete long original. '.repeat(35)}),content:'A full reply body that wraps across several lines. '.repeat(6)},quoteMessage('assistant','user','voice',{duration:13})]);
+  const valid=await page.locator('.fq-root').evaluateAll(els=>els.every(e=>{const r=e.getBoundingClientRect(),p=e.querySelector('.fq-preview').getBoundingClientRect(),b=e.querySelector('.fq-body').getBoundingClientRect(),svg=e.querySelector('.fq-connector');const gap=e.dataset.replyRole==='user'?b.left-r.left:r.right-b.right;return gap>=63&&r.left>=0&&r.right<=innerWidth+1&&p.width<=Math.min(240,innerWidth*.68)+1&&svg.firstElementChild.getAttribute('d')&&!svg.firstElementChild.getAttribute('d').includes('NaN');}));
+  check(valid,`responsive preview/connector geometry at ${width}px`);
+ }
+ await page.setViewportSize({width:402,height:874});
  // Native fallback and actual long text height.
  const actualCSS=await fs.readFile(path.join(theme,'聊天室CSS.txt'),'utf8');
  await scene(typedUI);
@@ -95,16 +145,20 @@ async function main(){
  check(await page.locator('.fq-native').count()===1&&await page.locator('.fq-preview').textContent()==='Legacy original','repository custom chat CSS example retains generic quote display');
  await page.evaluate(css=>quoteTest.theme(css),actualCSS);await settle();
  await scene([{role:'assistant',content:'Long reply',mediaType:'quote',mediaData:{quoteV1:{version:1,kind:'text',preview:'Long text with wrapping. '.repeat(70),summary:'Long text'}}}]);
- check(await page.locator('.fq-preview').evaluate(e=>e.scrollHeight<=e.clientHeight+1&&e.getBoundingClientRect().height>300),'full long quote preview wraps without height truncation');
+ check(await page.locator('.fq-preview').evaluate(e=>{const r=e.getBoundingClientRect(),text=e.querySelector('.fq-text').getBoundingClientRect();return getComputedStyle(e).overflow==='visible'&&text.bottom<=r.bottom&&text.top>=r.top&&r.height>300;}),'full long quote preview wraps without height truncation (SVG tail intentionally overflows)');
  // Own URL cleanup, mounted voice has zero synthesis/play side effects.
- await page.evaluate(()=>{window.urlProbe={created:[],revoked:[],plays:0};const c=URL.createObjectURL,r=URL.revokeObjectURL;URL.createObjectURL=function(b){const u=c.call(this,b);urlProbe.created.push(u);return u;};URL.revokeObjectURL=function(u){urlProbe.revoked.push(u);return r.call(this,u);};HTMLMediaElement.prototype.play=function(){urlProbe.plays++;return Promise.resolve();};});
+ await page.evaluate(()=>{window.urlProbe={created:[],revoked:[],plays:0};window.quoteObservers=new Set();const observe=ResizeObserver.prototype.observe,disconnect=ResizeObserver.prototype.disconnect;ResizeObserver.prototype.observe=function(e,...args){if(e.matches('.fq-root'))quoteObservers.add(this);return observe.call(this,e,...args);};ResizeObserver.prototype.disconnect=function(){quoteObservers.delete(this);return disconnect.call(this);};const c=URL.createObjectURL,r=URL.revokeObjectURL;URL.createObjectURL=function(b){const u=c.call(this,b);urlProbe.created.push(u);return u;};URL.revokeObjectURL=function(u){urlProbe.revoked.push(u);return r.call(this,u);};HTMLMediaElement.prototype.play=function(){urlProbe.plays++;return Promise.resolve();};});
  const ref=await page.evaluate(async()=>{const bytes=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='),c=>c.charCodeAt(0));return quoteTest.storeMediaBlob(new Blob([bytes],{type:'image/png'}),'image/png','image');});
  await scene([{role:'user',content:'Photo reply',mediaType:'quote',mediaData:{quoteV1:{version:1,kind:'image',preview:'Photo',summary:'Photo',imageRef:ref}}},{role:'assistant',content:'Voice reply',mediaType:'quote',mediaData:{quoteV1:{version:1,kind:'voice',preview:'[语音]',summary:'transcript',duration:13}}},{role:'user',content:'Music reply',mediaType:'quote',mediaData:{quoteV1:{version:1,kind:'music',preview:'Song',summary:'Song Artist',artist:'Artist',coverUrl:ref}}}]);
  await page.waitForFunction(()=>document.querySelectorAll('.fq-preview img').length===2&&[...document.querySelectorAll('.fq-preview img')].every(e=>e.complete&&e.naturalWidth));
  check(await page.locator('.fq-duration').textContent()==='00:13'&&await page.locator('.fq-wave i').count()===15,'voice mini preview waveform and duration');
  check(await page.evaluate(()=>urlProbe.plays===0)&&!blocked.some(p=>/speech|tts|audio/i.test(p)),'mounting quote previews causes no TTS or media playback');
+ check(await page.evaluate(()=>quoteObservers.size===3),'one local geometry observer per mounted quote');
+ const idle=await page.evaluate(async()=>{let writes=0;const observer=new MutationObserver(records=>writes+=records.length);document.querySelectorAll('.fq-outline,.fq-connector').forEach(e=>observer.observe(e,{attributes:true,subtree:true}));await new Promise(r=>setTimeout(r,400));observer.disconnect();return writes;});
+ check(idle===0,'settled quote geometry has no repeated SVG writes or layout loop',{idle});
  await page.screenshot({path:path.join(output,'media.png')});
  await page.evaluate(()=>imTest.leave());await settle();
+ check(await page.evaluate(()=>quoteObservers.size===0),'quote geometry observers disconnected on room unmount');
  const urls=await page.evaluate(()=>urlProbe);check(urls.created.length===2&&urls.created.every(u=>urls.revoked.filter(x=>x===u).length===1),'image and cached music cover object URLs revoked exactly once',urls);
  await page.evaluate(()=>imTest.remount());await settle();
  await scene([{role:'assistant',content:'Unavailable',mediaType:'quote',mediaData:{quoteV1:{version:1,kind:'image',preview:'Photo',summary:'Photo',imageRef:'media-store://absent'}}}]);
