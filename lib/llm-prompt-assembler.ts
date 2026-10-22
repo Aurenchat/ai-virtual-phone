@@ -210,6 +210,8 @@ function getAnnotatedSenderPrefix(body: string, msg: ChatMessage): string {
 }
 
 function formatAnnotatedVisionBody(msg: ChatMessage, body: string): string {
+    // 微博宿主已将图片编号/原帖或评论来源写入 label，保留完整注释。
+    if (msg.origin === "custom_app" && msg.mediaData?.appId === "nox.weibo") return body;
     const prefix = getAnnotatedSenderPrefix(body, msg);
     if (msg.mediaType === "sticker") {
         return `${prefix}${formatRichMediaForHistory(msg, "", "", true)}`;

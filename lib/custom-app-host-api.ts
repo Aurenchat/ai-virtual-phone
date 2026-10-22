@@ -552,7 +552,16 @@ function normalizeCustomAppNativeToolResult(value: unknown): NativeToolResultRec
   return { toolCallId, name, content };
 }
 
-function normalizeCustomAppGenerateMessages(record: Record<string, unknown>, sessionId: string): ChatMessage[] | null {
+function getCustomAppImageLimit(appId: string): number {
+  // app.id 来自宿主安装记录；APP 自报 tags 不能授予九图特权。
+  return appId === "nox.weibo" ? 9 : 4;
+}
+
+function normalizeCustomAppGenerateMessages(
+  record: Record<string, unknown>,
+  sessionId: string,
+  appId: string,
+): ChatMessage[] | null {
   const raw = Array.isArray(record.appMessages)
     ? record.appMessages
     : Array.isArray(record.messages)
@@ -562,7 +571,7 @@ function normalizeCustomAppGenerateMessages(record: Record<string, unknown>, ses
   // APP 可在消息上带 image（data:image dataURL）走视觉通道；限量限大小防上下文爆炸。
   // 用户模型不支持/关闭图像识别时，下游 provider-adapter 会自动降级为 [图片] 文本。
   let imageCount = 0;
-  const MAX_IMAGES_PER_CALL = 4;
+  const maxImages = getCustomAppImageLimit(appId);
   const MAX_IMAGE_DATAURL_LENGTH = 2_000_000;
   return raw.map((item, index): ChatMessage | null => {
     const entry = asRecord(item);
@@ -576,7 +585,7 @@ function normalizeCustomAppGenerateMessages(record: Record<string, unknown>, ses
       typeof rawImage === "string"
       && /^data:image\//.test(rawImage)
       && rawImage.length <= MAX_IMAGE_DATAURL_LENGTH
-      && imageCount < MAX_IMAGES_PER_CALL
+      && imageCount < maxImages
     ) {
       imageUrl = rawImage;
       imageCount++;
@@ -598,6 +607,7 @@ function normalizeCustomAppGenerateMessages(record: Record<string, unknown>, ses
       senderName: cleanText(entry.senderName ?? entry.name, 80) || undefined,
       origin: "custom_app",
       mediaType,
+      ...(imageUrl && appId === "nox.weibo" ? { mediaData: { appId, label: content } } : {}),
       rawResponseText: rawResponseText || undefined,
       nativeToolCalls,
       nativeToolResult,
@@ -1936,7 +1946,8 @@ export async function generateCustomAppText(app: InstalledCustomApp, record: Rec
     status: "sent",
     createdAt: new Date().toISOString(),
   };
-  const appProvidedHistory = normalizeCustomAppGenerateMessages(record, session.id);
+  const appTags = buildCustomAppChatTags(app, record);
+  const appProvidedHistory = normalizeCustomAppGenerateMessages(record, session.id, app.id);
   const existingHistory = appProvidedHistory ?? [];
   const recentLimit = Math.max(1, Math.min(50, Number(record.historyLimit ?? 12) || 12));
   const extraWorldBookIds = activeCustomAppWorldBookIds(app, record);
@@ -1954,12 +1965,15 @@ export async function generateCustomAppText(app: InstalledCustomApp, record: Rec
         : existingHistory),
     taskMessage,
   ];
-  const appTags = buildCustomAppChatTags(app, record);
   const appendMessages: ChatMessage[] = [];
   const pushContextMessage = (patch: Partial<ChatMessage> & Pick<ChatMessage, "role">): void => {
     appendMessages.push(createCustomAppGeneratedContextMessage(session.id, appendMessages.length, patch));
   };
-  const completion = await generateChatCompletion(session, history, {
+  // 微博仅本次请求使用九图上下文，不写回角色/群聊会话设置。
+  const requestSession = getCustomAppImageLimit(app.id) === 9
+    ? { ...session, visionImagePromptLimit: 9 }
+    : session;
+  const completion = await generateChatCompletion(requestSession, history, {
     appId: `custom_app:${app.id}`,
     appTags,
     promptProfile: profile ?? undefined,
@@ -2086,7 +2100,8 @@ export async function generateCustomAppGroupText(app: InstalledCustomApp, record
     createdAt: new Date().toISOString(),
   };
   const recentLimit = Math.max(1, Math.min(50, Number(record.historyLimit ?? 12) || 12));
-  const appProvidedHistory = normalizeCustomAppGenerateMessages(record, session.id);
+  const appTags = buildCustomAppChatTags(app, record);
+  const appProvidedHistory = normalizeCustomAppGenerateMessages(record, session.id, app.id);
   const existingHistory = appProvidedHistory ?? (isPersistedGroup ? loadChatMessages(session.id).slice(-recentLimit) : []);
   const history = [
     ...(profile?.history === "none"
@@ -2097,8 +2112,11 @@ export async function generateCustomAppGroupText(app: InstalledCustomApp, record
     taskMessage,
   ];
   // 纯 APP tags(与单聊路径一致):资料包结构化组装照进,宿主内置条目不命中
-  const appTags = buildCustomAppChatTags(app, record);
-  const completion = await generateGroupRawCompletion(session, history, {
+  // 微博仅本次请求使用九图上下文，不写回角色/群聊会话设置。
+  const requestSession = getCustomAppImageLimit(app.id) === 9
+    ? { ...session, visionImagePromptLimit: 9 }
+    : session;
+  const completion = await generateGroupRawCompletion(requestSession, history, {
     appTags,
     promptProfile: profile ?? undefined,
     apiConfigId: cleanText(record.apiConfigId ?? record.configId, 160) || undefined,
