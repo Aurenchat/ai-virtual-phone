@@ -6,6 +6,7 @@
 @import "../styles/phone-shell.css";
 @import "../styles/widgets.css";
 @import "../styles/chat.css";
+@import "../components/chat/chat-quote-preview.css";
 @import "../styles/cash-payment.css";
 @import "../styles/character.css";
 @import "../styles/animations.css";

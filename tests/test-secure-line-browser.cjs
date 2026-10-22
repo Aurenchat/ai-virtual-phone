@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const ts=require('typescript');
 const {chromium}=require(process.env.PLAYWRIGHT_PACKAGE||'playwright');
 const root=process.cwd(),output=process.env.SECURE_LINE_OUTPUT||path.join(root,'deliveries/secure-line');fs.mkdirSync(output,{recursive:true});
-const names=['chat-db','chat-storage','chat-cloud-delete','chat-history-prune','chat-prune-validation','chat-session-merge','chat-session-remove','short-term-assembler','token-counter','payment-directive','payment-currency','payment-money','prompt-time','data-management/idb','data-management/serializers','sha256-stream'];
+const names=['chat-db','chat-storage','chat-quote','bilingual-text','chat-cloud-delete','chat-history-prune','chat-prune-validation','chat-session-merge','chat-session-remove','short-term-assembler','token-counter','payment-directive','payment-currency','payment-money','prompt-time','data-management/idb','data-management/serializers','sha256-stream'];
 const compiled=Object.fromEntries(names.map(n=>[n,ts.transpileModule(fs.readFileSync(path.join(root,'lib',n+'.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText]));
 const fixture=fs.readFileSync(path.join(root,'scripts/native-chat-prune/browser-fixture.js'),'utf8')+'\n'+fs.readFileSync(path.join(root,'tests/secure-line-fixture.js'),'utf8');
 const dexie=fs.readFileSync(require.resolve('dexie'),'utf8'),bundle='const SOURCES='+JSON.stringify(compiled)+';'+fixture;

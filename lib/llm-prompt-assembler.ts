@@ -13,6 +13,7 @@ import { readDwellingLayoutCache } from "./dwelling-storage";
 import { formatDwellingContext } from "./dwelling-engine";
 import { matchesActiveTags } from "./content-tag-utils";
 import { formatReadingQuoteContent } from "./reading-quote";
+import { formatChatQuoteForPrompt } from "./chat-quote";
 import { formatXiaohongshuShareForPrompt, getXiaohongshuShareReadableContent } from "./chat-share";
 import { stripStateAndInnerForPrompt } from "./prompt-sanitizer";
 import { formatPromptTimestamp, getPromptTimestampOptionsForTimeContext, resolvePromptTimeAware, type PromptTimestampOptions } from "./prompt-time";
@@ -1204,7 +1205,7 @@ export function formatRichMediaForHistory(msg: ChatMessage, userName: string, ch
         case "sticker":
             return `[表情包:${d?.label ?? "表情"}]`;
         case "quote":
-            return `[引用:${d?.quotePreview ?? ""}]${msg.content}`;
+            return formatChatQuoteForPrompt(msg);
         case "music": {
             const artist = d?.musicArtist ? `-${d.musicArtist}` : "";
             return `[音乐:${d?.musicTitle ?? d?.label ?? "未知歌曲"}${artist}]`;

@@ -8,7 +8,7 @@ const ts=require('typescript');
 const {chromium}=require(process.env.PLAYWRIGHT_PACKAGE || 'playwright');
 const root=process.cwd(),output=process.env.NATIVE_PRUNE_OUTPUT ? path.resolve(process.env.NATIVE_PRUNE_OUTPUT) : path.join(root,'deliveries/native-chat-prune');
 fs.mkdirSync(output,{recursive:true});
-const sources=['chat-db','chat-storage','chat-cloud-delete','chat-history-prune','chat-prune-validation'];
+const sources=['chat-db','chat-storage','chat-quote','bilingual-text','chat-cloud-delete','chat-history-prune','chat-prune-validation'];
 const compiled=Object.fromEntries(sources.map(name=>[name,ts.transpileModule(fs.readFileSync(path.join(root,'lib',name+'.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText]));
 for (const [name,file] of Object.entries({'react':'react/cjs/react.production.js','react/jsx-runtime':'react/cjs/react-jsx-runtime.production.js','react-dom':'react-dom/cjs/react-dom.production.js','react-dom/client':'react-dom/cjs/react-dom-client.production.js','scheduler':'scheduler/cjs/scheduler.production.js'})) compiled[name]=fs.readFileSync(path.join(root,'node_modules',file),'utf8');
 compiled.dialog=ts.transpileModule(fs.readFileSync('components/chat/chat-history-prune-dialog.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;

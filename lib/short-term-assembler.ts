@@ -29,6 +29,7 @@ import { loadInterviewMagazineProjectionEntries } from "./interview-magazine-mem
 import { loadCoCreateProjectionEntries } from "./cocreate-memory";
 import { stripStateAndInnerForPrompt } from "./prompt-sanitizer";
 import { formatReadingQuoteContent } from "./reading-quote";
+import { formatChatQuoteForPrompt } from "./chat-quote";
 import { renderUserNameMacro } from "./user-macro";
 import { loadChatOfflineProjectionEntries } from "./chat-offline-storage";
 import { loadCheckPhoneProjectionEntries } from "./checkphone-storage";
@@ -210,7 +211,7 @@ export function loadNativeTimeline(
             else sender = msg.senderName || "未知";
 
             const msgLabel = formatPromptEventLabel(`群聊「${gs.groupName || "群聊"}」`, msg.createdAt, timeAware, timestampOptions);
-            let content = stripStateAndInnerForPrompt(msg.content || "");
+            let content = msg.mediaType === "quote" ? formatChatQuoteForPrompt(msg, stripStateAndInnerForPrompt(msg.content || "")) : stripStateAndInnerForPrompt(msg.content || "");
 
             // Action notifications: group format with names
             if (msg.mediaType === "accept_red_packet") content = `[${msg.mediaData?.claimer || ""}领取了${msg.mediaData?.owner || ""}的红包]`;
@@ -323,7 +324,7 @@ export function loadNativeTimeline(
             }
 
             const sender = msg.role === "user" ? userName : msg.role === "tool" ? "工具" : charName;
-            let content = formatReadingQuoteContent(msg, stripStateAndInnerForPrompt(msg.content || ""));
+            let content = msg.mediaType === "quote" ? formatChatQuoteForPrompt(msg, stripStateAndInnerForPrompt(msg.content || "")) : formatReadingQuoteContent(msg, stripStateAndInnerForPrompt(msg.content || ""));
 
             // Action notifications: always override content to bracket format (stored content is natural language for UI)
             if (msg.mediaType === "accept_red_packet") content = "[领取红包]";

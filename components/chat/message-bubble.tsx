@@ -20,6 +20,7 @@ import { ContactCardGenerateFlow } from "@/components/chat/contact-card-generate
 import { MediaPreviewOverlay } from "@/components/chat/media-preview-overlay";
 import { findStickerByName } from "@/lib/sticker-data";
 import { splitBilingualText } from "@/lib/bilingual-text";
+import { ChatQuoteShell } from "./chat-quote-preview";
 import { getReadingQuote, type ReadingQuote } from "@/lib/reading-quote";
 import { isInvisibleOrWhitespaceOnly } from "@/lib/rich-message-parser";
 import ReactMarkdown from "react-markdown";
@@ -160,6 +161,10 @@ export const MessageBubble = memo(function MessageBubble({ msg, onUpdate, charNa
         if (prev.msg.mediaData?.status !== next.msg.mediaData?.status) return false;
         if (prev.msg.mediaData?.readingQuote !== next.msg.mediaData?.readingQuote) return false;
         if (prev.msg.mediaData?.label !== next.msg.mediaData?.label) return false;
+        if (prev.msg.mediaData?.quoteV1 !== next.msg.mediaData?.quoteV1) return false;
+        if (prev.msg.mediaData?.quotePreview !== next.msg.mediaData?.quotePreview) return false;
+        if (prev.msg.mediaData?.quoteRole !== next.msg.mediaData?.quoteRole) return false;
+        if (prev.msg.mediaData?.quoteMessageId !== next.msg.mediaData?.quoteMessageId) return false;
         if (prev.msg.mediaData?.claimedBy?.length !== next.msg.mediaData?.claimedBy?.length) return false;
         if (prev.msg.mediaData?.appName !== next.msg.mediaData?.appName) return false;
         if (prev.msg.mediaData?.appCardTitle !== next.msg.mediaData?.appCardTitle) return false;
@@ -1766,17 +1771,9 @@ function StickerBubble({ msg, characterId }: { msg: ChatMessage; characterId?: s
 // ── Quote ─────────────────────────────
 
 function QuoteBubble({ msg, displayContent, defaultTranslationExpanded = false }: { msg: ChatMessage; displayContent?: string; defaultTranslationExpanded?: boolean }) {
-    const d = msg.mediaData;
-    return (
-        <div className="chat-quote-message max-w-full">
-            {d?.quotePreview && (
-                <div className="chat-quote-preview bg-black/[0.06] border-l-[3px] border-l-black/15 px-2.5 py-1.5 ts-12 text-[var(--c-icon)] mb-1.5 rounded-r-[6px] truncate max-w-full">
-                    {d.quotePreview}
-                </div>
-            )}
-            {msg.content && <TextBubble content={displayContent ?? msg.content} defaultTranslationExpanded={defaultTranslationExpanded} />}
-        </div>
-    );
+    return <ChatQuoteShell msg={msg}>
+        {msg.content && <TextBubble content={displayContent ?? msg.content} defaultTranslationExpanded={defaultTranslationExpanded} />}
+    </ChatQuoteShell>;
 }
 
 

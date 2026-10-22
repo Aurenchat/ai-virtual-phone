@@ -16,6 +16,8 @@ import { emitChatPluginEvent, runChatPluginTransformSync } from "./chat-plugin-h
 import { parseAIResponse } from "./rich-message-parser";
 import { extractTextToolDirectiveText } from "./text-tool-protocol";
 import type { ReadingQuote } from "./reading-quote";
+import type { ChatQuoteSnapshot } from "./chat-quote";
+import { resolveLegacyChatQuote } from "./chat-quote";
 import { captureCurrentStatusRendererId } from "./chat-status-region";
 
 export const DEFAULT_VISION_IMAGE_PROMPT_LIMIT = 1;
@@ -149,6 +151,7 @@ export type ChatMessage = {
         status?: "pending" | "opened" | "received" | "declined" | "paid" | "canceled";  // 红包/转账/代付状态
         quoteMessageId?: string;  // 引用消息 ID
         quotePreview?: string;    // 引用消息预览文本
+        quoteV1?: ChatQuoteSnapshot; // typed compact reference, no binary payload
         quoteRole?: ChatMessageRole; // 引用消息的 role
         stickerUrl?: string;      // 表情包图片路径
         diceFace?: number;        // 骰子点数（1-6），气泡翻滚后定格并与全屏动效一致
@@ -1429,6 +1432,21 @@ export function pushChatMessage(msg: Omit<ChatMessage, "id" | "createdAt" | "sta
         order: getNextMessageOrder(msg.sessionId),
         status: msg.status || "sent"
     };
+
+    // Bind AI-authored legacy [引用:...] only if unique across this session.
+    // Ambiguous references remain text-only; never guess a message ID.
+    if (newMsg.mediaType === "quote" && !newMsg.mediaData?.quoteV1 && newMsg.mediaData?.quotePreview) {
+        const history = _messagesCache.filter(m => m.sessionId === newMsg.sessionId);
+        const matched = resolveLegacyChatQuote(newMsg.mediaData.quotePreview, history);
+        if (matched) {
+            newMsg = { ...newMsg, mediaData: {
+                ...newMsg.mediaData,
+                quoteV1: matched,
+                quoteMessageId: matched.sourceMessageId,
+                quoteRole: matched.sourceRole,
+            } };
+        }
+    }
 
     // 聊天插件织入点：消息落库前同步改写（全部消息路径都会经过这里）
     const pluginResult = runChatPluginTransformSync("message.beforePersist", { message: newMsg });

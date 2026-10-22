@@ -11,6 +11,7 @@ import { parseAIResponse, type ParsedMessagePart } from "@/lib/rich-message-pars
 import { isKnownStickerLabel } from "@/lib/sticker-data";
 import { translateReasoningText } from "@/lib/reasoning-translate";
 import { MessageBubble, MediaDetailModal, BilingualTextBlock, isStandaloneHtmlPreviewContent, normalizeTextBubbleContent } from "./message-bubble";
+import { createChatQuote } from "@/lib/chat-quote";
 import { GeneratedImageErrorDialog } from "./generated-image-error-dialog";
 import { PhotoInputModal, TextPhotoModal, VoiceRecordModal, RedPacketModal, LocationInputModal, SystemInstructionModal } from "./rich-input-modals";
 import { EmojiPanel, StickerPanel } from "./emoji-panel";
@@ -779,7 +780,7 @@ const ChatTextInputBar = memo(forwardRef<ChatTextInputHandle, {
             {quotingMessage && (
                 <div className="chat-quote-bar">
                     <div className="flex-1 ts-12 text-[var(--c-icon)] overflow-hidden text-ellipsis whitespace-nowrap">
-                        引用 {quotingMessage.role === "user" ? "你" : characterName}: {quotingMessage.content.slice(0, 40)}
+                        引用 {quotingMessage.role === "user" ? "你" : characterName}: {createChatQuote(quotingMessage).preview.slice(0, 40)}
                     </div>
                     <button onClick={onClearQuote} className="ui-bare-btn text-[var(--c-icon)] ts-16 leading-none p-[2px]">✕</button>
                 </div>
@@ -4142,10 +4143,12 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
 
         // If quoting a message, send as quote type
         const isQuoting = !!quotingMessage;
-        const quoteData = quotingMessage ? {
-            quoteMessageId: quotingMessage.id,
-            quotePreview: quotingMessage.content.slice(0, 50),
-            quoteRole: quotingMessage.role,
+        const quoteSnapshot = quotingMessage ? createChatQuote(quotingMessage) : undefined;
+        const quoteData = quoteSnapshot ? {
+            quoteMessageId: quoteSnapshot.sourceMessageId,
+            quotePreview: quoteSnapshot.preview.slice(0, 50), // legacy import/export compatibility
+            quoteRole: quoteSnapshot.sourceRole,
+            quoteV1: quoteSnapshot,
         } : undefined;
         setQuotingMessage(null);
 
