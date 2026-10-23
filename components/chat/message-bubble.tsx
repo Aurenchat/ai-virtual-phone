@@ -21,6 +21,7 @@ import { MediaPreviewOverlay } from "@/components/chat/media-preview-overlay";
 import { findStickerByName } from "@/lib/sticker-data";
 import { splitBilingualText } from "@/lib/bilingual-text";
 import { ChatQuoteShell } from "./chat-quote-preview";
+import { readQuoteDisplayEcho } from "./chat-quote-presentation";
 import { getReadingQuote, type ReadingQuote } from "@/lib/reading-quote";
 import { isInvisibleOrWhitespaceOnly } from "@/lib/rich-message-parser";
 import ReactMarkdown from "react-markdown";
@@ -99,6 +100,13 @@ function PluginKindBubble({ msg, kind }: { msg: ChatMessage; kind: string }) {
  * Falls back to ReactMarkdown for plain text messages.
  */
 export const MessageBubble = memo(function MessageBubble({ msg, onUpdate, charName, userName, onSystemMessage, groupSize, onShowDetail, characterId, onMusicPlay, onActionSelect, displayContent, defaultTranslationExpanded = false }: MessageBubbleProps) {
+    // A model may echo the exact history envelope instead of [引用:…]. Keep the
+    // original record untouched; only the quote view resolves its explicit ID.
+    const echo = msg.role === "assistant" && (!msg.mediaType || msg.mediaType === "quote") ? readQuoteDisplayEcho(msg.content) : null;
+    if (echo) return <ChatQuoteShell msg={msg}>
+        <TextBubble content={readQuoteDisplayEcho(displayContent || "")?.body || echo.body || "引用消息"} defaultTranslationExpanded={defaultTranslationExpanded} />
+        {!msg.mediaType && <ChatPluginSlot name="message.footer" slotProps={{ sessionId: msg.sessionId, message: msg }} className="chat-plugin-message-footer" />}
+    </ChatQuoteShell>;
     switch (msg.mediaType) {
         case "red_packet":
             return <CashPaymentCard msg={msg} onShowDetail={onShowDetail} />;

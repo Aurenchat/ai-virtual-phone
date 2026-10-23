@@ -99,11 +99,12 @@ async function main(){
   await page.screenshot({path:path.join(output,`imessage-${replyRole}-${sourceRole}.png`)});
   // Ask the installed theme itself to render a normal bubble at preview size.
   // Compare exact paths; this oracle does not duplicate the contour algorithm.
-  const size=await page.locator('.fq-preview').evaluate(e=>({width:e.getBoundingClientRect().width+'px',height:e.getBoundingClientRect().height+'px'}));
+  const size=await page.locator('.fq-preview').evaluate(e=>{const r=e.getBoundingClientRect(),scale=Math.min(1,r.height/42.65625);return {width:r.width/scale+'px',height:r.height/scale+'px'};});
   await scene([{role:sourceRole,content:'Ordinary tail reference'}]);
   await page.locator('[data-ui^="bubble-"]').evaluate((e,size)=>{e.style.width=size.width;e.style.height=size.height;e.style.padding='0';},size);await settle();
   const themePath=await page.locator('[data-ui^="bubble-"] > .im-text-outline path').getAttribute('d');
-  check(g.previewPath===themePath,`${sourceRole} preview uses exact installed ordinary-bubble geometry at preview size`,{preview:g.previewPath,theme:themePath,size});
+  const nearContour=(a,b)=>a.replace(/[-\d.]+/g,'#')===b.replace(/[-\d.]+/g,'#')&&a.match(/-?\d*\.?\d+/g).every((x,i)=>Math.abs(+x-+b.match(/-?\d*\.?\d+/g)[i])<.03);
+  check(nearContour(g.previewPath,themePath),`${sourceRole} preview uniformly scales installed ordinary-bubble geometry (one layout-unit tolerance)`,{preview:g.previewPath,theme:themePath,size});
  }
  // Acceptance gallery: real local thumbnail, both directions, compact voice.
  const photo=await page.evaluate(async()=>{const canvas=document.createElement('canvas');canvas.width=90;canvas.height=128;const c=canvas.getContext('2d');c.fillStyle='#b6c9ca';c.fillRect(0,0,90,128);c.fillStyle='#526e5b';c.fillRect(0,72,90,56);c.fillStyle='#e6bf7e';c.beginPath();c.arc(62,35,17,0,Math.PI*2);c.fill();return quoteTest.storeMediaBlob(await new Promise(r=>canvas.toBlob(r,'image/png')),'image/png','image');});
@@ -111,18 +112,18 @@ async function main(){
  await scene([quoteMessage('user','assistant','text'),quoteMessage('user','assistant','voice',{duration:9}),quoteMessage('user','assistant','image',{imageRef:photo}),quoteMessage('assistant','user','text')]);
  await page.waitForFunction(()=>document.querySelector('.fq-thumb')?.naturalWidth>0);
  const mini=await page.locator('.fq-preview').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect();return {kind:e.dataset.quoteKind,w:r.width,h:r.height,left:r.left,path:e.querySelector('.fq-outline path').getAttribute('d'),duration:e.querySelector('.fq-duration')?.textContent,image:e.querySelector('img')?.getBoundingClientRect().height};}));
- check(mini[1].w===148&&mini[1].h===38&&mini[1].duration==='00:09'&&mini[2].image===56&&mini[2].w<=88&&mini.slice(0,3).every(x=>Math.abs(x.left-16)<1),'text/voice/image smaller mini bubbles attach left with ordinary tails',mini);
+ check(mini[1].w===148&&mini[1].h===38&&mini[1].duration==='00:09'&&mini[2].image===72&&mini[2].w===56&&mini[2].h===64&&mini.slice(0,3).every(x=>Math.abs(x.left-16)<1),'text/voice/image mini bubbles attach left; photo fills body and tail',mini);
  await page.screenshot({path:path.join(output,'acceptance-gallery.png')});
  await fs.writeFile(path.join(output,'mini-geometry.json'),JSON.stringify(mini,null,2));
  if(process.env.QUOTE_PREVIEW_BASELINE_PATH){const before=JSON.parse(await fs.readFile(process.env.QUOTE_PREVIEW_BASELINE_PATH,'utf8'));check(mini.every((m,i)=>m.w<before[i].w&&m.h<before[i].h),'all text/voice/image preview boxes shrink versus v1.1',{before,after:mini});}
  for(const sourceRole of ['assistant','user'])for(const kind of ['voice','image']){
   await scene([quoteMessage('user',sourceRole,kind,kind==='voice'?{duration:9}:{imageRef:photo})]);
   if(kind==='image')await page.waitForFunction(()=>document.querySelector('.fq-thumb')?.naturalWidth>0);
-  const p=await page.locator('.fq-preview').evaluate(e=>({width:e.getBoundingClientRect().width+'px',height:e.getBoundingClientRect().height+'px',paths:[...e.querySelectorAll('.fq-outline path')].map(p=>p.getAttribute('d')),transforms:[...e.querySelectorAll('.fq-outline path')].map(p=>p.getAttribute('transform'))}));
+  const p=await page.locator('.fq-preview').evaluate(e=>{const r=e.getBoundingClientRect(),scale=Math.min(1,r.height/42.65625);return {width:r.width/scale+'px',height:r.height/scale+'px',paths:[...e.querySelectorAll('.fq-outline path')].map(p=>p.getAttribute('d')),transforms:[...e.querySelectorAll('.fq-outline path')].map(p=>p.getAttribute('transform'))};});
   await scene([{role:sourceRole,content:'Ordinary tail reference'}]);
   await page.locator('[data-ui^="bubble-"]').evaluate((e,size)=>{e.style.width=size.width;e.style.height=size.height;e.style.padding='0';},p);await settle();
   const d=await page.locator('[data-ui^="bubble-"] > .im-text-outline path').getAttribute('d');
-  check(p.paths.length===2&&p.paths.every(x=>x===d)&&p.transforms.every(x=>!x),`${sourceRole} ${kind} preview reuses ordinary contour without mirrored substitutes`,{preview:p,theme:d});
+  check(p.paths.length===2&&p.paths.every(x=>x.replace(/[-\d.]+/g,'#')===d.replace(/[-\d.]+/g,'#')&&x.match(/-?\d*\.?\d+/g).every((n,i)=>Math.abs(+n-+d.match(/-?\d*\.?\d+/g)[i])<.03))&&p.transforms.every(x=>/^scale\(/.test(x)),`${sourceRole} ${kind} preview reuses uniformly scaled ordinary contour`,{preview:p,theme:d});
  }
  for(const width of [320,375,430]){
   await page.setViewportSize({width,height:874});
@@ -131,6 +132,7 @@ async function main(){
   check(valid,`responsive preview/connector geometry at ${width}px`);
  }
  await page.setViewportSize({width:402,height:874});
+ await require('./quote-v1/polish-v13.cjs')({page,scene,settle,check,output});
  // Native fallback and actual long text height.
  const actualCSS=await fs.readFile(path.join(theme,'聊天室CSS.txt'),'utf8');
  await scene(typedUI);
@@ -162,7 +164,7 @@ async function main(){
  const urls=await page.evaluate(()=>urlProbe);check(urls.created.length===2&&urls.created.every(u=>urls.revoked.filter(x=>x===u).length===1),'image and cached music cover object URLs revoked exactly once',urls);
  await page.evaluate(()=>imTest.remount());await settle();
  await scene([{role:'assistant',content:'Unavailable',mediaType:'quote',mediaData:{quoteV1:{version:1,kind:'image',preview:'Photo',summary:'Photo',imageRef:'media-store://absent'}}}]);
- check(await page.locator('.fq-image-fallback').textContent()==='[图片]','missing image safely falls back');
+ check(await page.locator('.fq-image-fallback').textContent()==='图片','missing image safely falls back');
  // Legacy inline photo lookup keeps the existing bytes only on the source row.
  const inline=await page.evaluate(async()=>{const c=imTest.chat,t=quoteTest,s=c.loadChatSessions()[0];c.clearChatSessionMessages(s.id);const src=c.pushChatMessage({sessionId:s.id,role:'user',content:'',mediaType:'image',mediaUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='});const q=t.createChatQuote(src);const reply=c.pushChatMessage({sessionId:s.id,role:'assistant',content:'Inline reply',mediaType:'quote',mediaData:{quoteV1:q}});await t.flush();imTest.remount();return{q,reply};});
  await page.waitForFunction(()=>document.querySelector('.fq-preview img')?.naturalWidth>0);

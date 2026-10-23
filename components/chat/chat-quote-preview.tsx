@@ -5,20 +5,26 @@ import { readChatQuote, type ChatQuoteSnapshot } from "@/lib/chat-quote";
 import { ImessagePresentation } from "./imessage-presentation";
 import { isMediaStoreRef, loadMediaObjectUrl } from "@/lib/media-cache-storage";
 import { chatDb } from "@/lib/chat-db";
+import { liveQuery } from "dexie";
+import { createChatQuote } from "@/lib/chat-quote";
+import { quoteImageCaption, quoteVoiceTime, readQuoteDisplayEcho } from "./chat-quote-presentation";
 
-function SourceThumbnail({ messageId, sessionId }: { messageId?: string; sessionId: string }) {
-    const [source, setSource] = useState({ messageId, sessionId, url: "" });
+/** Key-scoped, read-only source projection. Updates after image generation;
+ * retains no full source/media object and never changes the saved snapshot. */
+function useQuoteSource(messageId: string | undefined, sessionId: string) {
+    const [state, setState] = useState<{ id?: string; sessionId: string; quote?: ChatQuoteSnapshot; imageUrl?: string; seconds?: number; estimated?: boolean }>({ sessionId });
     useEffect(() => {
-        let active = true;
-        if (messageId) void chatDb.messages.get(messageId).then(msg => {
-            const url = msg?.sessionId === sessionId && !msg.isRetracted
-                && (msg.mediaType === "image" || (msg.mediaType === "media_file" && msg.mediaData?.fileType === "image"))
-                && /^(?:data:image\/|blob:|https?:\/\/|media-store:\/\/)/i.test(msg.mediaUrl || "") ? msg.mediaUrl! : "";
-            if (active) setSource({ messageId, sessionId, url });
-        }).catch(() => { if (active) setSource({ messageId, sessionId, url: "" }); });
-        return () => { active = false; };
+        if (!messageId) return;
+        const query = liveQuery(async () => {
+            const source = await chatDb.messages.get(messageId);
+            if (!source || source.sessionId !== sessionId || source.isRetracted) return { id: messageId, sessionId };
+            const quote = createChatQuote(source), time = quoteVoiceTime(source);
+            const url = quote.kind === "image" ? source.mediaData?.imageGenerationMediaRef || source.mediaUrl || "" : "";
+            return { id: messageId, sessionId, quote, imageUrl: /^(?:data:image\/|blob:|https?:\/\/|media-store:\/\/)/i.test(url) ? url : undefined, ...time };
+        }).subscribe({ next: setState, error: () => setState({ id: messageId, sessionId }) });
+        return () => query.unsubscribe();
     }, [messageId, sessionId]);
-    return <QuoteThumbnail refUrl={source.messageId === messageId && source.sessionId === sessionId ? source.url : undefined} />;
+    return state.id === messageId && state.sessionId === sessionId ? state : undefined;
 }
 
 /** Resolves only mounted quote thumbnails and revokes temporary URLs on cleanup. */
@@ -40,7 +46,7 @@ function QuoteThumbnail({ refUrl, cover = false }: { refUrl?: string; cover?: bo
         return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
     }, [refUrl]);
     const resolved = resolution.refUrl === refUrl ? resolution.url : "";
-    if (!resolved || broken) return cover ? <span className="fq-cover fq-cover-fallback" aria-label="封面不可用">♪</span> : <span className="fq-image-fallback">[图片]</span>;
+    if (!resolved || broken) return cover ? <span className="fq-cover fq-cover-fallback" aria-label="封面不可用">♪</span> : <span className="fq-image-fallback">图片</span>;
     return <img className={cover ? "fq-cover" : "fq-thumb"} src={resolved} alt={cover ? "" : "引用图片"} loading="lazy" decoding="async" onError={() => setBroken(true)} />;
 }
 
@@ -50,20 +56,22 @@ function compactTime(seconds?: number) {
     return `${String(Math.floor(count / 60)).padStart(2, "0")}:${String(count % 60).padStart(2, "0")}`;
 }
 
-function QuoteCard({ quote, sessionId }: { quote: ChatQuoteSnapshot; sessionId: string }) {
-    if (quote.kind === "image") return quote.imageRef
-        ? <span className="fq-image"><QuoteThumbnail refUrl={quote.imageRef} /></span>
-        : quote.imageFromSource ? <span className="fq-image"><SourceThumbnail messageId={quote.sourceMessageId} sessionId={sessionId} /></span>
-        : <span className="fq-image-text">{quote.preview}</span>;
+function QuoteCard({ quote, imageUrl, estimated }: { quote: ChatQuoteSnapshot; imageUrl?: string; estimated?: boolean }) {
+    if (quote.kind === "image") return imageUrl || quote.imageRef
+        ? <span className="fq-image"><QuoteThumbnail refUrl={imageUrl || quote.imageRef} /></span>
+        : <span className="fq-image-text"><span>{quoteImageCaption(quote.preview)}</span></span>;
     if (quote.kind === "voice") return <span className="fq-voice" aria-label={quote.summary}>
         <span className="fq-wave" aria-hidden="true">{[12,22,17,27,14,19,12,25,14,19,11,22,14,17,11].map((height, index) => <i key={index} style={{ height }} />)}</span>
-        <span className="fq-duration">{compactTime(quote.duration)}</span>
+        <span className="fq-duration" aria-label={estimated ? "估算时长" : "时长"}>{compactTime(quote.duration) || "--:--"}</span>
     </span>;
     if (quote.kind === "music") return <span className="fq-music">
         <QuoteThumbnail refUrl={quote.coverUrl} cover />
         <span className="fq-music-detail"><strong>{quote.preview}</strong><small>{quote.artist || "未知歌手"}</small></span>
     </span>;
-    if (quote.kind === "text") return <span className="fq-text">{quote.preview}</span>;
+    if (quote.kind === "text") {
+        const echo = readQuoteDisplayEcho(quote.preview);
+        return <span className="fq-text">{echo ? echo.body || "引用消息" : quote.preview}</span>;
+    }
     return <span className="fq-special"><span className="fq-special-title">{quote.preview}</span><small>{quote.kind === "payment" ? "支付消息" : quote.kind === "location" ? "位置" : "消息卡片"}</small></span>;
 }
 
@@ -90,29 +98,61 @@ function bubbleContour(w: number, h: number, incoming: boolean, tail: boolean) {
 function useQuoteGeometry(root: RefObject<HTMLDivElement | null>, enabled: boolean, replyRole: string, sourceRole?: string) {
     useLayoutEffect(() => {
         const el = root.current;
-        if (!enabled || !el) return;
+        if (!el) return;
         const preview = el.querySelector<HTMLElement>(".fq-preview")!;
         const body = el.querySelector<HTMLElement>(".fq-body")!;
-        const connector = el.querySelector<SVGSVGElement>(".fq-connector")!;
+        const connector = el.querySelector<SVGSVGElement>(".fq-connector");
+        const outer = el.parentElement!, row = outer.closest<HTMLElement>(".chat-msg-wrapper");
+        const owned = new Map<HTMLElement, Map<string, string>>();
+        const set = (node: HTMLElement, name: string, value: string) => {
+            if (!owned.has(node)) owned.set(node, new Map());
+            const props = owned.get(node)!;
+            if (!props.has(name)) props.set(name, node.style.getPropertyValue(name));
+            if (node.style.getPropertyValue(name) !== value) node.style.setProperty(name, value);
+        };
+        const offset = (node: HTMLElement, ancestor: HTMLElement) => {
+            let left = 0, top = 0;
+            let p: HTMLElement | null = node;
+            for (; p && p !== ancestor; p = p.offsetParent as HTMLElement | null) { left += p.offsetLeft; top += p.offsetTop; }
+            if (p === ancestor) return { left, top };
+            const box = node.getBoundingClientRect(), parent = ancestor.getBoundingClientRect();
+            return { left: box.left - parent.left, top: box.top - parent.top };
+        };
         const update = () => {
+            const anchor = offset(body, outer);
+            set(outer, "--fq-body-top", `${anchor.top}px`); set(outer, "--fq-body-left", `${anchor.left}px`);
+            set(outer, "--fq-body-width", `${body.offsetWidth}px`);
+            if (row && enabled) {
+                const point = offset(body, row);
+                set(row, "--fq-heart-left", `${point.left + body.offsetWidth + 6}px`);
+                set(row, "--fq-heart-top", `${point.top + body.offsetHeight - 22}px`);
+            }
+            if (!enabled || !connector) return;
+            let previewScale = 1;
             for (const [box, mini] of [[preview, true], [body, false]] as const) {
                 const style = getComputedStyle(box), w = parseFloat(style.width), h = parseFloat(style.height);
                 if (!w || !h) continue;
                 const svg = box.querySelector<SVGSVGElement>(":scope > .fq-outline")!;
                 svg.setAttribute("viewBox", `0 0 ${w} ${h + 8}`);
                 svg.setAttribute("height", String(h + 8));
-                const d = bubbleContour(w, h, (mini ? sourceRole : replyRole) !== "user", mini || !!el.parentElement?.hasAttribute("data-im-last"));
-                svg.querySelectorAll("path").forEach(path => path.setAttribute("d", d));
+                // Uniformly shrink the accepted short-capsule geometry. Keeping
+                // a 24px tail root on a 15px corner caused the short-text kink.
+                const scale = mini ? Math.min(1, h / 42.65625) : 1;
+                if (mini) previewScale = scale;
+                const d = bubbleContour(w / scale, h / scale, (mini ? sourceRole : replyRole) !== "user", mini || !!el.parentElement?.hasAttribute("data-im-last"));
+                svg.querySelectorAll("path").forEach(path => { path.setAttribute("d", d); path.setAttribute("transform", `scale(${scale})`); });
+                if (mini) set(preview, "--fq-image-shape", `path("${d}")`);
             }
             const leftSource = sourceRole !== "user", outgoing = replyRole !== "assistant";
             const sameEdge = leftSource === outgoing;
-            const start = sameEdge ? preview.offsetHeight + 12 : preview.offsetHeight / 2;
-            const end = body.offsetTop + body.offsetHeight / 2;
-            const radius = Math.min(24, (end - start) / (sameEdge ? 1 : 2));
+            const x = Math.min(24 * previewScale, preview.offsetWidth / 2) - 2 * previewScale, tip = x + 28;
+            const start = sameEdge ? preview.offsetHeight + 8 * previewScale + 4 : preview.offsetHeight / 2;
+            const end = body.offsetTop + Math.min(22, body.offsetHeight / 2);
+            const radius = Math.min(22, (end - start) / (sameEdge ? 1 : 2));
             const d = sameEdge
-                ? `M16 ${start}V${end-radius}Q16 ${end} ${16+radius} ${end}H50`
-                : `M50 ${start}H${16+radius}Q16 ${start} 16 ${start+radius}V${end-radius}Q16 ${end} ${16+radius} ${end}H50`;
-            connector.setAttribute("viewBox", `0 0 54 ${el.offsetHeight}`);
+                ? `M${x} ${start}V${end-radius}Q${x} ${end} ${x+radius} ${end}H${tip}`
+                : `M${tip} ${start}H${x+radius}Q${x} ${start} ${x} ${start+radius}V${end-radius}Q${x} ${end} ${x+radius} ${end}H${tip}`;
+            connector.setAttribute("viewBox", `0 0 56 ${el.offsetHeight}`);
             connector.firstElementChild!.setAttribute("d", d);
         };
         update();
@@ -121,7 +161,7 @@ function useQuoteGeometry(root: RefObject<HTMLDivElement | null>, enabled: boole
         // Group membership is owned by the existing theme bridge.
         const grouping = new MutationObserver(update);
         if (el.parentElement) grouping.observe(el.parentElement, { attributes: true, attributeFilter: ["data-im-last"] });
-        return () => { resize.disconnect(); grouping.disconnect(); };
+        return () => { resize.disconnect(); grouping.disconnect(); owned.forEach((props, node) => props.forEach((value, name) => { if (value) node.style.setProperty(name, value); else node.style.removeProperty(name); })); };
     }, [root, enabled, replyRole, sourceRole]);
 }
 
@@ -136,7 +176,14 @@ const previewOutline = <svg className="fq-outline" aria-hidden="true" focusable=
 
 /** Outer quote preview and reply body have separate DOM ownership for styling. */
 export function ChatQuoteShell({ msg, children }: { msg: ChatMessage; children: ReactNode }) {
-    const quote = readChatQuote(msg);
+    const stored = readChatQuote(msg), echo = readQuoteDisplayEcho(msg.content);
+    const needsSource = stored && (stored.kind === "image" || stored.kind === "voice" || !stored.sourceRole || !msg.mediaData?.quoteV1);
+    const source = useQuoteSource(needsSource ? stored?.sourceMessageId : echo?.sourceId, msg.sessionId);
+    const verifiedEcho = echo && source?.quote && (!echo.sourceRole || echo.sourceRole === source.quote.sourceRole) && echo.sourceType === source.quote.sourceType;
+    const resolved = !echo || verifiedEcho ? source : undefined;
+    const base: ChatQuoteSnapshot | null = stored || (echo ? verifiedEcho ? source!.quote! : { version: 1, kind: echo.sourceType === "image" ? "image" : "card", preview: echo.sourceType === "image" ? "图片" : "引用消息", summary: "引用消息" } : null);
+    const quote = base ? { ...base, ...(!msg.mediaData?.quoteV1 && source?.quote && !echo ? { kind: source.quote.kind } : {}),
+        sourceRole: resolved?.quote?.sourceRole || base.sourceRole, duration: base.duration || resolved?.seconds } : null;
     const { enabled } = useContext(ImessagePresentation);
     const root = useRef<HTMLDivElement>(null);
     useQuoteGeometry(root, enabled && !!quote, msg.role, quote?.sourceRole);
@@ -144,7 +191,7 @@ export function ChatQuoteShell({ msg, children }: { msg: ChatMessage; children: 
     return <div ref={root} className={enabled ? "fq-root fq-imessage" : "fq-root fq-native"} data-reply-role={msg.role} data-source-role={quote.sourceRole || "unknown"}>
         <div className="fq-preview" data-quote-kind={quote.kind} aria-label={`引用${quote.kind}消息`}>
             {enabled && previewOutline}
-            <QuoteCard quote={quote} sessionId={msg.sessionId} />
+            <QuoteCard quote={quote} imageUrl={resolved?.imageUrl} estimated={!base?.duration && resolved?.estimated} />
         </div>
         {enabled && <svg className="fq-connector" aria-hidden="true" focusable="false" preserveAspectRatio="none"><path vectorEffect="non-scaling-stroke" /></svg>}
         <div className="fq-body">{enabled && outline}{children}</div>
