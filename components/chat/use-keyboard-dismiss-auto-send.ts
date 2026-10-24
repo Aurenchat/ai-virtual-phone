@@ -24,6 +24,7 @@
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 import { loadChatMessages } from "@/lib/chat-storage";
+import { ChatKeyboardInteractionGuard } from "@/lib/chat-keyboard-interaction-guard";
 import { getKeyboardAutoSendDebounceMs, isKeyboardAutoSendEnabled } from "@/lib/keyboard-auto-send-config";
 
 const KEYBOARD_INSET_THRESHOLD = 80;
@@ -42,6 +43,8 @@ interface KeyboardDismissAutoSendOptions {
     generating: boolean;
     /** 表情/贴纸/加号面板开着 */
     panelOpen: boolean;
+    /** 需暂停倒计时的长按菜单 / 富媒体 / Collect 分享面板 */
+    interactionOpen: boolean;
     /** 用于「最后一条是不是用户发的」校验 + 按会话防抖时长 */
     sessionId: string;
     onTrigger: () => void;
@@ -55,11 +58,16 @@ const currentKeyboardInset = () => {
 export function useKeyboardDismissAutoSend(
     rootRef: RefObject<HTMLElement | null>,
     options: KeyboardDismissAutoSendOptions,
-): void {
+) {
     const optionsRef = useRef(options);
     optionsRef.current = options;
 
+    const interactionRef = useRef<ChatKeyboardInteractionGuard | null>(null);
+    if (!interactionRef.current) interactionRef.current = new ChatKeyboardInteractionGuard();
     const waitTimerRef = useRef(0);
+    const pointerReleaseTimersRef = useRef<Map<number, number>>(new Map());
+    const pluginSurfacesRef = useRef(new Set<string>());
+    const prevPanelOpenRef = useRef(false);
     // 本次防抖窗口是「键盘藏了但焦点没离开输入框」的收起（iPad 收起箭头等）
     const collapseKeptFocusRef = useRef(false);
 
@@ -70,6 +78,21 @@ export function useKeyboardDismissAutoSend(
             waitTimerRef.current = 0;
         }
     }, []);
+
+    // Called synchronously BEFORE a long press or modal is mounted.
+    const protectSurfaceOpen = useCallback(() => {
+        interactionRef.current?.setSurfaceOpen(true, Boolean(waitTimerRef.current));
+        cancelWait(); // cancel only an un-fired timer, NEVER an AI generation
+    }, [cancelWait]);
+
+    // Long-press starts as soon as pointer goes down, well before the 500ms menu.
+    const beginProtectedGesture = useCallback((pointer = 0) => {
+        const previous = pointerReleaseTimersRef.current.get(pointer);
+        if (previous !== undefined) window.clearTimeout(previous);
+        pointerReleaseTimersRef.current.delete(pointer);
+        interactionRef.current?.beginGesture(Boolean(waitTimerRef.current), pointer);
+        cancelWait();
+    }, [cancelWait]);
 
     /**
      * 最后一条非 system 消息必须是 user，否则「什么都没发也收键盘」会误触发。
@@ -94,7 +117,8 @@ export function useKeyboardDismissAutoSend(
         const keptFocus = collapseKeptFocusRef.current;
         collapseKeptFocusRef.current = false;
         const cur = optionsRef.current;
-        if (!cur.active || !cur.pending || cur.generating || cur.panelOpen) return;
+        if (!cur.active || !cur.pending || cur.generating || cur.panelOpen || cur.interactionOpen) return;
+        if (interactionRef.current?.blocked) return;
         if (!isKeyboardAutoSendEnabled(cur.sessionId)) return;
         const focused = document.activeElement;
         if (focused instanceof HTMLElement && focused.matches(INPUT_SELECTOR)) {
@@ -110,23 +134,107 @@ export function useKeyboardDismissAutoSend(
         cur.onTrigger();
     }, [rootRef, hasUnrepliedUserMessage]);
 
-    /** 键盘收起 / 面板关闭 → 开一个 N 秒防抖窗口（重复调用会重置计时）。 */
-    const scheduleWait = useCallback((keptFocus = false) => {
+    /**
+     * Start a FULL configured debounce interval. When blocked, remember the
+     * keyboard-dismiss intent instead; closing the LAST surface restarts it.
+     * A genuine new dismiss replaces a previously deferred intent.
+     */
+    const scheduleWait = useCallback((keptFocus = false, resuming = false) => {
         if (!isKeyboardAutoSendEnabled(optionsRef.current.sessionId)) return;
-        cancelWait();
         collapseKeptFocusRef.current = keptFocus;
+        if (resuming) {
+            if (interactionRef.current?.blocked) return;
+        } else if (!interactionRef.current?.keyboardDismissed()) {
+            cancelWait();
+            return;
+        }
+        cancelWait();
         const n = getKeyboardAutoSendDebounceMs(optionsRef.current.sessionId);
         waitTimerRef.current = window.setTimeout(fire, Math.max(0, n));
     }, [cancelWait, fire]);
 
-    // 面板「开 → 关」等价于收起键盘；面板打开则取消等待。
-    const prevPanelOpenRef = useRef(false);
+    const restartAfterInteraction = useCallback(() => {
+        if (interactionRef.current?.takeRestart()) {
+            // Never carry the already-elapsed portion of the previous N seconds.
+            scheduleWait(collapseKeptFocusRef.current, true);
+        }
+    }, [scheduleWait]);
+
+    // A gesture's pointerup happens before its synthetic click. Defer release
+    // one event-loop turn so a newly opened modal/panel becomes observable even
+    // at 0ms debounce, avoiding a pointerup -> click race on iOS.
+    const endProtectedGesture = useCallback((pointer = 0) => {
+        if (pointerReleaseTimersRef.current.has(pointer)) return;
+        const handle = window.setTimeout(() => {
+            pointerReleaseTimersRef.current.delete(pointer);
+            interactionRef.current?.endGesture(pointer);
+            restartAfterInteraction();
+        }, 0);
+        pointerReleaseTimersRef.current.set(pointer, handle);
+    }, [restartAfterInteraction]);
+
+    // Per-chat cleanup. Never inherit a timer or paused UI from another session.
     useEffect(() => {
-        const wasOpen = prevPanelOpenRef.current;
+        interactionRef.current?.reset();
+        pluginSurfacesRef.current.clear();
+        prevPanelOpenRef.current = false;
+        cancelWait();
+        collapseKeptFocusRef.current = false;
+        return () => {
+            for (const handle of pointerReleaseTimersRef.current.values()) window.clearTimeout(handle);
+            pointerReleaseTimersRef.current.clear();
+            interactionRef.current?.reset();
+            cancelWait();
+        };
+    }, [options.sessionId, cancelWait]);
+    // Preserve Float's original emoji/sticker/plus panel-close behavior, but
+    // defer its restart through rich-media or another protected open surface.
+    useEffect(() => {
+        const wasPanelOpen = prevPanelOpenRef.current;
         prevPanelOpenRef.current = options.panelOpen;
-        if (options.panelOpen) { cancelWait(); return; }
-        if (wasOpen) scheduleWait();
-    }, [options.panelOpen, cancelWait, scheduleWait]);
+        if (wasPanelOpen && !options.panelOpen) interactionRef.current?.legacyPanelClosed();
+        if (options.interactionOpen || options.panelOpen || pluginSurfacesRef.current.size) {
+            interactionRef.current?.setSurfaceOpen(true, Boolean(waitTimerRef.current));
+            cancelWait();
+        } else {
+            interactionRef.current?.setSurfaceOpen(false, false);
+            restartAfterInteraction();
+        }
+    }, [options.interactionOpen, options.panelOpen, cancelWait, restartAfterInteraction]);
+
+    // Explicit lifecycle from the iMessage toolbar plugin, scoped to this room.
+    // Defer close until its synchronous native panel/modal handoff has committed.
+    useEffect(() => {
+        const root = rootRef.current;
+        if (!root) return;
+        const releases = new Map<string, number>();
+        const onSurface = (event: Event) => {
+            if (event.target !== root || !(event instanceof CustomEvent)) return;
+            const { surface, open } = event.detail ?? {};
+            if (typeof surface !== "string" || !surface.startsWith("im-toolbar-") || typeof open !== "boolean") return;
+            const previous = releases.get(surface);
+            if (previous !== undefined) window.clearTimeout(previous);
+            releases.delete(surface);
+            if (open) {
+                pluginSurfacesRef.current.add(surface);
+                protectSurfaceOpen();
+            } else {
+                releases.set(surface, window.setTimeout(() => {
+                    releases.delete(surface);
+                    pluginSurfacesRef.current.delete(surface);
+                    const cur = optionsRef.current;
+                    interactionRef.current?.setSurfaceOpen(Boolean(cur.panelOpen || cur.interactionOpen || pluginSurfacesRef.current.size), false);
+                    restartAfterInteraction();
+                }, 0));
+            }
+        };
+        root.addEventListener("float:chat-keyboard-interaction", onSurface);
+        return () => {
+            root.removeEventListener("float:chat-keyboard-interaction", onSurface);
+            for (const handle of releases.values()) window.clearTimeout(handle);
+            pluginSurfacesRef.current.clear();
+        };
+    }, [rootRef, options.sessionId, protectSurfaceOpen, restartAfterInteraction]);
 
     // 输入框重新获得焦点 / 有输入 → 用户还要说，取消等待。
     // 用捕获阶段的 document 监听：输入框在子组件里，state 传不进 hook。
@@ -135,8 +243,13 @@ export function useKeyboardDismissAutoSend(
             target instanceof HTMLElement
             && target.matches(INPUT_SELECTOR)
             && Boolean(rootRef.current?.contains(target));
-        const onFocusIn = (event: FocusEvent) => { if (isOurInput(event.target)) cancelWait(); };
-        const onInput = (event: Event) => { if (isOurInput(event.target)) cancelWait(); };
+        const onComposerResume = (target: EventTarget | null) => {
+            if (!isOurInput(target)) return;
+            interactionRef.current?.composerResumed();
+            cancelWait();
+        };
+        const onFocusIn = (event: FocusEvent) => onComposerResume(event.target);
+        const onInput = (event: Event) => onComposerResume(event.target);
         document.addEventListener("focusin", onFocusIn, true);
         document.addEventListener("input", onInput, true);
         return () => {
@@ -144,6 +257,47 @@ export function useKeyboardDismissAutoSend(
             document.removeEventListener("input", onInput, true);
         };
     }, [rootRef, cancelWait]);
+
+    // Capture interaction BEFORE the composer blur that iOS may emit on
+    // pointerdown. Applies to the standard iMessage/Float +, emoji and sticker
+    // toolbar and entries. Exempts direct send, manual AI trigger, offline.
+    useEffect(() => {
+        const isProtectedToolbarIntent = (target: EventTarget | null) => {
+            if (!(target instanceof Element) || !rootRef.current?.contains(target)) return false;
+            const action = target.closest<HTMLElement>(
+                ".chat-input-bar button, .chat-input-bar [role='button'], " +
+                ".chat-plus-menu-item, .chat-plugin-input-toolbar button"
+            );
+            if (!action) return false;
+            const excluded = action.closest<HTMLElement>(
+                ".chat-offline-toggle, .chat-theater-mode-close, " +
+                "[aria-label='返回线上模式'], [aria-label='发送'], " +
+                "[aria-label='停止本轮生成'], [title*='触发 AI 主动回复'], " +
+                "[title*='发送输入框内容并触发回复']"
+            );
+            return !excluded;
+        };
+        const protectedPointers = new Set<number>();
+        const onPointerDown = (event: PointerEvent) => {
+            if (event.pointerType === "mouse" && event.button !== 0) return;
+            if (!isProtectedToolbarIntent(event.target)) return;
+            protectedPointers.add(event.pointerId);
+            beginProtectedGesture(event.pointerId + 1);
+        };
+        const onPointerFinish = (event: PointerEvent) => {
+            if (!protectedPointers.delete(event.pointerId)) return;
+            endProtectedGesture(event.pointerId + 1);
+        };
+        document.addEventListener("pointerdown", onPointerDown, true);
+        document.addEventListener("pointerup", onPointerFinish, true);
+        document.addEventListener("pointercancel", onPointerFinish, true);
+        return () => {
+            document.removeEventListener("pointerdown", onPointerDown, true);
+            document.removeEventListener("pointerup", onPointerFinish, true);
+            document.removeEventListener("pointercancel", onPointerFinish, true);
+            // A view unmount cancels the auto timer independently of this guard.
+        };
+    }, [rootRef, beginProtectedGesture, endProtectedGesture]);
 
     // 卸载时清掉定时器
     useEffect(() => () => cancelWait(), [cancelWait]);
@@ -204,6 +358,7 @@ export function useKeyboardDismissAutoSend(
                 // iOS 的 focusout 可能早于最后一次 visualViewport resize，
                 // 焦点单独维护，关闭事件才不会丢。
                 if (inputWasFocused || chatInputFocused()) keyboardWasOpen = true;
+                interactionRef.current?.composerResumed();
                 cancelWait(); // 键盘（重新）弹起 → 上一个防抖窗口作废
                 syncPolling();
                 return;
@@ -278,5 +433,7 @@ export function useKeyboardDismissAutoSend(
             document.removeEventListener("focusin", handleFocusIn);
             document.removeEventListener("focusout", handleFocusOut);
         };
-    }, [rootRef, cancelWait, scheduleWait]);
+    }, [rootRef, options.sessionId, cancelWait, scheduleWait]);
+
+    return { protectSurfaceOpen, beginProtectedGesture, endProtectedGesture };
 }

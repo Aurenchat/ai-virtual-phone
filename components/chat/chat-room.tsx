@@ -1482,6 +1482,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     };
 
     const openMessageContextMenu = (msgId: string, anchor: ContextMenuAnchor) => {
+        protectSurfaceOpen();
         setActiveOfflineTarget(null);
         setContextMenuAnchor(anchor);
         setActiveMessageId(msgId);
@@ -1813,7 +1814,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     useEffect(() => {
         const open = () => {
             const request = takeNativeGift(session.id);
-            if (request) { setGiftInitialItemId(request.itemId); setRichModal("gift"); }
+            if (request) { protectSurfaceOpen(); setGiftInitialItemId(request.itemId); setRichModal("gift"); }
         };
         open();
         window.addEventListener(NATIVE_GIFT_QUEUED, open);
@@ -4069,13 +4070,21 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         if (shouldRunDeclineReply) await triggerReply();
     };
 
-    // 收起键盘（或关掉表情/加号面板）并安静 N 秒后自动触发回复，
-    // 等价于替用户点一次「触发回复」。判定全在 hook 内部，配置关掉后与手动模式一致。
-    useKeyboardDismissAutoSend(wrapperRef, {
+    // Pause (do not discard) the current N-second auto-reply wait during
+    // protected UI interaction. Restart a FULL N seconds after its final close.
+    // Existing AI generation, message sending, API and storage remain untouched.
+    const collectShareOpen = Boolean(activeCustomChatPlus &&
+        activeCustomChatPlus.app.manifest.id === "fis.collect" &&
+        activeCustomChatPlus.action.id === "share-from-collect");
+    const { protectSurfaceOpen, beginProtectedGesture, endProtectedGesture } = useKeyboardDismissAutoSend(wrapperRef, {
         active: !offlineMode && !isMultiSelectMode,
         pending: pendingGenerate,
         generating: isGenerating,
         panelOpen: showEmojiPanel || showStickerPanel || showPlusMenu,
+        interactionOpen: Boolean(
+            showEmojiPanel || showStickerPanel || showPlusMenu || richModal ||
+            activeMessageId || collectShareOpen
+        ),
         sessionId: session.id,
         onTrigger: () => { void triggerAIResponse(); },
     });
@@ -4956,6 +4965,9 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         // Prevent right click from triggering the timer, as it has its own context menu handler
         if (e.pointerType === 'mouse' && e.button !== 0) return;
 
+        // Long-press may be held for 500ms before its menu appears: pause NOW.
+        beginProtectedGesture();
+
         // Prevent text selection on long press
         // Preserve mouse text selection in the opt-in translation body. Touch
         // retains the native long-press menu; its copy action is unchanged.
@@ -4974,6 +4986,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     };
 
     const handleMessagePointerUp = (e: React.PointerEvent) => {
+        endProtectedGesture();
         startPosRef.current = null;
         if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current);
@@ -4988,6 +5001,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     };
 
     const handleMessagePointerCancel = () => {
+        endProtectedGesture();
         startPosRef.current = null;
         longPressTriggeredRef.current = false;
         if (longPressTimerRef.current) {
@@ -6499,7 +6513,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     enterToSendEnabled={enterToSendEnabled}
                     onToggleOfflineMode={toggleOfflineMode}
                     onCloseEmojiPanel={() => setShowEmojiPanel(false)}
-                    onToggleEmojiPanel={() => { setShowEmojiPanel(!showEmojiPanel); setShowStickerPanel(false); setShowPlusMenu(false); }}
+                    onToggleEmojiPanel={() => { if (!showEmojiPanel) protectSurfaceOpen(); setShowEmojiPanel(!showEmojiPanel); setShowStickerPanel(false); setShowPlusMenu(false); }}
                     onSendText={handleOfflineSend}
                     onStopGeneration={clearOfflineGeneration}
                 />
@@ -6524,12 +6538,12 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                 onClearQuote={() => setQuotingMessage(null)}
                 onToggleOfflineMode={toggleOfflineMode}
                 onClosePanels={() => { setShowEmojiPanel(false); setShowStickerPanel(false); setShowPlusMenu(false); }}
-	                onToggleEmojiPanel={() => { setShowEmojiPanel(!showEmojiPanel); setShowStickerPanel(false); setShowPlusMenu(false); }}
-	                onToggleStickerPanel={() => { setShowStickerPanel(!showStickerPanel); setShowEmojiPanel(false); setShowPlusMenu(false); }}
-	                onTogglePlusMenu={() => { setShowPlusMenu(!showPlusMenu); setShowEmojiPanel(false); setShowStickerPanel(false); }}
+	                onToggleEmojiPanel={() => { if (!showEmojiPanel) protectSurfaceOpen(); setShowEmojiPanel(!showEmojiPanel); setShowStickerPanel(false); setShowPlusMenu(false); }}
+	                onToggleStickerPanel={() => { if (!showStickerPanel) protectSurfaceOpen(); setShowStickerPanel(!showStickerPanel); setShowEmojiPanel(false); }}
+	                onTogglePlusMenu={() => { if (!showPlusMenu) protectSurfaceOpen(); setShowPlusMenu(!showPlusMenu); setShowEmojiPanel(false); setShowStickerPanel(false); }}
 	                onToggleTheaterMode={toggleTheaterMode}
 	                onCloseTheaterMode={closeTheaterMode}
-	                onOpenRichModal={(modal) => { setShowPlusMenu(false); setRichModal(modal); }}
+	                onOpenRichModal={(modal) => { protectSurfaceOpen(); setShowPlusMenu(false); setRichModal(modal); }}
                 onOpenCustomPlusAction={handleOpenCustomPlusAction}
                 onStartVideoCall={() => { cancelFollowUp(session.id); setShowPlusMenu(false); setCallInitiator("user"); setShowVideoCall(true); }}
                 onStartVoiceCall={() => { startVoiceCallDiagnostic("user"); cancelFollowUp(session.id); setShowPlusMenu(false); setCallInitiator("user"); setShowVoiceCall(true); }}

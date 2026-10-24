@@ -5,7 +5,7 @@ export default {
     id: 'imessage-native-toolbar',
     name: 'iMessage · 输入栏与功能收纳',
     apiVersion: 1,
-    version: '1.1.0-alpha.7',
+    version: '1.1.0-alpha.8',
     author: 'Auren · Chloe 自用适配',
     description: '仅在 Native Day 主题聊天室启用；原发送/停止保留，AI、表情等收进加号，波形与视频按钮调用 Float 原功能。',
     permissions: ['ui']
@@ -39,7 +39,10 @@ export default {
       const el=document.createElement('button'); el.type='button'; el.className=className; el.dataset.imOwned='toolbar';
       el.setAttribute('aria-label',name); el.title=name; el.append(icon); return el;
     }
+    // Pauses only an un-fired keyboard auto-reply wait in the owning chat.
+    const signal=(s,open)=>s.room.dispatchEvent(new CustomEvent('float:chat-keyboard-interaction',{detail:{surface:s.menuId,open}}));
     function close(s,focus=false) {
+      if(s.menu) signal(s,false);
       s.menu?.remove(); s.menu=null; s.menuItems=[];
       set(s.plus,'aria-expanded','false');
       if(focus && s.plus.isConnected) s.plus.focus();
@@ -67,6 +70,7 @@ export default {
       if(s.menu) { close(s); return; }
       const menu=document.createElement('div'); menu.className='im-toolbar-menu'; menu.dataset.imOwned='toolbar';
       menu.id=s.menuId; menu.setAttribute('role','menu'); menu.setAttribute('aria-label','聊天功能');
+      signal(s,true);
       s.menu=menu; s.menuItems=[];
       const sources=[...s.actions.children].filter(el=>el.tagName==='BUTTON' && !el.dataset.imOwned && kind(el)!=='send');
       for(const source of sources) {
