@@ -28,7 +28,7 @@ function useQuoteSource(messageId: string | undefined, sessionId: string) {
 }
 
 /** Resolves only mounted quote thumbnails and revokes temporary URLs on cleanup. */
-function QuoteThumbnail({ refUrl, cover = false }: { refUrl?: string; cover?: boolean }) {
+function QuoteThumbnail({ refUrl, cover = false, caption = "图片" }: { refUrl?: string; cover?: boolean; caption?: string }) {
     const [resolution, setResolution] = useState({ refUrl, url: "" });
     const [broken, setBroken] = useState(false);
     useEffect(() => {
@@ -46,7 +46,7 @@ function QuoteThumbnail({ refUrl, cover = false }: { refUrl?: string; cover?: bo
         return () => { controller.abort(); if (objectUrl) URL.revokeObjectURL(objectUrl); };
     }, [refUrl]);
     const resolved = resolution.refUrl === refUrl ? resolution.url : "";
-    if (!resolved || broken) return cover ? <span className="fq-cover fq-cover-fallback" aria-label="封面不可用">♪</span> : <span className="fq-image-fallback">图片</span>;
+    if (!resolved || broken) return cover ? <span className="fq-cover fq-cover-fallback" aria-label="封面不可用">♪</span> : <span className="fq-image-text fq-image-fallback"><span>{caption}</span></span>;
     return <img className={cover ? "fq-cover" : "fq-thumb"} src={resolved} alt={cover ? "" : "引用图片"} loading="lazy" decoding="async" onError={() => setBroken(true)} />;
 }
 
@@ -58,7 +58,7 @@ function compactTime(seconds?: number) {
 
 function QuoteCard({ quote, imageUrl, estimated }: { quote: ChatQuoteSnapshot; imageUrl?: string; estimated?: boolean }) {
     if (quote.kind === "image") return imageUrl || quote.imageRef
-        ? <span className="fq-image"><QuoteThumbnail refUrl={imageUrl || quote.imageRef} /></span>
+        ? <span className="fq-image"><QuoteThumbnail refUrl={imageUrl || quote.imageRef} caption={quoteImageCaption(quote.preview)} /></span>
         : <span className="fq-image-text"><span>{quoteImageCaption(quote.preview)}</span></span>;
     if (quote.kind === "voice") return <span className="fq-voice" aria-label={quote.summary}>
         <span className="fq-wave" aria-hidden="true">{[12,22,17,27,14,19,12,25,14,19,11,22,14,17,11].map((height, index) => <i key={index} style={{ height }} />)}</span>
@@ -141,7 +141,14 @@ function useQuoteGeometry(root: RefObject<HTMLDivElement | null>, enabled: boole
                 if (mini) previewScale = scale;
                 const d = bubbleContour(w / scale, h / scale, (mini ? sourceRole : replyRole) !== "user", mini || !!el.parentElement?.hasAttribute("data-im-last"));
                 svg.querySelectorAll("path").forEach(path => { path.setAttribute("d", d); path.setAttribute("transform", `scale(${scale})`); });
-                if (mini) set(preview, "--fq-image-shape", `path("${d}")`);
+                if (mini) {
+                    // The clipped glass surface needs physical coordinates too;
+                    // SVG's scale() transform does not apply to CSS path().
+                    const clipped = scale === 1 ? d : d.replace(/-?\d*\.?\d+/g, value => String(Math.round(Number(value) * scale * 1000) / 1000));
+                    set(preview, "--fq-image-shape", `path("${clipped}")`);
+                    const blur = h <= 160 ? "true" : "false";
+                    if (preview.dataset.glassBlur !== blur) preview.dataset.glassBlur = blur;
+                }
             }
             const leftSource = sourceRole !== "user", outgoing = replyRole !== "assistant";
             const sameEdge = leftSource === outgoing;
@@ -153,7 +160,7 @@ function useQuoteGeometry(root: RefObject<HTMLDivElement | null>, enabled: boole
                 ? `M${x} ${start}V${end-radius}Q${x} ${end} ${x+radius} ${end}H${tip}`
                 : `M${tip} ${start}H${x+radius}Q${x} ${start} ${x} ${start+radius}V${end-radius}Q${x} ${end} ${x+radius} ${end}H${tip}`;
             connector.setAttribute("viewBox", `0 0 56 ${el.offsetHeight}`);
-            connector.firstElementChild!.setAttribute("d", d);
+            connector.querySelectorAll("path").forEach(path => path.setAttribute("d", d));
         };
         update();
         const resize = new ResizeObserver(update);
@@ -179,10 +186,17 @@ export function ChatQuoteShell({ msg, children }: { msg: ChatMessage; children: 
     const stored = readChatQuote(msg), echo = readQuoteDisplayEcho(msg.content);
     const needsSource = stored && (stored.kind === "image" || stored.kind === "voice" || !stored.sourceRole || !msg.mediaData?.quoteV1);
     const source = useQuoteSource(needsSource ? stored?.sourceMessageId : echo?.sourceId, msg.sessionId);
-    const verifiedEcho = echo && source?.quote && (!echo.sourceRole || echo.sourceRole === source.quote.sourceRole) && echo.sourceType === source.quote.sourceType;
+    // Uploads may be media_file/image while the visible envelope calls them
+    // image. Accept only a verified image source at the exact same-session ID.
+    const verifiedEcho = echo && source?.quote && (!echo.sourceRole || echo.sourceRole === source.quote.sourceRole)
+        && (echo.sourceType === source.quote.sourceType || echo.sourceType === "image" && source.quote.kind === "image");
     const resolved = !echo || verifiedEcho ? source : undefined;
-    const base: ChatQuoteSnapshot | null = stored || (echo ? verifiedEcho ? source!.quote! : { version: 1, kind: echo.sourceType === "image" ? "image" : "card", preview: echo.sourceType === "image" ? "图片" : "引用消息", summary: "引用消息" } : null);
-    const quote = base ? { ...base, ...(!msg.mediaData?.quoteV1 && source?.quote && !echo ? { kind: source.quote.kind } : {}),
+    const echoImage = echo && (echo.sourceType === "image" || /^\[引用图片\]/.test(echo.preview));
+    const base: ChatQuoteSnapshot | null = stored || (echo ? verifiedEcho ? source!.quote! : { version: 1, kind: echoImage ? "image" : "card", preview: echoImage ? quoteImageCaption(echo.preview) : "引用消息", summary: "引用消息" } : null);
+    // A legacy explicit image marker is a display hint, not a source match.
+    // Typed text (even the word 图片) and saved quote records stay untouched.
+    const legacyImage = !msg.mediaData?.quoteV1 && base && /^\[?(?:引用)?图片\]?$/.test(base.preview.trim());
+    const quote = base ? { ...base, ...(!msg.mediaData?.quoteV1 && source?.quote && !echo ? { kind: source.quote.kind } : legacyImage ? { kind: "image" as const } : {}),
         sourceRole: resolved?.quote?.sourceRole || base.sourceRole, duration: base.duration || resolved?.seconds } : null;
     const { enabled } = useContext(ImessagePresentation);
     const root = useRef<HTMLDivElement>(null);
@@ -190,10 +204,11 @@ export function ChatQuoteShell({ msg, children }: { msg: ChatMessage; children: 
     if (!quote) return <div className="chat-quote-message">{children}</div>;
     return <div ref={root} className={enabled ? "fq-root fq-imessage" : "fq-root fq-native"} data-reply-role={msg.role} data-source-role={quote.sourceRole || "unknown"}>
         <div className="fq-preview" data-quote-kind={quote.kind} aria-label={`引用${quote.kind}消息`}>
+            {enabled && quote.kind !== "image" && <span className="fq-glass" aria-hidden="true" />}
             {enabled && previewOutline}
             <QuoteCard quote={quote} imageUrl={resolved?.imageUrl} estimated={!base?.duration && resolved?.estimated} />
         </div>
-        {enabled && <svg className="fq-connector" aria-hidden="true" focusable="false" preserveAspectRatio="none"><path vectorEffect="non-scaling-stroke" /></svg>}
+        {enabled && <svg className="fq-connector" aria-hidden="true" focusable="false" preserveAspectRatio="none"><path vectorEffect="non-scaling-stroke" /><path className="fq-connector-shine" vectorEffect="non-scaling-stroke" /></svg>}
         <div className="fq-body">{enabled && outline}{children}</div>
     </div>;
 }

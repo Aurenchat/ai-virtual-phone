@@ -13,7 +13,9 @@ async function main(){
  const wp=require('next/dist/compiled/webpack/webpack');wp.init();
  await new Promise((resolve,reject)=>wp.webpack({mode:'development',target:'web',devtool:false,context:repo,entry:path.join(repo,'tests/quote-v1/fixture.tsx'),output:{path:temp,filename:'fixture.js'},resolve:{extensions:['.tsx','.ts','.js'],alias:{'@':repo},modules:[path.join(repo,'node_modules')],fallback:{fs:false,path:false,crypto:false}},module:{rules:[{test:/\.tsx?$/,exclude:/node_modules/,use:path.join(repo,'scripts/anonymous-xhs-phase0/ts-loader.cjs')}]},plugins:[new wp.webpack.DefinePlugin({'process.env.NODE_ENV':JSON.stringify('development')})]},(e,s)=>e||s.hasErrors()?reject(e||Error(s.toString({all:false,errors:true}))):resolve()));
  const css=(await require('postcss')([require('@tailwindcss/postcss')({base:repo})]).process(await fs.readFile(path.join(repo,'app/globals.css'),'utf8'),{from:path.join(repo,'app/globals.css')})).css;
- const files={'iMessage-Native-Day.css':'聊天室CSS.txt','iMessage-Message-Bridge.js':'iMessage-Message-Bridge-perf6.js','iMessage-Toolbar.js':'iMessage-Toolbar-perf.3-composer-flashfix.js','menu.js':'iMessage-Long-Press-Menu-perf.3-flashfix.js','reactions.js':'iMessage-Reactions-perf.js'};
+ const toolbars=(await fs.readdir(theme)).filter(f=>/^iMessage-Toolbar.*\.js$/.test(f));
+ assert.equal(toolbars.length,1,'Use the single actual toolbar in the supplied current-theme directory');
+ const files={'iMessage-Native-Day.css':'聊天室CSS.txt','iMessage-Message-Bridge.js':'iMessage-Message-Bridge-perf6.js','iMessage-Toolbar.js':toolbars[0],'menu.js':'iMessage-Long-Press-Menu-perf.3-flashfix.js','reactions.js':'iMessage-Reactions-perf.js'};
  server=http.createServer(async(req,res)=>{try{
   const u=new URL(req.url,'http://localhost');
   if(req.method==='POST'){
@@ -55,6 +57,7 @@ async function main(){
  await fs.writeFile(path.join(output,'ordinary-geometry.json'),JSON.stringify(ordinary,null,2));
  await page.screenshot({path:path.join(output,'ordinary-music.png')});
  if(process.env.QUOTE_BASELINE==='1')return;
+ if(process.env.QUOTE_HOTFIX_BASELINE==='1'){await require('./quote-v1/hotfix-v14.cjs')({page,scene,settle,check,output,before:true});return;}
  if(process.env.QUOTE_BASELINE_PATH){const baseline=JSON.parse(await fs.readFile(process.env.QUOTE_BASELINE_PATH,'utf8'));check(JSON.stringify(ordinary)===JSON.stringify(baseline),'ordinary outgoing/incoming/bilingual/voice/music geometry and SVG contours unchanged',{baseline,ordinary});}
  // Bidirectional typed references, persistence, model and actual memory assembler.
  const semantic=await page.evaluate(async()=>{
@@ -133,6 +136,7 @@ async function main(){
  }
  await page.setViewportSize({width:402,height:874});
  await require('./quote-v1/polish-v13.cjs')({page,scene,settle,check,output});
+ await require('./quote-v1/hotfix-v14.cjs')({page,scene,settle,check,output});
  // Native fallback and actual long text height.
  const actualCSS=await fs.readFile(path.join(theme,'聊天室CSS.txt'),'utf8');
  await scene(typedUI);
@@ -164,7 +168,7 @@ async function main(){
  const urls=await page.evaluate(()=>urlProbe);check(urls.created.length===2&&urls.created.every(u=>urls.revoked.filter(x=>x===u).length===1),'image and cached music cover object URLs revoked exactly once',urls);
  await page.evaluate(()=>imTest.remount());await settle();
  await scene([{role:'assistant',content:'Unavailable',mediaType:'quote',mediaData:{quoteV1:{version:1,kind:'image',preview:'Photo',summary:'Photo',imageRef:'media-store://absent'}}}]);
- check(await page.locator('.fq-image-fallback').textContent()==='图片','missing image safely falls back');
+ check(await page.locator('.fq-image-fallback').textContent()==='Photo'&&await page.locator('.fq-preview').getAttribute('data-quote-kind')==='image','missing image keeps a descriptive image card fallback');
  // Legacy inline photo lookup keeps the existing bytes only on the source row.
  const inline=await page.evaluate(async()=>{const c=imTest.chat,t=quoteTest,s=c.loadChatSessions()[0];c.clearChatSessionMessages(s.id);const src=c.pushChatMessage({sessionId:s.id,role:'user',content:'',mediaType:'image',mediaUrl:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=='});const q=t.createChatQuote(src);const reply=c.pushChatMessage({sessionId:s.id,role:'assistant',content:'Inline reply',mediaType:'quote',mediaData:{quoteV1:q}});await t.flush();imTest.remount();return{q,reply};});
  await page.waitForFunction(()=>document.querySelector('.fq-preview img')?.naturalWidth>0);

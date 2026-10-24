@@ -13,15 +13,15 @@ module.exports=async function({page,scene,settle,check,output}){
  const text=await page.locator('.fq-preview').evaluateAll(els=>els.map(e=>{const r=e.getBoundingClientRect(),t=e.querySelector('.fq-text').getBoundingClientRect(),s=getComputedStyle(e);return {top:t.top-r.top,left:t.left-r.left,overflow:s.overflow,scale:e.querySelector('path').getAttribute('transform'),height:r.height};}));
  check(text.every(x=>x.top>=9&&x.left>=12&&x.overflow==='visible')&&text[0].scale!=='scale(1)'&&text[2].height>50&&text[2].height<60&&text[3].height>60,'P3/P4/P14 compact one/two/three-line preview padding and normalized short tail',text);
  const connector=await page.locator('.fq-connector').first().evaluate(e=>({color:getComputedStyle(e).stroke,box:e.getBoundingClientRect().width,d:e.firstElementChild.getAttribute('d'),gap:getComputedStyle(e.parentElement).rowGap}));
- check(connector.color==='rgb(233, 233, 237)'&&connector.gap==='22px','P3/P4 softer connector and shorter preview/reply gap',connector);
+ check(connector.color==='rgba(233, 233, 237, 0.64)'&&connector.gap==='22px','P3/P4 translucent connector retains shorter preview/reply gap',connector);
  await shot('v13-text-directions');
 
  // Voice metadata versus the same text estimate used by the original voice bar.
  await scene([]);const voiceA=await create('assistant','audio',{mediaData:{label:'Where are you? | 你在哪？',voiceDuration:13}}),voiceB=await create('user','audio',{mediaData:{label:'A voice message without stored duration'}});
  const voiceRows=await scene([{...voiceA.src},{...voiceB.src},q('user','assistant','voice','[语音]',{sourceMessageId:voiceA.src.id}),{...q('assistant','user','voice','[语音]',{sourceMessageId:voiceB.src.id}),innerMonologue:'语音引用状态'}]);
  await page.waitForFunction(()=>[...document.querySelectorAll('.fq-duration')].every(e=>e.textContent!=='--:--'));
- const voice=await page.locator('.fq-voice').evaluateAll(els=>els.map(e=>{const w=e.querySelector('.fq-wave').getBoundingClientRect(),b=e.getBoundingClientRect(),time=e.querySelector('.fq-duration');return {time:time.textContent,estimate:time.getAttribute('aria-label'),waveLeft:w.left-b.left,waveRight:b.right-w.right,waveHeight:w.height};}));
- check(voice[0].time==='00:13'&&voice[1].time==='00:10'&&voice[1].estimate==='估算时长'&&voice.every(x=>Math.abs(x.waveLeft-x.waveRight)<1&&x.waveRight>35),'P5/P6 fixed centered waveform, real duration or original-bar text estimate; no audio decode',voice);
+ const voice=await page.locator('.fq-voice').evaluateAll(els=>els.map(e=>{const w=e.querySelector('.fq-wave').getBoundingClientRect(),b=e.getBoundingClientRect(),time=e.querySelector('.fq-duration'),t=time.getBoundingClientRect();return {time:time.textContent,estimate:time.getAttribute('aria-label'),slotCenter:Math.abs((w.left+w.right-b.left-(t.left-8))/2),gap:t.left-w.right,waveHeight:w.height};}));
+ check(voice[0].time==='00:13'&&voice[1].time==='00:10'&&voice[1].estimate==='估算时长'&&voice.every(x=>x.slotCenter<1&&x.gap>=8),'P5/P6 waveform centered in reserved slot, separate real/estimated clock; no audio decode',voice);
  await shot('v13-voice');
  await page.evaluate(ids=>{const data=imTest.plugins.readChatPluginData('imessage-reaction');for(const id of ids)data['user_reaction_'+id]='❤️';imTest.plugins.writeChatPluginData('imessage-reaction',data);imTest.remount();},voiceRows.slice(-2).map(m=>m.id));
  await page.waitForFunction(()=>document.querySelectorAll('.imrx-badge').length===2);await settle();
@@ -41,8 +41,8 @@ module.exports=async function({page,scene,settle,check,output}){
  // Text image -> generated real image, without rewriting the already saved quote.
  await scene([]);const textImage=await create('assistant','image',{mediaData:{label:'深夜工位桌面上放着一罐冰乌龙茶和散落的便签纸'}});
  const saved=await scene([{...textImage.src},q('assistant','assistant','image',textImage.quote.preview,{...textImage.quote})]);
- const caption=await page.locator('.fq-image-text').evaluate(e=>{const s=e.querySelector('span'),r=e.getBoundingClientRect(),t=s.getBoundingClientRect();return {display:getComputedStyle(e).display,whiteSpace:getComputedStyle(s).whiteSpace,ellipsis:getComputedStyle(s).textOverflow,center:Math.abs((r.top+r.bottom-t.top-t.bottom)/2),overflow:t.width<=r.width};});
- check(caption.display==='grid'&&caption.whiteSpace==='nowrap'&&caption.ellipsis==='ellipsis'&&caption.center<1&&caption.overflow,'P10/P11 text-image caption centered, ellipsized and bounded',caption);
+ const caption=await page.locator('.fq-image-text').evaluate(e=>{const s=e.querySelector('span'),r=e.getBoundingClientRect(),t=s.getBoundingClientRect();return {display:getComputedStyle(e).display,whiteSpace:getComputedStyle(s).whiteSpace,ellipsis:getComputedStyle(s).textOverflow,lineClamp:getComputedStyle(s).webkitLineClamp,center:Math.abs((r.top+r.bottom-t.top-t.bottom)/2),overflow:t.width<=r.width};});
+ check(caption.display==='grid'&&caption.whiteSpace==='normal'&&caption.lineClamp==='4'&&caption.ellipsis==='ellipsis'&&caption.center<1&&caption.overflow,'P10/P11 text-image caption centered, multiline and bounded',caption);
  await shot('v13-text-image');
  const quoteBefore=await page.evaluate(id=>JSON.stringify(imTest.chat.loadChatMessages(imTest.chat.loadChatSessions()[0].id).find(m=>m.id===id)),saved[1].id);
  await page.evaluate(({id,ref})=>imTest.chat.updateChatMessage(id,{mediaUrl:ref,mediaData:{label:'深夜工位',imageGenerationStatus:'generated',imageGenerationMediaRef:ref}}),{id:textImage.src.id,ref:portrait});

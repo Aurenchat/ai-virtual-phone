@@ -1,4 +1,4 @@
-/* Compact global fallback. No backdrop filters, no broad ancestor selectors. */
+/* Compact global fallback. Glass is confined to small iMessage previews. */
 .fq-root { display:flex; flex-direction:column; position:relative; width:100%; max-width:100%; gap:9px; min-width:0; box-sizing:border-box; }
 .fq-preview { align-self:flex-start; display:block; width:fit-content; max-width:min(100%, 420px); min-width:0; box-sizing:border-box; padding:6px 10px; border:1px solid #c9c9cb; border-radius:17px; background:#fff; color:#8c8c91; font:inherit; font-size:12px; line-height:1.4; white-space:normal; overflow-wrap:anywhere; }
 .fq-root[data-source-role="user"] .fq-preview { align-self:flex-end; }
@@ -7,10 +7,12 @@
 .fq-connector { display:none; }
 .fq-text { display:block; white-space:pre-wrap; font-size:inherit; line-height:inherit; }
 .fq-image { display:flex; justify-content:center; align-items:center; overflow:hidden; width:48px; height:68px; border-radius:12px; }
-.fq-image-text { display:grid; place-items:center; width:66px; height:64px; overflow:hidden; font-size:10px; line-height:1.3; color:#777; padding:6px; box-sizing:border-box; }
-.fq-image-text > span { display:block; max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.fq-preview[data-quote-kind="image"] { width:66px; height:78px; padding:0; }
+.fq-image-text { display:grid; place-items:center; width:100%; height:100%; overflow:hidden; font-size:10px; line-height:12px; color:#777; padding:6px; box-sizing:border-box; text-align:center; }
+.fq-image-text > span { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:4; max-width:100%; max-height:48px; overflow:hidden; white-space:normal; overflow-wrap:anywhere; text-overflow:ellipsis; }
 .fq-thumb { width:100%; height:100%; object-fit:cover; display:block; }
-.fq-image-fallback { display:grid; place-items:center; width:100%; height:100%; font-size:11px; }
+.fq-native .fq-preview[data-quote-kind="image"] > .fq-image { width:100%; height:100%; border-radius:16px; }
+.fq-image-fallback { font-size:10px; }
 .fq-voice { display:flex; align-items:center; justify-content:space-between; gap:14px; width:154px; height:27px; }
 .fq-wave { display:flex; height:27px; align-items:center; gap:2px; }
 .fq-wave i { display:block; flex:0 0 2px; border-radius:3px; background:#8d8d91; }
@@ -34,17 +36,22 @@
 .fq-imessage .fq-outline { position:absolute; top:0; left:0; width:100%; max-width:none; overflow:visible; pointer-events:none; z-index:-1; }
 .fq-imessage .fq-preview .fq-outline-edge { fill:none; stroke:#d9d9df; stroke-width:2px; stroke-linejoin:round; }
 .fq-imessage .fq-preview .fq-outline-fill { fill:#fff; stroke:none; }
+.fq-imessage .fq-preview:not([data-quote-kind="image"]) > .fq-outline { opacity:.64; }
+.fq-imessage .fq-glass { position:absolute; top:0; left:0; width:100%; height:calc(100% + 8px); z-index:-2; pointer-events:none; clip-path:var(--fq-image-shape); background:linear-gradient(145deg,rgba(255,255,255,.28),rgba(255,255,255,.04) 58%,rgba(235,235,242,.14)); -webkit-backdrop-filter:none; backdrop-filter:none; }
+/* Long previews keep translucency without allocating a large blur surface. */
+.fq-imessage .fq-preview[data-glass-blur="true"] > .fq-glass { -webkit-backdrop-filter:blur(6px) saturate(125%); backdrop-filter:blur(6px) saturate(125%); }
 .fq-imessage .fq-preview[data-quote-kind="image"] { width:56px; height:64px; padding:0; }
 .fq-imessage .fq-image { width:56px; height:64px; overflow:visible; border-radius:0; }
 .fq-imessage .fq-thumb { width:100%; height:calc(100% + 8px); object-fit:cover; border-radius:0; clip-path:var(--fq-image-shape); }
 .fq-imessage .fq-preview[data-quote-kind="image"]:has(.fq-thumb) > .fq-outline { visibility:hidden; }
-.fq-imessage .fq-image-text { width:56px; height:64px; }
+.fq-imessage .fq-image-text { width:56px; height:64px; background:transparent; }
 .fq-imessage .fq-preview[data-quote-kind="voice"] { width:148px; height:38px; padding:7px 11px; }
-.fq-imessage .fq-voice { position:relative; justify-content:center; width:100%; height:24px; gap:0; }
-.fq-imessage .fq-wave { justify-self:center; flex-shrink:0; height:24px; gap:1.5px; transform:scaleY(.78); }
-.fq-imessage .fq-duration { position:absolute; right:0; width:32px; text-align:right; }
+.fq-imessage .fq-voice { display:grid; grid-template-columns:minmax(0,1fr) max-content; align-items:center; width:100%; height:24px; gap:8px; line-height:1; -webkit-text-size-adjust:none; text-size-adjust:none; }
+.fq-imessage .fq-wave { justify-self:center; width:51px; max-width:100%; min-width:0; overflow:hidden; height:24px; gap:1.5px; transform:scaleY(.78); }
+.fq-imessage .fq-duration { position:static; width:auto; min-width:32px; text-align:right; font:11px/1 var(--im-font, -apple-system, sans-serif); letter-spacing:0; }
 .fq-imessage .fq-preview:has(.fq-music) { max-width:min(100%, 300px); }
-.fq-imessage .fq-connector { display:block; position:absolute; top:0; left:0; width:56px; height:100%; overflow:visible; pointer-events:none; fill:none; stroke:#e9e9ed; stroke-width:4px; stroke-linecap:round; stroke-linejoin:round; }
+.fq-imessage .fq-connector { display:block; position:absolute; top:0; left:0; width:56px; height:100%; overflow:visible; pointer-events:none; fill:none; stroke:rgba(233,233,237,.64); stroke-width:4px; stroke-linecap:round; stroke-linejoin:round; }
+.fq-imessage .fq-connector-shine { stroke:rgba(255,255,255,.48); stroke-width:1px; }
 .fq-imessage[data-reply-role="assistant"] .fq-connector { left:auto; right:0; transform:scaleX(-1); }
 .fq-imessage .fq-preview, .fq-imessage .fq-body { z-index:1; }
 .fq-imessage .fq-body { isolation:isolate; max-width:min(var(--im-text-max, 72%), calc(100% - 64px)); border-radius:22px; color:#fff; padding:10.333px 14px; line-height:var(--im-text-line, 1.32); font-size:var(--im-text-size, 19px); }
