@@ -37,7 +37,14 @@ const promptTime = await loadTs("prompt-time", {
 const sanitizer = await loadTs("prompt-sanitizer", {
   "./state-value-parser": await loadTs("state-value-parser"),
 });
+// Keep the real voice module in this no-voice fixture so new prompt dependencies
+// remain exercised without reading user settings or weakening image assertions.
+const voiceExpression = await loadTs("voice-expression", {
+  "./settings-storage": { loadBindingConfig: () => ({}), loadVoiceConfigs: () => [], resolveBinding: () => ({}) },
+  "./voice-guides/elevenlabs": await loadTs("voice-guides/elevenlabs"),
+});
 const assemblerDependencies = {
+  "./voice-expression": voiceExpression,
   "./macro-engine": macro,
   "./character-time": time,
   "./prompt-time": promptTime,

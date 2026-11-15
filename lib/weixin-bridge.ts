@@ -11,6 +11,7 @@ import { parseAIResponse, type ParsedMessagePart } from "./rich-message-parser";
 import { getStatusRegionConfig, isCustomStatusRegionActive } from "./chat-status-region";
 import { splitBilingualText } from "./bilingual-text";
 import { resolveVoiceConfig, synthesizeSpeech } from "./tts-service";
+import { voicePlaybackText } from "./voice-expression";
 import { formatShoppingPaymentRequestHistory } from "./shopping-payment-request";
 
 // ── iLink 实际消息格式 ────────────────────────────────────────
@@ -768,7 +769,7 @@ async function partToWeixinOutgoing(part: ParsedMessagePart, charName: string, c
     if (directImage.startsWith("data:image/")) return { kind: "image", imageDataUrl: directImage };
     if (part.mediaType === "audio") {
         const transcript = getVoiceTranscript(part);
-        const speechText = getVoiceSpeechText(transcript);
+        const speechText = getVoiceSpeechText(voicePlaybackText(part.mediaData?.label ?? transcript, part.mediaData?.speechText));
         const fallbackDuration = typeof part.mediaData?.voiceDuration === "number"
             ? Math.max(1, Math.ceil(part.mediaData.voiceDuration))
             : estimateVoiceDuration(speechText || transcript);
@@ -776,7 +777,7 @@ async function partToWeixinOutgoing(part: ParsedMessagePart, charName: string, c
         const voiceConfig = resolveVoiceConfig(characterId, "chat");
         if (voiceConfig?.enableTTS) {
             try {
-                const audioBlob = await synthesizeSpeech(speechText || transcript, voiceConfig);
+                const audioBlob = await synthesizeSpeech(speechText || transcript, voiceConfig, { authoredDirections: true });
                 if (audioBlob) {
                     const [audioDataUrl, audioDuration] = await Promise.all([
                         blobToAudioDataUrl(audioBlob),

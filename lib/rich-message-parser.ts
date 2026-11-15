@@ -1,3 +1,4 @@
+import { voiceDisplayText, voiceSpeechText } from "./voice-expression";
 /**
  * Shared rich-media message parser.
  *
@@ -285,7 +286,7 @@ const RICH_PATTERNS: {
         build: (m) => ({
             content: "",
             mediaType: "audio" as const,
-            mediaData: { label: m[1].trim() },
+            mediaData: { label: voiceDisplayText(m[1]), ...(/\{voice\s*[:：]/i.test(m[1]) ? { speechText: voiceSpeechText(m[1]) } : {}) },
         }),
     },
     {

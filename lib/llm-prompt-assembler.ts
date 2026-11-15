@@ -1,3 +1,4 @@
+import { voiceHistoryText, voiceExpressionInstruction } from "./voice-expression";
 // lib/llm-prompt-assembler.ts
 import { paymentDirective } from "./payment-directive";
 
@@ -1139,6 +1140,10 @@ export function assemblePromptPayload(input: AssemblerInput): LLMMessage[] {
         }
     }
 
+    if (!input.isolatedContext && activeTags.some(tag => ["chat", "voice", "video"].includes(tag))) {
+        const instruction = voiceExpressionInstruction([character.id], activeTags.includes("voice") || activeTags.includes("video"));
+        if (instruction) finalPayload.push({ role: "system", content: instruction, _debugMeta: { marker: "voice_expression" } });
+    }
     return finalPayload;
 }
 
@@ -1190,7 +1195,7 @@ export function formatRichMediaForHistory(msg: ChatMessage, userName: string, ch
             }
             return msg.content;
         case "audio":
-            return `[语音条:${d?.label ?? "语音消息"}]`;
+            return `[语音条:${voiceHistoryText(d?.label ?? "", d?.speechText)}]`;
         case "location":
             return `[位置:${d?.label ?? "位置"}]`;
         case "group_admin_notice":
@@ -2301,6 +2306,10 @@ export function assembleGroupPromptPayload(input: GroupAssemblerInput): LLMMessa
         }
     }
 
+    if (activeTags.includes("group_chat")) {
+        const instruction = voiceExpressionInstruction(members.map(member => member.character.id), activeTags.includes("voice") || activeTags.includes("video"));
+        if (instruction) finalPayload.push({ role: "system", content: instruction, _debugMeta: { marker: "voice_expression" } });
+    }
     return finalPayload;
 }
 

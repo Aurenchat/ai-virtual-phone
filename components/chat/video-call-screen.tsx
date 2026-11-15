@@ -1,5 +1,6 @@
 "use client";
 
+import { voiceDisplayText, voiceSpeechText } from "@/lib/voice-expression";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatSession, ChatMessage, loadChatMessages, pushChatMessage, getLatestCharacterStateValues } from "@/lib/chat-storage";
 import { getStatusRegionConfig, isCustomStatusRegionActive } from "@/lib/chat-status-region";
@@ -399,7 +400,7 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
         } else {
             const newMsgs = chatParts.map((part, idx) =>
                 pushChatMessage({
-                    sessionId: session.id, role: "assistant", content: part.content,
+                    sessionId: session.id, role: "assistant", content: voiceDisplayText(part.content),
                     mediaType: part.mediaType,
                     mediaData: part.mediaData,
                     statusPanel: idx === 0 && statusPanel ? statusPanel : undefined,
@@ -439,12 +440,13 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
             if (stateRef.current === "ENDED") return;
 
             const { cleanParts } = processAIResponse(aiResponseText);
-            const displayText = cleanParts.join("\n");
-            const speechText = stripBilingualForSpeech(displayText);
+            const authoredText = cleanParts.join("\n");
+            const displayText = voiceDisplayText(authoredText);
+            const speechText = voiceSpeechText(stripBilingualForSpeech(authoredText));
 
-            if (!displayText) { setCallState("IDLE"); return; }
+            if (!displayText && !speechText) { setCallState("IDLE"); return; }
 
-            setSubtitles(prev => [...prev, { id: `ai-${Date.now()}`, role: "assistant", text: displayText }]);
+            if (displayText) setSubtitles(prev => [...prev, { id: `ai-${Date.now()}`, role: "assistant", text: displayText }]);
 
             // 缩小为悬浮窗期间收到的回复：只静默记录文字，不播放语音
             if (minimizedRef.current) {
@@ -457,7 +459,7 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
             const voiceConfig = resolveVoiceConfig(session.contactId);
             if (voiceConfig && !isSpeakerMutedRef.current) {
                 try {
-                    const audioBlob = await synthesizeSpeech(speechText, voiceConfig);
+                    const audioBlob = await synthesizeSpeech(speechText, voiceConfig, { authoredDirections: true });
                     if (stateRef.current === "ENDED") return;
                     if (audioBlob && !isSpeakerMutedRef.current) {
                         const { promise, abort } = playCallAudio(audioBlob);

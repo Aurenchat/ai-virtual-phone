@@ -1,4 +1,5 @@
 "use client";
+import { voicePlaybackText } from "@/lib/voice-expression";
 import { settleChatPayment } from "@/lib/payment-chat";
 import { CashBrand, CashPaymentCard } from "./cash-payment-card";
 import { PaymentFxLine, usePaymentFx } from "./payment-fx-preview";
@@ -2412,7 +2413,7 @@ function synthesizeVoiceForMessage(msgId: string, characterId: string, speechTex
         const { resolveVoiceConfig, synthesizeSpeech } = await import("@/lib/tts-service");
         const vc = resolveVoiceConfig(characterId);
         if (!vc) throw new Error("未绑定语音配置");
-        const blob = await synthesizeSpeech(speechText, vc);
+        const blob = await synthesizeSpeech(speechText, vc, { authoredDirections: true });
         if (!blob) throw new Error("合成失败");
         const dataUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -2437,9 +2438,10 @@ function VoiceMessageBubble({ msg, characterId, onUpdate, defaultTranslationExpa
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const mountedRef = useRef(true);
     useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
-    const text = msg.mediaData?.label || "语音消息";
+    const text = msg.mediaData?.label ?? "语音消息";
     const bilingual = splitBilingualText(text);
-    const speechText = bilingual?.original || text;
+    const authoredSpeech = voicePlaybackText(text, msg.mediaData?.speechText);
+    const speechText = splitBilingualText(authoredSpeech)?.original || authoredSpeech;
     const synthesizedFromText = msg.mediaData?.synthesizedFromText;
     const needsResynthesis = msg.role !== "user" && synthesizedFromText !== speechText;
     const duration = msg.mediaData?.voiceDuration || Math.max(2, Math.ceil(speechText.length / 4));

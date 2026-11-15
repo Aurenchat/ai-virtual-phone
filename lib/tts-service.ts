@@ -3,6 +3,9 @@
 import type { VoiceApiConfig, ContentAppId } from "./settings-types";
 import { loadVoiceConfigs, loadBindingConfig, resolveBinding } from "./settings-storage";
 
+import { synthesizeElevenLabs } from "./elevenlabs-tts";
+import { supportsVoiceExpression, voiceSpeechText, voiceDisplayText } from "./voice-expression";
+
 export type VoiceApiConfigResolved = VoiceApiConfig;
 
 /**
@@ -25,11 +28,12 @@ export function resolveVoiceConfig(characterId?: string, appId?: ContentAppId): 
  * Supported providers:
  * - Minimax: REST API → hex-encoded mp3
  * - OpenAI: REST API → binary audio blob
+ * - ElevenLabs: REST API → binary MP3 (Yyk-Y2k implementation; see docs/elevenlabs-port.md)
  */
 export async function synthesizeSpeech(
     text: string,
     voiceConfig: VoiceApiConfig,
-    options?: { emotion?: string; speed?: number; pitch?: number; signal?: AbortSignal },
+    options?: { emotion?: string; speed?: number; pitch?: number; signal?: AbortSignal; authoredDirections?: boolean },
 ): Promise<Blob | null> {
     options?.signal?.throwIfAborted();
     if (!text.trim()) return null;
@@ -40,6 +44,13 @@ export async function synthesizeSpeech(
     };
 
     const provider = voiceConfig.provider;
+    const expressive = supportsVoiceExpression(provider, config.model);
+    text = expressive ? voiceSpeechText(text) : voiceDisplayText(text);
+    // Replaying authored cues after changing provider must not read directions aloud.
+    // Ordinary reading text can contain literal [brackets]; only authored audio has cues.
+    if (!expressive && options?.authoredDirections) text = text.replace(/\[[a-zA-Z][a-zA-Z ,'-]{0,100}\]/g, "").trim();
+    if (!text.trim()) return null;
+    if (provider === "ElevenLabs") return synthesizeElevenLabs(text, config, options?.signal);
 
     if (provider === "Minimax") {
         return synthesizeMinimax(text, config, options?.emotion, options?.signal);

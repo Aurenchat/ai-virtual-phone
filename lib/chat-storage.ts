@@ -247,6 +247,7 @@ export type ChatMessage = {
         xiaohongshuTone?: string;
         callDuration?: string;    // 通话时长（如 05:23）
         voiceDuration?: number;   // 语音条时长（秒）
+        speechText?: string; // Authored vocal directions, separate from the visible transcript.
         synthesizedFromText?: string; // 语音条当前音频对应的合成文本
         memoryContent?: string;   // 记忆写入内容
         memoryReason?: string;    // 记忆写入原因

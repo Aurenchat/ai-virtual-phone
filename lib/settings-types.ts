@@ -167,8 +167,9 @@ export type VoiceApiConfig = {
     sttModel?: string;
     defaultVoice: string;
     languageBoost?: string;
-    /** Minimax voice_setting.speed. Missing values keep the legacy 1.0x behavior. */
+    /** Provider speed: Minimax 0.5–2; ElevenLabs v2 0.7–1.2. */
     speechSpeed?: number;
+    elevenLabs?: { stability?: number; similarity?: number; style?: number; speakerBoost?: boolean; languageCode?: string };
     /** Minimax voice_setting.vol. Missing values keep the legacy 1.0x behavior. */
     speechVolume?: number;
     /** Minimax voice_setting.pitch（半音，±12）。缺省保持旧行为（0，原声）。 */

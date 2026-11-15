@@ -1,5 +1,6 @@
 "use client";
 
+import { voiceDisplayText, voiceSpeechText } from "@/lib/voice-expression";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatSession, ChatMessage, loadChatMessages, pushChatMessage, getLatestCharacterStateValues } from "@/lib/chat-storage";
 import { getStatusRegionConfig, isCustomStatusRegionActive } from "@/lib/chat-status-region";
@@ -242,10 +243,11 @@ export function GroupCallScreen({ type, session, characters, onEnd, initiator = 
                     getLatestCharacterStateValues(r.characterId),
                 );
                 const textParts = parts.filter(p => !p.mediaType && p.content.trim());
-                const displayText = textParts.map(p => p.content).join("\n");
-                const speechText = stripBilingualForSpeech(displayText);
+                const authoredText = textParts.map(p => p.content).join("\n");
+                const displayText = voiceDisplayText(authoredText);
+                const speechText = voiceSpeechText(stripBilingualForSpeech(authoredText));
 
-                if (!displayText && !(statusPanel || innerMonologue)) continue;
+                if (!displayText && !speechText && !(statusPanel || innerMonologue)) continue;
 
                 const aiMsg = pushChatMessage({
                     sessionId: session.id, role: "assistant",
@@ -263,7 +265,7 @@ export function GroupCallScreen({ type, session, characters, onEnd, initiator = 
                 });
                 messagesRef.current = [...messagesRef.current, aiMsg];
 
-                setSubtitles(prev => [...prev, {
+                if (displayText) setSubtitles(prev => [...prev, {
                     id: aiMsg.id, role: "assistant",
                     text: displayText,
                     senderName: r.characterName,
@@ -276,7 +278,7 @@ export function GroupCallScreen({ type, session, characters, onEnd, initiator = 
                 const voiceConfig = resolveVoiceConfig(r.characterId);
                 if (voiceConfig && speechText.trim()) {
                     try {
-                        const audioBlob = await synthesizeSpeech(speechText, voiceConfig);
+                        const audioBlob = await synthesizeSpeech(speechText, voiceConfig, { authoredDirections: true });
                         if (stateRef.current === "ENDED") return;
                         if (audioBlob) {
                             const { promise, abort } = playCallAudio(audioBlob);

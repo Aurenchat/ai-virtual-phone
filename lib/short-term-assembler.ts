@@ -1,3 +1,4 @@
+import { voiceHistoryText } from "./voice-expression";
 // lib/short-term-assembler.ts
 import { paymentDirective } from "./payment-directive";
 // Reads native app data (chat messages, moments posts/comments) and provides
@@ -232,7 +233,7 @@ export function loadNativeTimeline(
             // Represent rich media as text when content is empty
             else if (!content && msg.mediaType) {
                 if (msg.mediaType === "sticker") content = `[表情包:${msg.mediaData?.label || "贴纸"}]`;
-                else if (msg.mediaType === "audio") content = `[语音条:${msg.mediaData?.label || "语音消息"}]`;
+                else if (msg.mediaType === "audio") content = `[语音条:${voiceHistoryText(msg.mediaData?.label || "", msg.mediaData?.speechText)}]`;
                 else if (msg.mediaType === "image") content = formatPhotoDirectiveForPrompt(msg);
                 else if (msg.mediaType === "red_packet") {
                     content = paymentDirective(msg);
@@ -337,7 +338,7 @@ export function loadNativeTimeline(
             // Represent rich media as text when content is empty
             else if (!content && msg.mediaType) {
                 if (msg.mediaType === "sticker") content = `[表情包:${msg.mediaData?.label || "贴纸"}]`;
-                else if (msg.mediaType === "audio") content = `[语音条:${msg.mediaData?.label || "语音消息"}]`;
+                else if (msg.mediaType === "audio") content = `[语音条:${voiceHistoryText(msg.mediaData?.label || "", msg.mediaData?.speechText)}]`;
                 else if (msg.mediaType === "image") content = formatPhotoDirectiveForPrompt(msg);
                 else if (msg.mediaType === "red_packet" || msg.mediaType === "transfer") content = paymentDirective(msg);
                 else if (msg.mediaType === "contact_card") {

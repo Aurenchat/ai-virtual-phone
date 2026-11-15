@@ -107,7 +107,11 @@ function fixture(texts = [["a", "b", "c"], ["d", "", "e"]], slow = false) {
     ]) check(key !== readingTtsCacheKey(position, text, options), `cache key changes with ${label}`);
 }
 // Exercise real provider adapters (no external network): defaults, overrides, errors, abort and timeout.
-const service = await load("tts-service", () => ({ loadVoiceConfigs: () => [voice], loadBindingConfig: () => ({}), resolveBinding: () => ({ voiceConfigId: "v" }) }));
+const storage = { loadVoiceConfigs: () => [voice], loadBindingConfig: () => ({}), resolveBinding: () => ({ voiceConfigId: "v" }) };
+const eleven = await load("elevenlabs-tts");
+const guide = await load("voice-guides/elevenlabs");
+const expression = await load("voice-expression", name => name === "./settings-storage" ? storage : guide);
+const service = await load("tts-service", name => name === "./settings-storage" ? storage : name === "./elevenlabs-tts" ? eleven : expression);
 check(service.resolveVoiceConfig(undefined, "reading").id === "v", "voice resolver accepts app defaults without a character");
 const { resolveBinding } = await load("settings-storage", () => ({ registerKvMigration() {} }));
 const bindings = { globalDefaults: { voiceConfigId: "global" }, appDefaults: { reading: { voiceConfigId: "app" } }, characterBindings: [{ characterId: "char", defaults: { voiceConfigId: "character" }, appOverrides: { reading: { voiceConfigId: "override" } } }] };
