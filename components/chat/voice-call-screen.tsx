@@ -433,7 +433,7 @@ export function VoiceCallScreen({ session, character, onEnd, onConnect, initiato
                     if (stateRef.current === "ENDED") return;
 
                     if (audioBlob) {
-                        const { promise, abort } = playCallAudio(audioBlob);
+                        const { promise, abort } = playCallAudio(audioBlob, voiceConfig);
                         audioAbortRef.current = abort;
                         await promise;
                         audioAbortRef.current = null;

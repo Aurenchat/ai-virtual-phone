@@ -13,11 +13,13 @@ const globals = { Blob, Response, URL, URLSearchParams, AbortController, TypeErr
 function load(file, require = () => { throw new Error('Unexpected import'); }) {
     const context = { ...globals, exports: {}, require: name => name.endsWith('identity-runtime')
         ? { assertIdentityActive: () => {}, registerIdentityRequest: () => () => {}, identityLocalStorage: {} }
-        : name === './voice-expression' ? { voiceDisplayText: text => text, voiceSpeechText: text => text, supportsVoiceExpression: () => false } : require(name) };
+        : name === './voice-expression' ? { voiceDisplayText: text => text, voiceSpeechText: text => text, supportsVoiceExpression: () => false }
+        : name === './speech-playback-volume' ? playbackVolume : require(name) };
     vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,file),'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, context);
     return context.exports;
 }
 const eleven = load('lib/elevenlabs-tts.ts');
+const playbackVolume = load('lib/speech-playback-volume.ts');
 const config = { id:'test', provider:'ElevenLabs', apiKey:'test-key-not-real', defaultVoice:'voice/id', enableTTS:true, enableSTT:false };
 const plain = value => JSON.parse(JSON.stringify(value));
 async function main() {
@@ -84,6 +86,7 @@ async function main() {
             if(name==='@/lib/elevenlabs-tts') return eleven;
             if(name==='@/lib/fish-audio-tts') return { FISH_AUDIO_BASE_URL:'https://api.fish.audio/v1', FISH_AUDIO_FREE_MODEL:'s2.1-pro-free', FISH_AUDIO_MODELS:['s2.1-pro-free','s2.1-pro','s2-pro','drama-3'] };
             if(name==='@/lib/tts-service') return tts;
+            if(name==='@/lib/speech-playback-volume') return playbackVolume;
             if(name==='@/lib/settings-storage') return {loadVoiceConfigs:()=>[voiceConfig],saveVoiceConfigs:()=>{throw new Error('Render must not write storage');}};
             if(name==='../phone-settings-app') return {SettingsContext:{}};
             if(name==='@/components/ui/form') return {Input:props=>React.createElement('input',props),Toggle:({checked})=>React.createElement('input',{type:'checkbox',checked,readOnly:true})};

@@ -172,6 +172,8 @@ export type VoiceApiConfig = {
     elevenLabs?: { stability?: number; similarity?: number; style?: number; speakerBoost?: boolean; languageCode?: string };
     /** Minimax voice_setting.vol. Missing values keep the legacy 1.0x behavior. */
     speechVolume?: number;
+    /** ElevenLabs only: local playback gain, never sent to the speech API. */
+    playbackVolume?: number;
     /** Minimax voice_setting.pitch（半音，±12）。缺省保持旧行为（0，原声）。 */
     speechPitch?: number;
     customVoices?: { id: string; name: string; createdAt?: number }[];

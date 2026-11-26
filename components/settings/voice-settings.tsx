@@ -5,7 +5,8 @@ import { Plus, Play, Pause, AlertCircle, RefreshCw, FileEdit, Trash2, X, Check, 
 import { SettingsContext } from "../phone-settings-app";
 import type { VoiceApiConfig } from "@/lib/settings-types";
 import { loadVoiceConfigs, saveVoiceConfigs } from "@/lib/settings-storage";
-import { synthesizeSpeech } from "@/lib/tts-service";
+import { createSpeechMediaPlayer, synthesizeSpeech } from "@/lib/tts-service";
+import { speechPlaybackVolume } from "@/lib/speech-playback-volume";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { Toggle, Input } from "@/components/ui/form";
 import { Alert } from "@/components/ui/feedback";
@@ -255,9 +256,8 @@ export function VoiceSettings() {
     const [manualModelIds, setManualModelIds] = useState<Record<string, boolean>>({});
     const [manualVoiceIds, setManualVoiceIds] = useState<Record<string, boolean>>({});
     const [isLoaded, setIsLoaded] = useState(false);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const previewPlayerRef = useRef<ReturnType<typeof createSpeechMediaPlayer> | null>(null);
     const previewAbortRef = useRef<AbortController | null>(null);
-    const previewUrlRef = useRef<string | null>(null);
     const syncAbortRef = useRef(new Map<string, AbortController>());
     const configsRef = useRef(configs);
     configsRef.current = configs;
@@ -332,7 +332,7 @@ export function VoiceSettings() {
         const nextProvider = providerOption.startsWith("Minimax") ? "Minimax" : providerOption;
         const cleanup: Partial<VoiceApiConfig> = current?.provider !== nextProvider ? {
             apiKey: "", customVoices: [], speechSpeed: 1, speechPitch: undefined,
-            speechVolume: undefined, languageBoost: undefined, sttModel: undefined, elevenLabs: undefined,
+            speechVolume: undefined, playbackVolume: undefined, languageBoost: undefined, sttModel: undefined, elevenLabs: undefined,
             enableSTT: nextProvider !== "ElevenLabs",
         } : {};
         setFetchedVoices(prev => ({ ...prev, [id]: [] }));
@@ -572,15 +572,12 @@ export function VoiceSettings() {
 
     const stopPreview = () => {
         previewAbortRef.current?.abort(); previewAbortRef.current = null;
-        if (audioRef.current) { audioRef.current.pause(); audioRef.current.removeAttribute("src"); audioRef.current.load(); audioRef.current = null; }
-        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-        previewUrlRef.current = null;
+        previewPlayerRef.current?.stop();
         setPlayingVoiceId(null);
     };
     useEffect(() => () => {
         previewAbortRef.current?.abort();
-        audioRef.current?.pause();
-        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewPlayerRef.current?.dispose();
         for (const controller of syncAbortRef.current.values()) controller.abort();
     }, []);
 
@@ -589,6 +586,9 @@ export function VoiceSettings() {
         stopPreview();
         if (wasPlaying) return;
         const controller = new AbortController(); previewAbortRef.current = controller;
+        const player = previewPlayerRef.current ??= createSpeechMediaPlayer({ useGlobalVolume: false });
+        player.setVoiceConfig(config);
+        if (speechPlaybackVolume(config) !== 1) player.unlock();
         setPlayingVoiceId(config.id);
         try {
             const previewText = config.provider === "Minimax" && config.languageBoost
@@ -597,10 +597,10 @@ export function VoiceSettings() {
             const blob = await synthesizeSpeech(previewText, config, { signal: controller.signal });
             if (controller.signal.aborted) return;
             if (!blob) throw new Error("当前语音配置未返回真实音频");
-            const url = URL.createObjectURL(blob); previewUrlRef.current = url;
-            const audio = new Audio(url); audioRef.current = audio;
-            audio.onended = audio.onerror = () => { if (previewAbortRef.current === controller) stopPreview(); };
-            await audio.play();
+            const playback = player.play(blob);
+            const finished = () => { if (previewAbortRef.current === controller) stopPreview(); };
+            void playback.ended.then(finished, finished);
+            await playback.started;
         } catch (error: unknown) {
             if (controller.signal.aborted) return;
             alert(`语音测试失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -728,6 +728,22 @@ export function VoiceSettings() {
                                         </div>
                                         {config.provider === "ElevenLabs" && (
                                             <>
+                                                <div className="flex flex-col gap-1 -mt-1">
+                                                    <div className="flex items-center justify-between px-1">
+                                                        <label className="menu-desc">播放音量 (Playback Volume)</label>
+                                                        <span className="menu-label font-medium">{speechPlaybackVolume(config).toFixed(1)}×</span>
+                                                    </div>
+                                                    <input type="range" min="0.1" max="2" step="0.1"
+                                                        value={speechPlaybackVolume(config)}
+                                                        onChange={e => updateConfig(config.id, { playbackVolume: Number(e.target.value) })}
+                                                        className="w-full accent-black" aria-label="ElevenLabs 播放音量" />
+                                                    <div className="relative h-4 px-1 text-xs text-gray-500" aria-hidden="true">
+                                                        <span className="absolute left-1 whitespace-nowrap">0.1×</span>
+                                                        <span className="absolute whitespace-nowrap" style={{ left: "47.368%", transform: "translateX(-50%)" }}>1.0× 默认</span>
+                                                        <span className="absolute right-1 whitespace-nowrap">2.0×</span>
+                                                    </div>
+                                                    <span className="menu-desc ml-1">仅调整 Float 本地播放，不影响生成参数或消耗额外合成额度。</span>
+                                                </div>
                                                 <label className="flex flex-col gap-1"><span className="menu-desc ml-1">接口地址 (Base URL)</span>
                                                     <Input value={config.baseUrl || ""} onChange={e => updateConfig(config.id, { baseUrl: e.target.value })} placeholder={ELEVENLABS_BASE_URL} />
                                                 </label>

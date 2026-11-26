@@ -281,7 +281,7 @@ export function GroupCallScreen({ type, session, characters, onEnd, initiator = 
                         const audioBlob = await synthesizeSpeech(speechText, voiceConfig, { authoredDirections: true });
                         if (stateRef.current === "ENDED") return;
                         if (audioBlob) {
-                            const { promise, abort } = playCallAudio(audioBlob);
+                            const { promise, abort } = playCallAudio(audioBlob, voiceConfig);
                             audioAbortRef.current = abort;
                             await promise;
                             audioAbortRef.current = null;

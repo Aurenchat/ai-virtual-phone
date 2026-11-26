@@ -1,5 +1,7 @@
 "use client";
 import { voicePlaybackText } from "@/lib/voice-expression";
+import { createSpeechMediaPlayer, resolveVoiceConfig } from "@/lib/tts-service";
+import { speechPlaybackVolume } from "@/lib/speech-playback-volume";
 import { settleChatPayment } from "@/lib/payment-chat";
 import { CashBrand, CashPaymentCard } from "./cash-payment-card";
 import { PaymentFxLine, usePaymentFx } from "./payment-fx-preview";
@@ -2435,7 +2437,8 @@ function VoiceMessageBubble({ msg, characterId, onUpdate, defaultTranslationExpa
     const [playing, setPlaying] = useState(false);
     const [synthesizing, setSynthesizing] = useState(false);
     const [synthFailed, setSynthFailed] = useState(false);
-    const audioRef = useRef<HTMLAudioElement | null>(null);
+    const voicePlayerRef = useRef<ReturnType<typeof createSpeechMediaPlayer> | null>(null);
+    const voicePlayTurnRef = useRef(0);
     const mountedRef = useRef(true);
     useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
     const text = msg.mediaData?.label ?? "语音消息";
@@ -2447,30 +2450,30 @@ function VoiceMessageBubble({ msg, characterId, onUpdate, defaultTranslationExpa
     const duration = msg.mediaData?.voiceDuration || Math.max(2, Math.ceil(speechText.length / 4));
 
     const playSrc = (src: string) => {
-        // 必须用 <audio> 元素:iOS 静音拨键会掐掉 Web Audio 的输出(表现为全线
-        // 无声),媒体元素不受影响。元素属于宿主页面,锁屏媒体卡片指向站点本身,
-        // 点了只会回到 App;播完清 src 让卡片立即撤下。
-        const audio = new Audio(src);
-        audioRef.current = audio;
+        // Keep the media element/position/unlock path. Unity stays native; only
+        // non-unity ElevenLabs gain routes through the existing audio context.
+        const player = getVoicePlayer();
+        const turn = ++voicePlayTurnRef.current;
         setPlaying(true);
-        const finalize = () => {
-            if (audioRef.current === audio) audioRef.current = null;
-            try { audio.pause(); audio.removeAttribute("src"); audio.load(); } catch { /* ignore */ }
-            setPlaying(false);
-        };
-        audio.onended = finalize;
-        audio.onerror = finalize;
-        audio.play().catch(finalize);
+        // Use the persisted source directly: never copy/rewrite audio for a volume change.
+        const playback = player.playUrl(src);
+        const finished = () => { if (mountedRef.current && turn === voicePlayTurnRef.current) setPlaying(false); };
+        void playback.started.catch(finished);
+        void playback.ended.then(finished).catch(finished);
+    };
+    const getVoicePlayer = () => {
+        const player = voicePlayerRef.current ??= createSpeechMediaPlayer({ useGlobalVolume: false });
+        player.setVoiceConfig(msg.role === "user" ? null : resolveVoiceConfig(characterId));
+        return player;
     };
 
     // 点击才合成（不再挂载即合成）：已有音频直接播；没有就现场合成一次，
     // 合成结果已在任务内落库，之后任何时候点都是直接播放，不再消耗额度。
     const handlePlay = () => {
         if (synthesizing) return;
-        if (playing && audioRef.current) {
-            const active = audioRef.current;
-            audioRef.current = null;
-            try { active.pause(); active.removeAttribute("src"); active.load(); } catch { /* ignore */ }
+        if (playing && voicePlayerRef.current) {
+            ++voicePlayTurnRef.current;
+            voicePlayerRef.current.stop();
             setPlaying(false);
             return;
         }
@@ -2484,6 +2487,7 @@ function VoiceMessageBubble({ msg, characterId, onUpdate, defaultTranslationExpa
         }
         setSynthesizing(true);
         setSynthFailed(false);
+        if (speechPlaybackVolume(resolveVoiceConfig(characterId)) !== 1) getVoicePlayer().unlock();
         synthesizeVoiceForMessage(msg.id, characterId, speechText)
             .then((dataUrl) => {
                 if (onUpdate) onUpdate({ ...msg, mediaUrl: dataUrl, mediaData: { ...msg.mediaData, synthesizedFromText: speechText } });
@@ -2498,7 +2502,7 @@ function VoiceMessageBubble({ msg, characterId, onUpdate, defaultTranslationExpa
             });
     };
 
-    useEffect(() => () => { audioRef.current?.pause(); }, []);
+    useEffect(() => () => { voicePlayerRef.current?.dispose(); }, []);
 
     // Wave bars — slightly irregular heights so the idle state already looks intentional.
     const barCount = Math.min(Math.max(4, Math.round(duration / 2)), 9);

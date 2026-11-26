@@ -111,7 +111,8 @@ const storage = { loadVoiceConfigs: () => [voice], loadBindingConfig: () => ({})
 const eleven = await load("elevenlabs-tts");
 const guide = await load("voice-guides/elevenlabs");
 const expression = await load("voice-expression", name => name === "./settings-storage" ? storage : guide);
-const service = await load("tts-service", name => name === "./settings-storage" ? storage : name === "./elevenlabs-tts" ? eleven : expression);
+const playbackVolume = await load("speech-playback-volume");
+const service = await load("tts-service", name => name === "./settings-storage" ? storage : name === "./elevenlabs-tts" ? eleven : name === "./speech-playback-volume" ? playbackVolume : expression);
 check(service.resolveVoiceConfig(undefined, "reading").id === "v", "voice resolver accepts app defaults without a character");
 const { resolveBinding } = await load("settings-storage", () => ({ registerKvMigration() {} }));
 const bindings = { globalDefaults: { voiceConfigId: "global" }, appDefaults: { reading: { voiceConfigId: "app" } }, characterBindings: [{ characterId: "char", defaults: { voiceConfigId: "character" }, appOverrides: { reading: { voiceConfigId: "override" } } }] };
@@ -180,5 +181,20 @@ try {
     c.start(async signal => { await sourceReady.promise; signal.throwIfAborted(); return pos(1); });
     c.configure({ voice, speed: 2 }); sourceReady.resolve(); await turn();
     check(clips.length === 1 && calls[0].options.speed === 2 && c.state.position.paragraphIndex === 1, "parameter change during lazy position resolution restarts only latest session"); c.dispose();
+}
+{
+    const { controller: c, calls, clips } = fixture(undefined, true);
+    const elevenVoice = { ...voice, provider: "ElevenLabs", playbackVolume: 1 };
+    c.configure({ voice: elevenVoice }); c.start(pos()); await turn();
+    const count = calls.length;
+    c.configure({ voice: { ...elevenVoice, playbackVolume: 2 } }); await turn();
+    check(c.state.status === "loading" && calls.length === count && calls.every(call => !call.options.signal.aborted), "gain-only change while loading keeps all synthesis jobs alive");
+    c.pause(); c.configure({ voice: { ...elevenVoice, playbackVolume: .5 } });
+    calls.find(call => call.text === "a").resolve(new Blob(["cached"])); await turn();
+    check(c.state.status === "paused" && clips.length === 0, "gain change and late audio preserve reading pause");
+    c.resume(); await turn();
+    check(clips.length === 1 && calls.filter(call => call.text === "a").length === 1, "gain edit during loading reuses the original result on resume");
+    check(readingTtsCacheKey(pos(), "a", { voice: elevenVoice }) === readingTtsCacheKey(pos(), "a", { voice: { ...elevenVoice, playbackVolume: 2 } }), "playback gain is absent from synthesis cache keys");
+    c.dispose();
 }
 console.log(`PASS ${passed} reading TTS unit assertions`);

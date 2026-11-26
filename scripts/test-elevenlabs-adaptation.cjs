@@ -10,6 +10,7 @@ function load(file) {
     const dependencies = name => name === './settings-storage' ? storage
         : name === './voice-expression' ? load('lib/voice-expression.ts')
         : name === './elevenlabs-tts' ? load('lib/elevenlabs-tts.ts')
+        : name === './speech-playback-volume' ? load('lib/speech-playback-volume.ts')
         : name === './voice-guides/elevenlabs' ? load('lib/voice-guides/elevenlabs.ts')
         : name === './macro-engine' ? load('lib/macro-engine.ts')
         : name === './prompt-time' ? { resolvePromptTimeAware: () => false, getPromptTimestampOptionsForTimeContext: () => ({}) }

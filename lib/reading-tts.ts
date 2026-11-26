@@ -48,7 +48,7 @@ type Dependencies = {
     chapterCount: () => number;
     getChapter: (index: number, signal: AbortSignal) => Promise<BookChapter | undefined>;
     synthesize: (text: string, voice: VoiceApiConfig, options: { emotion?: string; speed?: number; signal: AbortSignal }) => Promise<Blob | null>;
-    player: { unlock: () => void; play: (blob: Blob) => PausableSpeechPlayback; dispose: () => void };
+    player: { unlock: () => void; play: (blob: Blob) => PausableSpeechPlayback; dispose: () => void; setVoiceConfig?: (voice: VoiceApiConfig | null) => void };
     onChange: (state: ReadingTtsState) => void;
 };
 
@@ -75,13 +75,15 @@ export class ReadingTtsController {
         for (const [key, job] of this.jobs) if (key !== keep) { job.controller.abort(); this.jobs.delete(key); }
     }
     configure(options: ReadingTtsOptions) {
-        const key = JSON.stringify(options);
-        if (key === this.optionsKey) return;
+        const { playbackVolume: _playbackOnly, ...synthesisVoice } = options.voice ?? {};
+        const key = JSON.stringify({ ...options, voice: options.voice ? synthesisVoice : null });
+        if (key === this.optionsKey) { this.options = options; this.deps.player.setVoiceConfig?.(options.voice); return; }
         const resume = ["playing", "loading", "paused"].includes(this.state.status);
         const paused = this.paused;
         const position = this.state.position ?? this.source;
         this.stop(); this.cache.clear(); this.failures.clear();
         this.options = options; this.optionsKey = key;
+        this.deps.player.setVoiceConfig?.(options.voice);
         if (resume && position) this.start(position, { paused });
     }
     stop() {

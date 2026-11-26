@@ -24,7 +24,8 @@ export function useReadingTts({ bookId, characterId, preferences, chapterCount, 
         const reload = () => { setVoices(loadVoiceConfigs()); setBindingVersion(value => value + 1); };
         window.addEventListener("focus", reload);
         window.addEventListener("settings-bindings-updated", reload);
-        return () => { window.removeEventListener("focus", reload); window.removeEventListener("settings-bindings-updated", reload); };
+        window.addEventListener("voice-configs-updated", reload);
+        return () => { window.removeEventListener("focus", reload); window.removeEventListener("settings-bindings-updated", reload); window.removeEventListener("voice-configs-updated", reload); };
     }, []);
     useEffect(() => { if (active) setVoices(loadVoiceConfigs()); }, [active]);
     const voice = preferences.voiceConfigId ? voices.find(item => item.id === preferences.voiceConfigId) ?? null : resolveVoiceConfig(characterId, "reading");

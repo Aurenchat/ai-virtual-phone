@@ -5,6 +5,7 @@ import { loadVoiceConfigs, loadBindingConfig, resolveBinding } from "./settings-
 
 import { synthesizeElevenLabs } from "./elevenlabs-tts";
 import { supportsVoiceExpression, voiceSpeechText, voiceDisplayText } from "./voice-expression";
+import { createPlaybackVolumeNode, speechPlaybackVolume } from "./speech-playback-volume";
 
 export type VoiceApiConfigResolved = VoiceApiConfig;
 
@@ -220,31 +221,83 @@ export type PausableSpeechPlayback = {
 
 /** A reader owns one reusable element: pause retains currentTime, and other TTS callers
  * keep their existing shared-player behavior. Unlock synchronously from a user gesture. */
-export function createSpeechMediaPlayer() {
-    let audio: HTMLAudioElement | null = null;
+export function createSpeechMediaPlayer(options: { useGlobalVolume?: boolean; initialAudio?: HTMLAudioElement; onAudioReplaced?: (audio: HTMLAudioElement) => void } = {}) {
+    let audio: HTMLAudioElement | null = options.initialAudio ?? null;
     let active: PausableSpeechPlayback | null = null;
     let primeUrl: string | null = null;
+    let voice: VoiceApiConfig | null = null;
+    let removeVoiceListener = () => {};
+    let graph: { context: AudioContext; source: MediaElementAudioSourceNode; volume: ReturnType<typeof createPlaybackVolumeNode> } | null = null;
+    let nativeFallback = false;
+    let disposed = false;
+    const baseVolume = () => options.useGlobalVolume === false ? 1 : getTtsVolume();
     const getAudio = () => {
         if (!audio) { audio = new Audio(); audio.setAttribute("playsinline", ""); }
         return audio;
     };
+    const suspend = () => { if (audio) _activeMediaElements.delete(audio); suspendIdleSpeechContext(); };
+    const disconnect = () => {
+        suspend();
+        graph?.source.disconnect(); graph?.volume.dispose(); graph = null;
+    };
+    const updateVolume = () => {
+        const element = audio;
+        if (!element || disposed) return;
+        const volume = speechPlaybackVolume(voice);
+        // No context/source/processing for an untouched unity-volume media player.
+        const needsGraph = volume !== 1 || (voice?.provider === "ElevenLabs" && baseVolume() !== 1);
+        if (!graph && needsGraph && !nativeFallback) {
+            const context = getAudioContext();
+            if (context) {
+                const node = createPlaybackVolumeNode(context);
+                try {
+                    const source = context.createMediaElementSource(element);
+                    source.connect(node.input); node.output.connect(context.destination);
+                    graph = { context, source, volume: node };
+                } catch { node.dispose(); nativeFallback = true; }
+            } else {
+                nativeFallback = true;
+                console.warn("[TTS] Web Audio 不可用，保留原媒体播放路径（无法应用本地增益）");
+            }
+        }
+        if (graph) {
+            graph.volume.set(volume); graph.volume.output.gain.value = baseVolume();
+            element.volume = 1; // Global volume is in the graph, exactly once.
+        } else element.volume = baseVolume();
+    };
+    const refreshPlayingVolume = () => {
+        updateVolume();
+        if (active && audio && !audio.paused && graph && graph.context.state !== "running") void active.resume().catch(() => {});
+    };
+    const setVoiceConfig = (config?: VoiceApiConfig | null) => {
+        removeVoiceListener(); voice = latestSpeechPlaybackConfig(config);
+        removeVoiceListener = watchSpeechPlaybackVolume(config, latest => { voice = latest; refreshPlayingVolume(); });
+        refreshPlayingVolume();
+    };
+    _mediaVolumeUpdates.add(refreshPlayingVolume);
     const clearPrime = () => { if (primeUrl) URL.revokeObjectURL(primeUrl); primeUrl = null; };
     return {
+        get isActive() { return active !== null; },
+        setVoiceConfig,
         unlock() {
             if (active || primeUrl) return;
             const element = getAudio();
+            updateVolume();
+            if (graph) void graph.context.resume().then(suspendIdleSpeechContext).catch(() => {});
             const url = silentWavUrl(); primeUrl = url;
             element.src = url;
             void element.play().then(() => {
-                if (primeUrl === url && !active) { element.pause(); clearPrime(); }
-            }).catch(() => { if (primeUrl === url) clearPrime(); });
+                if (primeUrl === url && !active) { element.pause(); element.removeAttribute("src"); element.load(); suspend(); clearPrime(); }
+            }).catch(() => { if (primeUrl === url) { element.removeAttribute("src"); element.load(); suspend(); clearPrime(); } });
         },
-        play(blob: Blob): PausableSpeechPlayback {
+        play(blob: Blob | string, config?: VoiceApiConfig | null): PausableSpeechPlayback {
             active?.stop(); clearPrime();
-            const element = getAudio();
-            const url = URL.createObjectURL(blob);
+            if (config !== undefined) setVoiceConfig(config);
+            let element = getAudio();
+            nativeFallback = false;
+            const ownsUrl = typeof blob !== "string";
+            const url = typeof blob === "string" ? blob : URL.createObjectURL(blob);
             element.src = url;
-            element.volume = getTtsVolume();
             let settled = false;
             let playAttempt = 0;
             let resolveEnd!: () => void;
@@ -255,17 +308,54 @@ export function createSpeechMediaPlayer() {
             const finish = (error?: Error) => {
                 if (settled) return;
                 settled = true;
-                element.onended = null; element.onerror = null;
+                element.onended = null; element.onerror = null; element.onloadedmetadata = null;
                 element.pause(); element.removeAttribute("src"); element.load();
-                URL.revokeObjectURL(url);
+                suspend();
+                if (ownsUrl) URL.revokeObjectURL(url);
                 if (active === playback) active = null;
                 if (error) rejectEnd(error); else resolveEnd();
             };
-            element.onended = () => finish();
-            element.onerror = () => finish(new Error("音频播放失败，请重试或跳到下一段"));
+            const handlers = () => {
+                element.onended = () => finish();
+                element.onerror = () => finish(new Error("音频播放失败，请重试或跳到下一段"));
+            };
+            handlers();
             const resume = () => {
                 const attempt = ++playAttempt;
-                return element.play().catch(error => {
+                updateVolume();
+                const playNative = () => settled || attempt !== playAttempt ? Promise.resolve() : element.play();
+                // Retain the original element-only fallback if the context cannot run.
+                // An element once routed into Web Audio cannot be detached back to native
+                // output; replace only that failed element, retaining URL and currentTime.
+                const fallback = () => {
+                    if (settled || attempt !== playAttempt) return Promise.resolve();
+                    const time = element.currentTime;
+                    element.onended = null; element.onerror = null; element.pause();
+                    disconnect();
+                    element.removeAttribute("src"); element.load();
+                    audio = element = new Audio(); element.setAttribute("playsinline", "");
+                    options.onAudioReplaced?.(element);
+                    nativeFallback = true; element.src = url; element.volume = baseVolume();
+                    try { element.currentTime = time; } catch {
+                        element.onloadedmetadata = () => {
+                            element.onloadedmetadata = null;
+                            if (!settled) try { element.currentTime = time; } catch { /* Unsupported native seek. */ }
+                        };
+                    }
+                    handlers();
+                    console.warn("[TTS] 本地播放增益不可用，已回退原媒体播放路径");
+                    return playNative();
+                };
+                const start = graph ? (() => {
+                    _activeMediaElements.add(element);
+                    return resumeSpeechContext(graph!.context).then(() => {
+                        // pause/stop already released this attempt. A newer resume may
+                        // now own the same element; a stale callback must not suspend it.
+                        if (settled || attempt !== playAttempt) return;
+                        return element.play();
+                    }).catch(fallback);
+                })() : playNative();
+                return start.catch(error => {
                     // pause()/stop() may reject a still-pending play() with AbortError.
                     // Only the latest attempt can report a real playback failure.
                     if (settled || attempt !== playAttempt) return;
@@ -275,12 +365,17 @@ export function createSpeechMediaPlayer() {
                 });
             };
             const playback: PausableSpeechPlayback = { started: Promise.resolve(), ended,
-                pause: () => { ++playAttempt; element.pause(); }, resume, stop: () => finish() };
+                pause: () => { ++playAttempt; element.pause(); suspend(); }, resume, stop: () => finish() };
             active = playback;
             playback.started = resume();
             return playback;
         },
-        dispose() { active?.stop(); clearPrime(); audio?.pause(); audio?.removeAttribute("src"); audio = null; },
+        playUrl(src: string): PausableSpeechPlayback { return this.play(src); },
+        stop() { active?.stop(); clearPrime(); audio?.pause(); audio?.removeAttribute("src"); audio?.load(); suspend(); },
+        dispose() {
+            active?.stop(); clearPrime(); removeVoiceListener(); _mediaVolumeUpdates.delete(refreshPlayingVolume);
+            disconnect(); audio?.pause(); audio?.removeAttribute("src"); audio = null; disposed = true;
+        },
     };
 }
 
@@ -313,6 +408,41 @@ let _ttsVolume = ((): number => {
 // Live gain node of the currently-playing AudioContext clip, so the slider can
 // adjust volume mid-sentence.
 let _activeGain: GainNode | null = null;
+const _activeMediaElements = new Set<HTMLAudioElement>();
+const _mediaVolumeUpdates = new Set<() => void>();
+
+function suspendIdleSpeechContext() {
+    if (_activeGain || _activeMediaElements.size) return;
+    try { void _audioCtx?.suspend(); } catch { /* Already closed/suspended. */ }
+}
+
+async function resumeSpeechContext(context: AudioContext) {
+    if (context.state !== "running" && context.state !== "closed") {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        try {
+            await Promise.race([
+                context.resume().then(suspendIdleSpeechContext),
+                new Promise(resolve => { timer = setTimeout(resolve, 800); }),
+            ]);
+        } finally { clearTimeout(timer); }
+    }
+    if (context.state !== "running") throw new Error("audio_context_not_running");
+}
+
+function watchSpeechPlaybackVolume(config: VoiceApiConfig | null | undefined, update: (latest: VoiceApiConfig | null) => void) {
+    if (config?.provider !== "ElevenLabs" || typeof window === "undefined") return () => {};
+    const changed = () => update(loadVoiceConfigs().find(item => item.id === config.id && item.provider === "ElevenLabs") ?? null);
+    window.addEventListener("voice-configs-updated", changed);
+    return () => window.removeEventListener("voice-configs-updated", changed);
+}
+
+function latestSpeechPlaybackConfig(config?: VoiceApiConfig | null): VoiceApiConfig | null {
+    if (config?.provider !== "ElevenLabs") return config ?? null;
+    // TTS/decoding may have taken seconds. Resolve playback-only settings at play
+    // time, while retaining support for explicitly supplied, unsaved configs.
+    const latest = loadVoiceConfigs().find(item => item.id === config.id);
+    return latest ? (latest.provider === "ElevenLabs" ? latest : null) : config;
+}
 
 export function getTtsVolume(): number {
     return _ttsVolume;
@@ -322,7 +452,7 @@ export function setTtsVolume(volume: number): void {
     _ttsVolume = Math.min(1, Math.max(0, volume));
     try { window.localStorage.setItem(TTS_VOLUME_KEY, String(_ttsVolume)); } catch { /* ignore */ }
     if (_activeGain) { try { _activeGain.gain.value = _ttsVolume; } catch { /* ignore */ } }
-    if (_sharedAudio) { try { _sharedAudio.volume = _ttsVolume; } catch { /* ignore */ } }
+    for (const update of _mediaVolumeUpdates) update();
 }
 
 // ── 通话音频会话开关 ──
@@ -334,7 +464,7 @@ let _callAudioSessionActive = false;
 /** 通话界面挂载时置 true、卸载/挂断时置 false（false 时立即挂起空闲的上下文）。 */
 export function setCallAudioSessionActive(active: boolean): void {
     _callAudioSessionActive = active;
-    if (!active && _audioCtx && !_activeGain) {
+    if (!active && _audioCtx && !_activeGain && !_activeMediaElements.size) {
         try { void _audioCtx.suspend(); } catch { /* ignore */ }
     }
 }
@@ -343,7 +473,7 @@ function getAudioContext(): AudioContext | null {
     if (typeof window === "undefined") return null;
     const Ctor = (window as any).AudioContext || (window as any).webkitAudioContext;
     if (!Ctor) return null;
-    if (!_audioCtx) {
+    if (!_audioCtx || _audioCtx.state === "closed") {
         // 不要钉 sampleRate:部分 iOS 版本上非硬件采样率的 ctx 会"时钟照走、
         // 输出全静音"(比闷更糟)。防发闷靠 TTS 请求参数(44100/256k)兜底。
         try { _audioCtx = new Ctor(); } catch { return null; }
@@ -391,22 +521,26 @@ export function unlockAudioPlayback(): void {
     // resumed under a gesture, subsequent programmatic resume()s are allowed.
     // 非通话期只借这次手势拿"授权"，随即挂起——不让页面平时一直持有音频会话。
     const ctx = getAudioContext();
-    if (ctx && ctx.state === "suspended") {
+    if (ctx && ctx.state !== "running" && ctx.state !== "closed") {
         const keepRunning = _callAudioSessionActive;
         ctx.resume().then(() => {
-            if (!keepRunning && !_activeGain && !_callAudioSessionActive) {
+            if (!keepRunning && !_activeGain && !_activeMediaElements.size && !_callAudioSessionActive) {
                 try { void ctx.suspend(); } catch { /* ignore */ }
             }
         }).catch(() => {});
     }
 
     // Fallback path: unlock the shared <audio> element once.
-    if (_audioUnlocked) return;
+    if (_audioUnlocked || _sharedMediaPlayer?.isActive) return;
     const audio = getSharedAudio();
     const url = silentWavUrl();
     audio.muted = true;
     audio.src = url;
     const finish = () => {
+        // The prime promise can settle after a real clip took over this element.
+        if (_sharedMediaPlayer?.isActive) {
+            audio.muted = false; URL.revokeObjectURL(url); _audioUnlocked = true; return;
+        }
         try { audio.pause(); audio.currentTime = 0; } catch {}
         audio.muted = false;
         URL.revokeObjectURL(url);
@@ -458,37 +592,18 @@ function decodeAudio(ctx: AudioContext, data: ArrayBuffer): Promise<AudioBuffer>
  * keep-alive on" bug — the keep-alive's looping silent <audio> was what kept the
  * context alive). Bonus: media-element playback also obeys hardware volume keys.
  */
-export function playAudioBlobViaMediaElement(blob: Blob): { promise: Promise<void>; abort: () => void } {
-    return playAudioBlobElement(blob);
+export function playAudioBlobViaMediaElement(blob: Blob, config?: VoiceApiConfig | null): { promise: Promise<void>; abort: () => void } {
+    return playAudioBlobElement(blob, config);
 }
 
-function playAudioBlobElement(blob: Blob): { promise: Promise<void>; abort: () => void } {
-    const url = URL.createObjectURL(blob);
-    const audio = getSharedAudio();
-    audio.muted = false;
-    audio.volume = _ttsVolume;
-    audio.src = url;
-
-    let settled = false;
-    let resolveFn: () => void = () => {};
-    const finalize = () => {
-        if (settled) return;
-        settled = true;
-        audio.onended = null;
-        audio.onerror = null;
-        URL.revokeObjectURL(url);
-        try { audio.pause(); audio.removeAttribute("src"); audio.load(); } catch {}
-        resolveFn();
-    };
-    const promise = new Promise<void>((resolve) => {
-        resolveFn = resolve;
-        audio.onended = finalize;
-        audio.onerror = finalize;
-        audio.play().catch(() => {
-            finalize();
-        });
-    });
-    return { promise, abort: finalize };
+let _sharedMediaPlayer: ReturnType<typeof createSpeechMediaPlayer> | null = null;
+function playAudioBlobElement(blob: Blob, config?: VoiceApiConfig | null): { promise: Promise<void>; abort: () => void } {
+    const audio = getSharedAudio(); audio.muted = false;
+    _sharedMediaPlayer ??= createSpeechMediaPlayer({ initialAudio: audio, onAudioReplaced: replacement => { _sharedAudio = replacement; } });
+    const playback = _sharedMediaPlayer.play(blob, config ?? null);
+    void playback.started.catch(() => {});
+    // Keep the existing call contract: media failure releases the turn/microphone.
+    return { promise: playback.ended.catch(() => {}), abort: playback.stop };
 }
 
 /**
@@ -497,15 +612,19 @@ function playAudioBlobElement(blob: Blob): { promise: Promise<void>; abort: () =
  * session back to the microphone (lets SpeechRecognition restart next turn).
  * Returns an abort function to stop playback early. Playback is sequential.
  */
-export function playAudioBlob(blob: Blob): { promise: Promise<void>; abort: () => void } {
+export function playAudioBlob(blob: Blob, config?: VoiceApiConfig | null): { promise: Promise<void>; abort: () => void } {
     const ctx = getAudioContext();
-    if (!ctx) return playAudioBlobElement(blob);
+    if (!ctx) return playAudioBlobElement(blob, config);
 
     let settled = false;
     let resolveFn: () => void = () => {};
     let source: AudioBufferSourceNode | null = null;
 
     let gain: GainNode | null = null;
+    let localVolume: ReturnType<typeof createPlaybackVolumeNode> | null = null;
+    let latestVoice = latestSpeechPlaybackConfig(config);
+    let updateLocalVolume = () => {};
+    let removeVoiceListener = watchSpeechPlaybackVolume(config, latest => { latestVoice = latest; updateLocalVolume(); });
     let fallbackAbort: (() => void) | null = null;
 
     const cleanupWebAudio = () => {
@@ -515,11 +634,13 @@ export function playAudioBlob(blob: Blob): { promise: Promise<void>; abort: () =
             try { source.disconnect(); } catch {}
             source = null;
         }
+        localVolume?.dispose(); localVolume = null;
+        removeVoiceListener(); removeVoiceListener = () => {};
         if (gain) { try { gain.disconnect(); } catch {} }
         if (_activeGain === gain) _activeGain = null;
         gain = null;
         // Suspend so iOS hands the audio session back to the microphone.
-        try { ctx.suspend(); } catch {}
+        suspendIdleSpeechContext();
     };
 
     const finalize = () => {
@@ -534,11 +655,11 @@ export function playAudioBlob(blob: Blob): { promise: Promise<void>; abort: () =
         resolveFn = resolve;
         (async () => {
             try {
-                if (ctx.state === "suspended") {
+                if (ctx.state !== "running" && ctx.state !== "closed") {
                     // 程序化 resume 在部分安卓浏览器上会被拒绝，甚至让 promise 永远
                     // 悬着（要等下一次用户手势）。限时等待后检查状态，走不通就回落。
                     await Promise.race([
-                        ctx.resume().catch(() => {}),
+                        ctx.resume().then(() => { if (settled) suspendIdleSpeechContext(); }).catch(() => {}),
                         new Promise(r => setTimeout(r, 800)),
                     ]);
                 }
@@ -552,6 +673,17 @@ export function playAudioBlob(blob: Blob): { promise: Promise<void>; abort: () =
                 gain.gain.value = _ttsVolume;
                 source.connect(gain);
                 gain.connect(ctx.destination);
+                updateLocalVolume = () => {
+                    if (!source || !gain || settled) return;
+                    const volume = speechPlaybackVolume(latestVoice);
+                    if (!localVolume && volume === 1) return;
+                    if (!localVolume) {
+                        localVolume = createPlaybackVolumeNode(ctx);
+                        source.disconnect(); source.connect(localVolume.input); localVolume.output.connect(gain);
+                    }
+                    localVolume.set(volume);
+                };
+                updateLocalVolume();
                 _activeGain = gain;
                 source.onended = finalize;
                 source.start();
@@ -561,7 +693,7 @@ export function playAudioBlob(blob: Blob): { promise: Promise<void>; abort: () =
                 // 此前这里直接 finalize，正是「语音条有声、通话没声」的来源之一。
                 if (settled) return;
                 cleanupWebAudio();
-                const fallback = playAudioBlobElement(blob);
+                const fallback = playAudioBlobElement(blob, latestVoice);
                 fallbackAbort = fallback.abort;
                 void fallback.promise.then(() => {
                     if (settled) return;

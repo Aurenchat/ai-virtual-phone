@@ -462,7 +462,7 @@ export function VideoCallScreen({ session, character, onEnd, onConnect, initiato
                     const audioBlob = await synthesizeSpeech(speechText, voiceConfig, { authoredDirections: true });
                     if (stateRef.current === "ENDED") return;
                     if (audioBlob && !isSpeakerMutedRef.current) {
-                        const { promise, abort } = playCallAudio(audioBlob);
+                        const { promise, abort } = playCallAudio(audioBlob, voiceConfig);
                         audioAbortRef.current = abort;
                         await promise;
                         audioAbortRef.current = null;

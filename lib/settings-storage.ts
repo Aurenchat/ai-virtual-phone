@@ -663,6 +663,7 @@ export function loadVoiceConfigs(): VoiceApiConfig[] {
 export function saveVoiceConfigs(configs: VoiceApiConfig[]): void {
     if (typeof window === "undefined") return;
     kvSet(VOICE_CONFIGS_KEY, JSON.stringify(configs));
+    window.dispatchEvent(new Event("voice-configs-updated"));
 }
 
 // --- Image Generation Settings ──────────────────────────────────────────
