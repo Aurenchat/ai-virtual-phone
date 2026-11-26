@@ -120,6 +120,7 @@ try {
     const cached = await page.evaluate(() => { const element = volumeAudit.audio.find(element => !element.paused && element.src === playbackVolumeTest.dataUrl()); window.cachedVoice = element; return { src: element.src, graph: volumeAudit.graph(element) }; });
     check(cached.graph.some(node => node.gain === .5) && requests.length === beforeBubbles, 'cached assistant bubble applies current gain without synthesis');
     await page.locator('[data-case="b"] .voice-msg-bubble').click();
+    await page.waitForFunction(() => volumeAudit.audio.filter(element => !element.paused && element.src === playbackVolumeTest.dataUrl()).some(element => volumeAudit.graph(element).some(node => node.curve)));
     check(await page.evaluate(() => volumeAudit.audio.filter(element => !element.paused && element.src === playbackVolumeTest.dataUrl()).some(element => volumeAudit.graph(element).some(node => node.curve))), 'second role uses its own amplified graph');
     await page.evaluate(() => playbackVolumeTest.setVolume('b', .2));
     check(await page.evaluate(() => volumeAudit.graph(cachedVoice).some(node => node.gain === .5)), 'editing another role gain leaves first role unchanged');

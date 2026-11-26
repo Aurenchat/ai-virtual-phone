@@ -24,8 +24,9 @@ function tone() {
 }
 let dataUrl = "";
 const chapter = async (index: number) => ({ id: `chapter-${index}`, bookId: "synthetic", title: `Chapter ${index}`, index, paragraphs: ["alpha", "beta", "gamma"] });
-function Reader() {
-    const reader = useReadingTts({ bookId: "synthetic", preferences: { voiceConfigId: "a" }, chapterCount: 2, getChapter: chapter, active: true });
+const singleChapter = async (index: number) => ({ ...(await chapter(index)), paragraphs: ["alpha"] });
+function Reader({ single = false }: { single?: boolean }) {
+    const reader = useReadingTts({ bookId: "synthetic", preferences: { voiceConfigId: "a" }, chapterCount: single ? 1 : 2, getChapter: single ? singleChapter : chapter, active: true });
     // The test intercepts only the provider HTTP response; hook/controller/player remain real.
     return <div>
         <button onClick={() => reader.start({ bookId: "synthetic", chapterIndex: 0, paragraphIndex: 0 })}>reader start</button>
@@ -38,21 +39,21 @@ function Reader() {
     </div>;
 }
 const probe = {
-    async ready() {
+    async ready(source = tone()) {
         await hydrateKvDb(); await ensureSettingsStorageHydrated();
         saveVoiceConfigs([base, { ...base, id: "b", name: "Eleven B", playbackVolume: 2 }, { ...base, id: "mini", name: "MiniMax", provider: "Minimax", speechVolume: 1.7, playbackVolume: 2 }]);
         saveBindingConfig({ globalDefaults: {}, characterBindings: ["a", "b"].map(id => ({ characterId: id, defaults: { voiceConfigId: id }, appOverrides: {} })) });
-        dataUrl = await new Promise<string>(resolve => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.readAsDataURL(tone()); });
+        dataUrl = await new Promise<string>(resolve => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.readAsDataURL(source); });
     },
     configs: loadVoiceConfigs,
     setVolume(id: string, playbackVolume: number) { saveVoiceConfigs(loadVoiceConfigs().map(config => config.id === id ? { ...config, playbackVolume } : config)); },
     mountSettings() { root.render(<VoiceSettings key={++revision} />); },
-    mountBubbles() {
+    mountBubbles(synthesize = false) {
         root.render(<div key={++revision}>{["a", "b", "user"].map(id => <div data-case={id} key={id}>
-            <MessageBubble characterId={id === "user" ? "a" : id} msg={{ id, sessionId: "fixture", role: id === "user" ? "user" : "assistant", content: "", status: "sent", createdAt: new Date().toISOString(), mediaType: "audio", mediaUrl: dataUrl, mediaData: { label: "Hello.", synthesizedFromText: "Hello." } }} />
+            <MessageBubble characterId={id === "user" ? "a" : id} msg={{ id, sessionId: "fixture", role: id === "user" ? "user" : "assistant", content: "", status: "sent", createdAt: new Date().toISOString(), mediaType: "audio", mediaUrl: synthesize ? undefined : dataUrl, mediaData: { label: "Hello.", synthesizedFromText: synthesize ? undefined : "Hello." } }} />
         </div>)}</div>);
     },
-    mountReader() { root.render(<Reader key={++revision} />); },
+    mountReader(single = false) { root.render(<Reader key={++revision} single={single} />); },
     unmount() { root.render(null); },
     tone, dataUrl: () => dataUrl, global: setTtsVolume,
     async renderGain(gain: number, global: number, amplitude = .1) {

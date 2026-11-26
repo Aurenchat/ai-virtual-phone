@@ -230,12 +230,15 @@ export function createSpeechMediaPlayer(options: { useGlobalVolume?: boolean; in
     let graph: { context: AudioContext; source: MediaElementAudioSourceNode; volume: ReturnType<typeof createPlaybackVolumeNode> } | null = null;
     let nativeFallback = false;
     let disposed = false;
+    let releaseContext = () => {};
+    let releasePrime = () => {};
+    let startController: AbortController | null = null;
     const baseVolume = () => options.useGlobalVolume === false ? 1 : getTtsVolume();
     const getAudio = () => {
         if (!audio) { audio = new Audio(); audio.setAttribute("playsinline", ""); }
         return audio;
     };
-    const suspend = () => { if (audio) _activeMediaElements.delete(audio); suspendIdleSpeechContext(); };
+    const suspend = () => { startController?.abort(); startController = null; releaseContext(); releaseContext = () => {}; suspendIdleSpeechContext(); };
     const disconnect = () => {
         suspend();
         graph?.source.disconnect(); graph?.volume.dispose(); graph = null;
@@ -266,8 +269,14 @@ export function createSpeechMediaPlayer(options: { useGlobalVolume?: boolean; in
         } else element.volume = baseVolume();
     };
     const refreshPlayingVolume = () => {
+        const playing = active && audio && !audio.paused;
+        // An element routed into Web Audio loses its native output immediately.
+        // Freeze its transport before making that connection, including mid-clip edits.
+        const needsStart = playing && (!graph && (speechPlaybackVolume(voice) !== 1 || (voice?.provider === "ElevenLabs" && baseVolume() !== 1))
+            || graph && !speechContextReady(graph.context));
+        if (needsStart) audio!.pause();
         updateVolume();
-        if (active && audio && !audio.paused && graph && graph.context.state !== "running") void active.resume().catch(() => {});
+        if (needsStart) void active!.resume().catch(() => {});
     };
     const setVoiceConfig = (config?: VoiceApiConfig | null) => {
         removeVoiceListener(); voice = latestSpeechPlaybackConfig(config);
@@ -275,7 +284,7 @@ export function createSpeechMediaPlayer(options: { useGlobalVolume?: boolean; in
         refreshPlayingVolume();
     };
     _mediaVolumeUpdates.add(refreshPlayingVolume);
-    const clearPrime = () => { if (primeUrl) URL.revokeObjectURL(primeUrl); primeUrl = null; };
+    const clearPrime = () => { if (primeUrl) URL.revokeObjectURL(primeUrl); primeUrl = null; releasePrime(); releasePrime = () => {}; };
     return {
         get isActive() { return active !== null; },
         setVoiceConfig,
@@ -283,7 +292,11 @@ export function createSpeechMediaPlayer(options: { useGlobalVolume?: boolean; in
             if (active || primeUrl) return;
             const element = getAudio();
             updateVolume();
-            if (graph) void graph.context.resume().then(suspendIdleSpeechContext).catch(() => {});
+            if (graph) {
+                const controller = new AbortController(), release = acquireSpeechContext(graph.context);
+                releasePrime = () => { controller.abort(); release(); };
+                void resumeSpeechContext(graph.context, true, controller.signal).catch(() => {});
+            }
             const url = silentWavUrl(); primeUrl = url;
             element.src = url;
             void element.play().then(() => {
@@ -347,8 +360,15 @@ export function createSpeechMediaPlayer(options: { useGlobalVolume?: boolean; in
                     return playNative();
                 };
                 const start = graph ? (() => {
-                    _activeMediaElements.add(element);
-                    return resumeSpeechContext(graph!.context).then(() => {
+                    // A running state does not mean a previous suspend has completed.
+                    // Keep the content paused until both control and render threads agree.
+                    element.pause();
+                    startController?.abort();
+                    const controller = new AbortController(); startController = controller;
+                    const previousRelease = releaseContext;
+                    releaseContext = acquireSpeechContext(graph!.context);
+                    previousRelease();
+                    return resumeSpeechContext(graph!.context, false, controller.signal).then(() => {
                         // pause/stop already released this attempt. A newer resume may
                         // now own the same element; a stale callback must not suspend it.
                         if (settled || attempt !== playAttempt) return;
@@ -408,25 +428,103 @@ let _ttsVolume = ((): number => {
 // Live gain node of the currently-playing AudioContext clip, so the slider can
 // adjust volume mid-sentence.
 let _activeGain: GainNode | null = null;
-const _activeMediaElements = new Set<HTMLAudioElement>();
 const _mediaVolumeUpdates = new Set<() => void>();
 
-function suspendIdleSpeechContext() {
-    if (_activeGain || _activeMediaElements.size) return;
-    try { void _audioCtx?.suspend(); } catch { /* Already closed/suspended. */ }
+type SpeechContextState = {
+    owners: Set<symbol>;
+    suspending: Promise<void> | null;
+    resuming: Promise<void> | null;
+};
+const _speechContexts = new WeakMap<AudioContext, SpeechContextState>();
+function speechContextState(context: AudioContext): SpeechContextState {
+    let state = _speechContexts.get(context);
+    if (!state) { state = { owners: new Set(), suspending: null, resuming: null }; _speechContexts.set(context, state); }
+    return state;
 }
 
-async function resumeSpeechContext(context: AudioContext) {
-    if (context.state !== "running" && context.state !== "closed") {
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        try {
-            await Promise.race([
-                context.resume().then(suspendIdleSpeechContext),
-                new Promise(resolve => { timer = setTimeout(resolve, 800); }),
-            ]);
-        } finally { clearTimeout(timer); }
+function speechContextReady(context: AudioContext) {
+    const state = speechContextState(context);
+    return context.state === "running" && !state.suspending && !state.resuming;
+}
+
+function acquireSpeechContext(context: AudioContext) {
+    const state = speechContextState(context), owner = Symbol();
+    state.owners.add(owner);
+    return (keepRunning = false) => { if (state.owners.delete(owner) && !keepRunning) suspendIdleSpeechContext(context); };
+}
+
+function suspendIdleSpeechContext(context = _audioCtx) {
+    if (!context || context.state === "closed") return;
+    const state = speechContextState(context);
+    if (state.owners.size || state.suspending) return;
+    // A late resume must finish before handing the session back to the mic.
+    if (state.resuming) { void state.resuming.then(() => suspendIdleSpeechContext(context), () => suspendIdleSpeechContext(context)); return; }
+    if (context.state === "suspended") return;
+    try {
+        const pending = context.suspend().catch(() => {});
+        state.suspending = pending;
+        void pending.then(() => { if (state.suspending === pending) state.suspending = null; });
+    } catch { /* Already closed/suspended. */ }
+}
+
+/** Resume + a render-thread acknowledgement, with no content transport running.
+ * The one-frame silent source is separate from the media, not padding or a delay.
+ * Keep the existing bounded native fallback when Web Audio cannot make progress. */
+async function resumeSpeechContext(context: AudioContext, gesture = false, signal?: AbortSignal) {
+    const state = speechContextState(context);
+    // Permission must be requested synchronously in the gesture, even if an older
+    // suspend is pending. We still reconcile that suspend before starting content.
+    const permission = gesture ? context.resume() : null;
+    if (permission) void permission.catch(() => {});
+    if (!state.resuming || permission) {
+        const previous = state.resuming;
+        const pending = (async () => {
+            if (state.suspending) await state.suspending;
+            if (previous) await previous.catch(() => {});
+            if (permission) await permission;
+            if (context.state !== "running") await context.resume();
+        })();
+        state.resuming = pending;
+        const completed = () => {
+            if (state.resuming === pending) state.resuming = null;
+            if (!state.owners.size) suspendIdleSpeechContext(context);
+        };
+        void pending.then(completed, completed);
     }
-    if (context.state !== "running") throw new Error("audio_context_not_running");
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let probe: AudioBufferSourceNode | null = null;
+    let finished = false;
+    let onAbort = () => {};
+    try {
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        await Promise.race([
+            (async () => {
+                await state.resuming;
+                if (finished) return;
+                if (context.state !== "running") throw new Error("audio_context_not_running");
+                await new Promise<void>((resolve, reject) => {
+                    try {
+                        probe = context.createBufferSource();
+                        probe.buffer = context.createBuffer(1, 1, context.sampleRate);
+                        probe.connect(context.destination);
+                        probe.onended = () => resolve();
+                        probe.start();
+                    } catch (error) { reject(error); }
+                });
+            })(),
+            new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("audio_context_not_ready")), 800); }),
+            new Promise<never>((_, reject) => {
+                onAbort = () => reject(new DOMException("Aborted", "AbortError"));
+                signal?.addEventListener("abort", onAbort, { once: true });
+            }),
+        ]);
+        if (context.state !== "running" || state.suspending) throw new Error("audio_context_not_ready");
+    } finally {
+        finished = true;
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        if (probe) { const source = probe as AudioBufferSourceNode; source.onended = null; try { source.stop(); } catch {} source.disconnect(); }
+    }
 }
 
 function watchSpeechPlaybackVolume(config: VoiceApiConfig | null | undefined, update: (latest: VoiceApiConfig | null) => void) {
@@ -464,9 +562,7 @@ let _callAudioSessionActive = false;
 /** 通话界面挂载时置 true、卸载/挂断时置 false（false 时立即挂起空闲的上下文）。 */
 export function setCallAudioSessionActive(active: boolean): void {
     _callAudioSessionActive = active;
-    if (!active && _audioCtx && !_activeGain && !_activeMediaElements.size) {
-        try { void _audioCtx.suspend(); } catch { /* ignore */ }
-    }
+    if (!active) suspendIdleSpeechContext();
 }
 
 function getAudioContext(): AudioContext | null {
@@ -521,13 +617,9 @@ export function unlockAudioPlayback(): void {
     // resumed under a gesture, subsequent programmatic resume()s are allowed.
     // 非通话期只借这次手势拿"授权"，随即挂起——不让页面平时一直持有音频会话。
     const ctx = getAudioContext();
-    if (ctx && ctx.state !== "running" && ctx.state !== "closed") {
-        const keepRunning = _callAudioSessionActive;
-        ctx.resume().then(() => {
-            if (!keepRunning && !_activeGain && !_activeMediaElements.size && !_callAudioSessionActive) {
-                try { void ctx.suspend(); } catch { /* ignore */ }
-            }
-        }).catch(() => {});
+    if (ctx && !speechContextReady(ctx) && ctx.state !== "closed") {
+        const release = acquireSpeechContext(ctx);
+        void resumeSpeechContext(ctx, true).catch(() => {}).finally(() => release(_callAudioSessionActive));
     }
 
     // Fallback path: unlock the shared <audio> element once.
@@ -626,8 +718,11 @@ export function playAudioBlob(blob: Blob, config?: VoiceApiConfig | null): { pro
     let updateLocalVolume = () => {};
     let removeVoiceListener = watchSpeechPlaybackVolume(config, latest => { latestVoice = latest; updateLocalVolume(); });
     let fallbackAbort: (() => void) | null = null;
+    const releaseContext = acquireSpeechContext(ctx);
+    const startController = new AbortController();
 
     const cleanupWebAudio = () => {
+        startController.abort();
         if (source) {
             source.onended = null;
             try { source.stop(); } catch {}
@@ -640,7 +735,7 @@ export function playAudioBlob(blob: Blob, config?: VoiceApiConfig | null): { pro
         if (_activeGain === gain) _activeGain = null;
         gain = null;
         // Suspend so iOS hands the audio session back to the microphone.
-        suspendIdleSpeechContext();
+        releaseContext();
     };
 
     const finalize = () => {
@@ -655,16 +750,9 @@ export function playAudioBlob(blob: Blob, config?: VoiceApiConfig | null): { pro
         resolveFn = resolve;
         (async () => {
             try {
-                if (ctx.state !== "running" && ctx.state !== "closed") {
-                    // 程序化 resume 在部分安卓浏览器上会被拒绝，甚至让 promise 永远
-                    // 悬着（要等下一次用户手势）。限时等待后检查状态，走不通就回落。
-                    await Promise.race([
-                        ctx.resume().then(() => { if (settled) suspendIdleSpeechContext(); }).catch(() => {}),
-                        new Promise(r => setTimeout(r, 800)),
-                    ]);
-                }
-                if (ctx.state !== "running") throw new Error("audio_context_not_running");
                 const audioBuffer = await decodeAudio(ctx, await blob.arrayBuffer());
+                if (settled) return;
+                await resumeSpeechContext(ctx, false, startController.signal);
                 if (settled) return;
                 source = ctx.createBufferSource();
                 source.buffer = audioBuffer;

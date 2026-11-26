@@ -1,19 +1,20 @@
 // Synthetic audio lifecycle and provider contracts. No network, microphone, or paid API.
 const fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript'),assert=require('node:assert/strict');
-let configs=[], media=[], contexts=[], denyResume=false, resumeGate=null, primeGate=null, decodeGate=null;
+let configs=[], media=[], contexts=[], denyResume=false, resumeGate=null, suspendGate=null, probeGate=null, primeGate=null, decodeGate=null;
 class Node {
  constructor(context,kind){this.context=context;this.kind=kind;this.gain={value:1};this.connections=[];}
  connect(node){this.connections.push(node);return node;}
  disconnect(){this.connections=[];}
 }
 class Context {
- constructor(){this.state='suspended';this.destination=new Node(this,'destination');this.mediaSources=[];this.bufferSources=[];contexts.push(this);}
+ constructor(){this.state='suspended';this.sampleRate=48000;this.destination=new Node(this,'destination');this.mediaSources=[];this.bufferSources=[];contexts.push(this);}
  resume(){if(denyResume)return Promise.reject(Error('resume blocked'));if(resumeGate)return resumeGate.then(()=>{this.state='running';});this.state='running';return Promise.resolve();}
- suspend(){this.state='suspended';return Promise.resolve();}
+ suspend(){if(suspendGate)return suspendGate.then(()=>{this.state='suspended';});this.state='suspended';return Promise.resolve();}
  createGain(){return new Node(this,'gain');}
  createWaveShaper(){return new Node(this,'shaper');}
  createMediaElementSource(audio){const n=new Node(this,'media');n.audio=audio;this.mediaSources.push(n);return n;}
- createBufferSource(){const n=new Node(this,'buffer');n.start=()=>{};n.stop=()=>{};this.bufferSources.push(n);return n;}
+ createBuffer(){return {probe:true};}
+ createBufferSource(){const n=new Node(this,'buffer');n.start=()=>{if(n.buffer?.probe)(probeGate||Promise.resolve()).then(()=>n.onended?.());else this.bufferSources.push(n);};n.stop=()=>{};return n;}
  decodeAudioData(_bytes,resolve){const result=(decodeGate||Promise.resolve()).then(()=>({synthetic:true}));result.then(resolve);return result;}
 }
 class Audio {
@@ -74,6 +75,23 @@ let passed=0;const check=(value,name)=>{assert.ok(value,name);passed++;console.l
  const fastPlayer=service.createSpeechMediaPlayer();fastPlayer.setVoiceConfig(voice('a',2));const fastClip=fastPlayer.play(blob);fastClip.pause();const fastResume=fastClip.resume();releaseFastResume();
  await Promise.all([fastClip.started,fastResume]);resumeGate=null;
  check(context.state==='running'&&!media.at(-1).paused,'stale resume completion cannot suspend a newer resume on the same element');fastClip.stop();fastPlayer.dispose();
+ configs=[voice('a',.5)];const racePlayer=service.createSpeechMediaPlayer();racePlayer.setVoiceConfig(configs[0]);
+ const oldRace=racePlayer.play(blob);await oldRace.started;let releaseSuspend;suspendGate=new Promise(resolve=>{releaseSuspend=resolve;});oldRace.stop();
+ const newRace=racePlayer.play(blob);await tick();
+ check(context.state==='running'&&media.at(-1).paused,'running state with a pending suspend must not advance content');
+ releaseSuspend();await newRace.started;suspendGate=null;
+ check(context.state==='running'&&!media.at(-1).paused,'new playback awaits old suspend then resumes before starting');newRace.stop();
+ let releaseProbe;probeGate=new Promise(resolve=>{releaseProbe=resolve;});const pendingProbe=racePlayer.play(blob);await tick();
+ check(context.state==='running'&&media.at(-1).paused,'resume completion alone cannot start content before the render acknowledgement');
+ pendingProbe.stop();await pendingProbe.started;probeGate=null;
+ const afterProbeStop=racePlayer.play(blob);await afterProbeStop.started;releaseProbe();await tick();
+ check(context.state==='running'&&!media.at(-1).paused,'stopped render probe and its late completion cannot interrupt replay');afterProbeStop.stop();racePlayer.dispose();
+ const livePlayer=service.createSpeechMediaPlayer({useGlobalVolume:false});configs=[voice('live',1)];livePlayer.setVoiceConfig(configs[0]);
+ const live=livePlayer.play(blob);await live.started;const liveAudio=media.at(-1);liveAudio.currentTime=.08;
+ let releaseLiveResume;resumeGate=new Promise(resolve=>{releaseLiveResume=resolve;});configs=[voice('live',.5)];refresh();await tick();
+ check(liveAudio.paused&&liveAudio.currentTime===.08,'first live gain connection freezes native transport before routing into a cold context');
+ releaseLiveResume();await tick();resumeGate=null;
+ check(!liveAudio.paused&&liveAudio.currentTime===.08,'live gain resumes the retained position after output acknowledgement');live.stop();livePlayer.dispose();
  service.setTtsVolume(.6);configs=[voice('a',2),voice('b',.2)];
  const a=service.playAudioBlob(blob,configs[0]);await tick();await tick();
  const buffer=context.bufferSources.at(-1);let chain=pathFrom(buffer);
